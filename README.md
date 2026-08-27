@@ -2,6 +2,8 @@
 
 A local-first byte inspector for hex, binary, integers, endianness, and text.
 
+[Live demo](https://bitpeek-seven.vercel.app)
+
 ## Features
 
 - Parse hex, binary, decimal bytes, and UTF-8 text
