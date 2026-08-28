@@ -21,6 +21,7 @@ interface ByteToolsProps {
   onGoToOffset: (input: string) => string | null
   onSelectAll: () => void
   onTransform: (operation: RangeOperation) => void
+  onOpenStrings: () => void
   onUndo: () => void
   onRedo: () => void
 }
@@ -44,6 +45,7 @@ export function ByteTools({
   onGoToOffset,
   onSelectAll,
   onTransform,
+  onOpenStrings,
   onUndo,
   onRedo,
 }: ByteToolsProps) {
@@ -185,6 +187,19 @@ export function ByteTools({
           disabled={selectionLength === 0}
         >
           Invert
+        </button>
+      </div>
+
+      <div className="tool-divider" aria-hidden="true" />
+
+      <div className="tool-group analysis-tools" aria-label="Document analysis">
+        <button
+          type="button"
+          onClick={onOpenStrings}
+          disabled={byteCount === 0}
+          title="Extract printable ASCII and UTF-16 strings"
+        >
+          Strings
         </button>
       </div>
 

@@ -1,8 +1,9 @@
 interface HeaderProps {
   onHelp: () => void
+  onSupport: () => void
 }
 
-export function Header({ onHelp }: HeaderProps) {
+export function Header({ onHelp, onSupport }: HeaderProps) {
   return (
     <header className="app-header">
       <div className="brand">
@@ -18,6 +19,9 @@ export function Header({ onHelp }: HeaderProps) {
         >
           GitHub
         </a>
+        <button type="button" className="header-text-action" onClick={onSupport}>
+          Support
+        </button>
         <button
           type="button"
           className="help-link"

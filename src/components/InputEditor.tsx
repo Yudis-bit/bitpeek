@@ -12,6 +12,7 @@ interface InputEditorProps {
   onModeChange: (mode: InputMode) => void
   onSourceChange: (source: string) => void
   onOpenFile: (file: File) => void
+  onOpenComparison: (file: File) => void
   onSaveFile: () => void
   onClear: () => void
   onCopy: () => void
@@ -44,6 +45,7 @@ export function InputEditor({
   onModeChange,
   onSourceChange,
   onOpenFile,
+  onOpenComparison,
   onSaveFile,
   onClear,
   onCopy,
@@ -156,6 +158,18 @@ export function InputEditor({
               onChange={(event) => {
                 const file = event.target.files?.[0]
                 if (file) onOpenFile(file)
+                event.target.value = ''
+              }}
+            />
+          </label>
+          <label className="file-action" title="Compare a local file by offset">
+            Compare
+            <input
+              type="file"
+              aria-label="Open comparison file"
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                if (file) onOpenComparison(file)
                 event.target.value = ''
               }}
             />

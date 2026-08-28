@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import {
   crc16CcittFalse,
   crc32Ieee,
@@ -24,6 +25,7 @@ import {
   unsignedLittleEndian,
   type SelectionRange,
 } from '../lib/bytes'
+import { digestHex } from '../lib/crypto'
 
 interface InterpretationPanelProps {
   bytes: Uint8Array
@@ -92,10 +94,43 @@ export function InterpretationPanel({
   range,
   onCopy,
 }: InterpretationPanelProps) {
+  const [digests, setDigests] = useState<{
+    source: Uint8Array | null
+    sha256: string | null
+    sha512: string | null
+    error: boolean
+  }>({ source: null, sha256: null, sha512: null, error: false })
   const length = bytes.length
   const bitWidth = length * 8
   const hasInteger = length > 0 && length <= 8
   const signature = detectFileSignature(documentBytes)
+
+  useEffect(() => {
+    let active = true
+    if (bytes.length === 0) return
+
+    void Promise.all([
+      digestHex(bytes, 'SHA-256'),
+      digestHex(bytes, 'SHA-512'),
+    ])
+      .then(([sha256, sha512]) => {
+        if (active) setDigests({ source: bytes, sha256, sha512, error: false })
+      })
+      .catch(() => {
+        if (active) {
+          setDigests({ source: bytes, sha256: null, sha512: null, error: true })
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [bytes])
+
+  const currentDigests =
+    digests.source === bytes
+      ? digests
+      : { source: null, sha256: null, sha512: null, error: false }
 
   const unsignedBe = hasInteger ? unsignedBigEndian(bytes).toString() : ''
   const signedBe = hasInteger ? signedBigEndian(bytes).toString() : ''
@@ -345,6 +380,38 @@ export function InterpretationPanel({
               <div>
                 <dt>Entropy</dt>
                 <dd>{shannonEntropy(bytes).toFixed(3)} bits / byte</dd>
+              </div>
+              <div>
+                <dt>SHA-256</dt>
+                <dd>
+                  {currentDigests.sha256 ? (
+                    <ValueWithCopy
+                      value={currentDigests.sha256}
+                      label="SHA-256"
+                      onCopy={onCopy}
+                    />
+                  ) : (
+                    <code>
+                      {currentDigests.error ? 'Unavailable' : 'Computing…'}
+                    </code>
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt>SHA-512</dt>
+                <dd>
+                  {currentDigests.sha512 ? (
+                    <ValueWithCopy
+                      value={currentDigests.sha512}
+                      label="SHA-512"
+                      onCopy={onCopy}
+                    />
+                  ) : (
+                    <code>
+                      {currentDigests.error ? 'Unavailable' : 'Computing…'}
+                    </code>
+                  )}
+                </dd>
               </div>
             </dl>
           </section>

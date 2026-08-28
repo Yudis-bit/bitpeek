@@ -62,6 +62,24 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
       </section>
 
       <section>
+        <h3>Compare and patch</h3>
+        <p>
+          Compare loads a second local file and performs an offset-aligned byte
+          diff. Navigate each change or export a reference-to-current JSON patch
+          with SHA-256 source and target fingerprints.
+        </p>
+      </section>
+
+      <section>
+        <h3>Analysis</h3>
+        <p>
+          Selection analysis includes numeric interpretations, CRC, entropy,
+          SHA-256, and SHA-512. Strings scans the document for printable ASCII
+          and ASCII-like UTF-16 data.
+        </p>
+      </section>
+
+      <section>
         <h3>Keyboard</h3>
         <dl className="shortcut-list">
           {shortcuts.map(([keys, action]) => (

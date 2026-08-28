@@ -28,6 +28,8 @@ interface ByteTableProps {
   searchOffsets: number[]
   searchLength: number
   activeSearchOffset: number | null
+  diffOffsets: number[]
+  activeDiffOffset: number | null
   onSelectionChange: (selection: ByteSelection | null) => void
   onByteEdit: (index: number, value: number) => void
 }
@@ -48,6 +50,8 @@ export function ByteTable({
   searchOffsets,
   searchLength,
   activeSearchOffset,
+  diffOffsets,
+  activeDiffOffset,
   onSelectionChange,
   onByteEdit,
 }: ByteTableProps) {
@@ -60,6 +64,7 @@ export function ByteTable({
   const [viewportHeight, setViewportHeight] = useState(360)
   const [editing, setEditing] = useState<EditState | null>(null)
   const range = getSelectionRange(selection, bytes.length)
+  const diffIndexes = useMemo(() => new Set(diffOffsets), [diffOffsets])
   const totalRows = Math.ceil(bytes.length / BYTES_PER_ROW)
   const bodyScrollTop = Math.max(0, scrollTop - HEADER_HEIGHT)
   const firstRow = Math.max(
@@ -311,6 +316,8 @@ export function ByteTable({
                           ? isWithin(index, range.start, range.end)
                           : false
                         const searchMatch = visibleMatchIndexes.has(index)
+                        const diffMatch = diffIndexes.has(index)
+                        const activeDiff = activeDiffOffset === index
                         const activeMatch =
                           activeSearchOffset !== null &&
                           isWithin(
@@ -320,6 +327,8 @@ export function ByteTable({
                           )
                         const classes = [
                           'byte-cell',
+                          diffMatch ? 'is-diff' : '',
+                          activeDiff ? 'is-active-diff' : '',
                           searchMatch ? 'is-match' : '',
                           activeMatch ? 'is-active-match' : '',
                           selected ? 'is-selected' : '',
@@ -414,11 +423,15 @@ export function ByteTable({
                           ? isWithin(index, range.start, range.end)
                           : false
                         const searchMatch = visibleMatchIndexes.has(index)
+                        const diffMatch = diffIndexes.has(index)
+                        const activeDiff = activeDiffOffset === index
                         return (
                           <span
                             key={index}
                             className={[
                               'ascii-cell',
+                              diffMatch ? 'is-diff' : '',
+                              activeDiff ? 'is-active-diff' : '',
                               searchMatch ? 'is-match' : '',
                               selected ? 'is-selected' : '',
                             ]

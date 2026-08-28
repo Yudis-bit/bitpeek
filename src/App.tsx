@@ -2,10 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BitInspector } from './components/BitInspector'
 import { ByteTable } from './components/ByteTable'
 import { ByteTools } from './components/ByteTools'
+import { DiffBar } from './components/DiffBar'
 import { Header } from './components/Header'
 import { HelpDialog } from './components/HelpDialog'
 import { InputEditor } from './components/InputEditor'
 import { InterpretationPanel } from './components/InterpretationPanel'
+import { StringScannerDialog } from './components/StringScannerDialog'
+import { SupportDialog } from './components/SupportDialog'
 import { useClipboard } from './hooks/useClipboard'
 import {
   findBytePattern,
@@ -25,6 +28,12 @@ import {
   type ByteSelection,
   type InputMode,
 } from './lib/bytes'
+import { digestHex } from './lib/crypto'
+import {
+  createOffsetPatch,
+  diffBytes,
+  serializeOffsetPatch,
+} from './lib/diff'
 import {
   appendPatch,
   applyPatch,
@@ -33,6 +42,7 @@ import {
   type BytePatch,
   type RangeOperation,
 } from './lib/edits'
+import { ETHEREUM_ADDRESS } from './lib/support'
 
 const DEFAULT_BYTES = Uint8Array.from([
   0xde, 0xad, 0xbe, 0xef, 0x00, 0x01, 0x7f, 0x80,
@@ -43,6 +53,11 @@ const MAX_DOCUMENT_BYTES = 256 * 1024
 interface HistoryState {
   undo: BytePatch[]
   redo: BytePatch[]
+}
+
+interface ComparisonDocument {
+  name: string
+  bytes: Uint8Array
 }
 
 function initialMode(): InputMode {
@@ -93,7 +108,13 @@ export default function App() {
   const [searchMode, setSearchMode] = useState<SearchMode>('hex')
   const [searchQuery, setSearchQuery] = useState('')
   const [activeMatchIndex, setActiveMatchIndex] = useState(-1)
+  const [comparison, setComparison] = useState<ComparisonDocument | null>(null)
+  const [activeDifferenceIndex, setActiveDifferenceIndex] = useState(-1)
+  const [stringsOpen, setStringsOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [supportOpen, setSupportOpen] = useState(
+    () => window.location.hash === '#support',
+  )
   const baselineRef = useRef<Uint8Array | null>(null)
   const { notice, copy } = useClipboard()
 
@@ -121,6 +142,26 @@ export default function App() {
       truncated: matches.truncated,
     }
   }, [bytes, searchMode, searchQuery])
+
+  const comparisonDiff = useMemo(
+    () => (comparison ? diffBytes(bytes, comparison.bytes) : null),
+    [bytes, comparison],
+  )
+  const activeDifference =
+    comparisonDiff && comparisonDiff.offsets.length > 0
+      ? Math.min(activeDifferenceIndex, comparisonDiff.offsets.length - 1)
+      : -1
+  const activeDifferenceOffset =
+    activeDifference >= 0
+      ? (comparisonDiff?.offsets[activeDifference] ?? null)
+      : null
+  const currentDifferenceOffsets = useMemo(
+    () =>
+      comparisonDiff
+        ? comparisonDiff.offsets.filter((offset) => offset < bytes.length)
+        : [],
+    [bytes.length, comparisonDiff],
+  )
 
   const activeMatch =
     search.offsets.length === 0
@@ -199,6 +240,14 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleGlobalKeys)
   }, [handleRedo, handleUndo])
 
+  useEffect(() => {
+    const syncSupportHash = () => {
+      setSupportOpen(window.location.hash === '#support')
+    }
+    window.addEventListener('hashchange', syncSupportHash)
+    return () => window.removeEventListener('hashchange', syncSupportHash)
+  }, [])
+
   const commitMutation = (
     nextBytes: Uint8Array,
     start: number,
@@ -260,6 +309,8 @@ export default function App() {
     baselineRef.current = null
     setHistory({ undo: [], redo: [] })
     setActiveMatchIndex(-1)
+    setComparison(null)
+    setActiveDifferenceIndex(-1)
   }
 
   const handleOpenFile = async (file: File) => {
@@ -284,6 +335,26 @@ export default function App() {
       setActiveMatchIndex(-1)
     } catch {
       setError('The selected file could not be read.')
+    }
+  }
+
+  const handleOpenComparison = async (file: File) => {
+    if (file.size > MAX_DOCUMENT_BYTES) {
+      setError('Comparison file exceeds the 256 KiB workspace limit.')
+      return
+    }
+    try {
+      const referenceBytes = new Uint8Array(await file.arrayBuffer())
+      const nextDiff = diffBytes(bytes, referenceBytes)
+      setComparison({ name: file.name, bytes: referenceBytes })
+      setActiveDifferenceIndex(nextDiff.offsets.length > 0 ? 0 : -1)
+      setError(null)
+      const firstOffset = nextDiff.offsets[0]
+      if (firstOffset !== undefined && firstOffset < bytes.length) {
+        setSelection({ anchor: firstOffset, focus: firstOffset })
+      }
+    } catch {
+      setError('The comparison file could not be read.')
     }
   }
 
@@ -355,9 +426,80 @@ export default function App() {
     return null
   }
 
+  const handleNavigateDifference = (direction: 1 | -1) => {
+    if (!comparisonDiff || comparisonDiff.offsets.length === 0) return
+    const next =
+      activeDifference < 0
+        ? direction === 1
+          ? 0
+          : comparisonDiff.offsets.length - 1
+        : (activeDifference + direction + comparisonDiff.offsets.length) %
+          comparisonDiff.offsets.length
+    const offset = comparisonDiff.offsets[next]
+    if (offset === undefined) return
+    setActiveDifferenceIndex(next)
+    if (offset < bytes.length) setSelection({ anchor: offset, focus: offset })
+  }
+
+  const createPatchText = async (): Promise<string> => {
+    if (!comparison) return ''
+    const [referenceSha256, currentSha256] = await Promise.all([
+      digestHex(comparison.bytes, 'SHA-256'),
+      digestHex(bytes, 'SHA-256'),
+    ])
+    return serializeOffsetPatch(
+      createOffsetPatch(comparison.bytes, bytes, {
+        referenceName: comparison.name,
+        currentName: documentName ?? 'current.bin',
+        referenceSha256,
+        currentSha256,
+      }),
+    )
+  }
+
+  const handleCopyPatch = async () => {
+    const value = await createPatchText()
+    if (value) await copy(value, 'offset patch')
+  }
+
+  const handleDownloadPatch = async () => {
+    const value = await createPatchText()
+    if (!value) return
+    const baseName = (documentName ?? 'current').replace(/\.[^.]+$/, '')
+    const blob = new Blob([value], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = baseName + '.bitpeek.patch.json'
+    document.body.append(anchor)
+    anchor.click()
+    anchor.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 1_000)
+  }
+
+  const openSupport = () => {
+    window.history.replaceState(
+      null,
+      '',
+      window.location.pathname + window.location.search + '#support',
+    )
+    setSupportOpen(true)
+  }
+
+  const closeSupport = () => {
+    if (window.location.hash === '#support') {
+      window.history.replaceState(
+        null,
+        '',
+        window.location.pathname + window.location.search,
+      )
+    }
+    setSupportOpen(false)
+  }
+
   return (
     <div className="app-shell">
-      <Header onHelp={() => setHelpOpen(true)} />
+      <Header onHelp={() => setHelpOpen(true)} onSupport={openSupport} />
       <main className="workbench">
         <InputEditor
           mode={mode}
@@ -370,6 +512,7 @@ export default function App() {
           onModeChange={handleModeChange}
           onSourceChange={handleSourceChange}
           onOpenFile={(file) => void handleOpenFile(file)}
+          onOpenComparison={(file) => void handleOpenComparison(file)}
           onSaveFile={handleSaveFile}
           onClear={handleClear}
           onCopy={() => void copy(source, mode + ' input')}
@@ -404,9 +547,28 @@ export default function App() {
             }
           }}
           onTransform={handleTransform}
+          onOpenStrings={() => setStringsOpen(true)}
           onUndo={handleUndo}
           onRedo={handleRedo}
         />
+
+        {comparison && comparisonDiff ? (
+          <DiffBar
+            currentName={documentName ?? 'current bytes'}
+            referenceName={comparison.name}
+            currentBytes={bytes}
+            referenceBytes={comparison.bytes}
+            diff={comparisonDiff}
+            activeIndex={activeDifference}
+            onNavigate={handleNavigateDifference}
+            onCopyPatch={() => void handleCopyPatch()}
+            onDownloadPatch={() => void handleDownloadPatch()}
+            onClose={() => {
+              setComparison(null)
+              setActiveDifferenceIndex(-1)
+            }}
+          />
+        ) : null}
 
         <div className="split-workspace">
           <ByteTable
@@ -415,6 +577,13 @@ export default function App() {
             searchOffsets={search.offsets}
             searchLength={search.patternLength}
             activeSearchOffset={activeSearchOffset}
+            diffOffsets={currentDifferenceOffsets}
+            activeDiffOffset={
+              activeDifferenceOffset !== null &&
+              activeDifferenceOffset < bytes.length
+                ? activeDifferenceOffset
+                : null
+            }
             onSelectionChange={setSelection}
             onByteEdit={handleByteEdit}
           />
@@ -444,10 +613,29 @@ export default function App() {
           >
             Yudis
           </a>
+          <span aria-hidden="true"> · </span>
+          <button type="button" className="footer-link" onClick={openSupport}>
+            Support development
+          </button>
         </span>
       </footer>
 
       <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
+      <StringScannerDialog
+        open={stringsOpen}
+        bytes={bytes}
+        onClose={() => setStringsOpen(false)}
+        onSelect={(offset, byteLength) => {
+          setSelection({ anchor: offset, focus: offset + byteLength - 1 })
+          setStringsOpen(false)
+        }}
+        onCopy={(value, label) => void copy(value, label)}
+      />
+      <SupportDialog
+        open={supportOpen}
+        onClose={closeSupport}
+        onCopyAddress={() => void copy(ETHEREUM_ADDRESS, 'Ethereum address')}
+      />
       <div className="copy-notice" role="status" aria-live="polite">
         {notice}
       </div>
