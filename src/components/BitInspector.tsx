@@ -1,4 +1,4 @@
-import { formatBinary, type SelectionRange } from '../lib/bytes'
+import type { SelectionRange } from '../lib/bytes'
 
 interface BitInspectorProps {
   bytes: Uint8Array
@@ -29,8 +29,10 @@ export function BitInspector({ bytes, range, onToggle }: BitInspectorProps) {
         <div className="bits-placeholder">Select one byte to inspect its bits.</div>
       ) : singleByte === undefined ? (
         <div className="multi-bit-view">
-          <span>Selected binary</span>
-          <code>{formatBinary(bytes)}</code>
+          <span>Range</span>
+          <code>
+            {bytes.length} bytes · {bytes.length * 8} bits
+          </code>
           <small>Select exactly one byte to toggle individual bits.</small>
         </div>
       ) : (

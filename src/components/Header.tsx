@@ -1,4 +1,8 @@
-export function Header() {
+interface HeaderProps {
+  onHelp: () => void
+}
+
+export function Header({ onHelp }: HeaderProps) {
   return (
     <header className="app-header">
       <div className="brand">
@@ -14,9 +18,14 @@ export function Header() {
         >
           GitHub
         </a>
-        <a className="help-link" href="#privacy" aria-label="About bitpeek">
+        <button
+          type="button"
+          className="help-link"
+          onClick={onHelp}
+          aria-label="Open bitpeek help"
+        >
           ?
-        </a>
+        </button>
       </nav>
     </header>
   )

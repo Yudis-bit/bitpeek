@@ -1,16 +1,17 @@
 # bitpeek
 
-A local-first byte inspector for hex, binary, integers, endianness, and text.
+A local-first binary workbench for inspecting and editing raw bytes in the browser.
 
 [Live demo](https://bitpeek-seven.vercel.app)
 
 ## Features
 
-- Parse hex, binary, decimal bytes, and UTF-8 text
-- Inspect offsets, ASCII, numeric values, endianness, and two's-complement values
-- Select byte ranges with mouse or keyboard controls
-- Toggle individual bits and keep the active source representation synchronized
-- Copy selected representations without sending data anywhere
+- Parse hex, binary, decimal, UTF-8 text, and Base64
+- Open, edit, and save local binary files without uploads
+- Find exact or wildcard byte patterns and jump directly to offsets
+- Inspect signed integers, endianness, floats, text, checksums, entropy, and file signatures
+- Edit bytes and bits directly with selection transforms and undo/redo
+- Navigate large inputs through a virtualized hex and ASCII view
 
 ## Screenshot
 

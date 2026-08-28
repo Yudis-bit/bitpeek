@@ -1,4 +1,4 @@
-export const INPUT_MODES = ['hex', 'binary', 'decimal', 'text'] as const
+export const INPUT_MODES = ['hex', 'binary', 'decimal', 'text', 'base64'] as const
 
 export type InputMode = (typeof INPUT_MODES)[number]
 
@@ -18,7 +18,14 @@ export interface SelectionRange {
 }
 
 const utf8Encoder = new TextEncoder()
-const utf8Decoder = new TextDecoder('utf-8', { fatal: false })
+const utf8Decoder = new TextDecoder('utf-8', {
+  fatal: false,
+  ignoreBOM: true,
+})
+const fatalUtf8Decoder = new TextDecoder('utf-8', {
+  fatal: true,
+  ignoreBOM: true,
+})
 
 function success(values: number[]): ParseResult {
   return { ok: true, bytes: Uint8Array.from(values) }
@@ -27,51 +34,63 @@ function success(values: number[]): ParseResult {
 export function parseHex(input: string): ParseResult {
   if (input.trim() === '') return success([])
 
-  const nibbles: number[] = []
-  let sawPrefix = false
+  const values: number[] = []
+  let cursor = 0
 
-  for (let index = 0; index < input.length; index += 1) {
-    const character = input[index]
-    if (character === undefined) continue
+  while (cursor < input.length) {
+    while (cursor < input.length && /[\s,:-]/.test(input[cursor] ?? '')) {
+      cursor += 1
+    }
+    if (cursor >= input.length) break
 
-    if (/\s|[,:-]/.test(character)) continue
-
-    const next = input[index + 1]
-    if (
-      character === '0' &&
-      (next === 'x' || next === 'X') &&
-      nibbles.length % 2 === 0
-    ) {
-      sawPrefix = true
-      index += 1
-      continue
+    const tokenStart = cursor
+    while (cursor < input.length && !/[\s,:-]/.test(input[cursor] ?? '')) {
+      cursor += 1
     }
 
-    if (!/[0-9a-fA-F]/.test(character)) {
+    const token = input.slice(tokenStart, cursor)
+    const hasPrefix = token.startsWith('0x') || token.startsWith('0X')
+    const digits = hasPrefix ? token.slice(2) : token
+    const digitStart = tokenStart + (hasPrefix ? 2 : 0)
+
+    if (digits.length === 0) {
       return {
         ok: false,
-        error: `Invalid hexadecimal character at position ${index + 1}.`,
+        error:
+          'Hex prefix at position ' +
+          (tokenStart + 1) +
+          ' is not followed by a byte.',
       }
     }
 
-    nibbles.push(Number.parseInt(character, 16))
-  }
-
-  if (nibbles.length === 0 && sawPrefix) {
-    return { ok: false, error: 'Hex input contains no bytes.' }
-  }
-
-  if (nibbles.length % 2 !== 0) {
-    return { ok: false, error: 'Incomplete hex byte at the end of input.' }
-  }
-
-  const values: number[] = []
-  for (let index = 0; index < nibbles.length; index += 2) {
-    const high = nibbles[index]
-    const low = nibbles[index + 1]
-    if (high !== undefined && low !== undefined) {
-      values.push((high << 4) | low)
+    for (let index = 0; index < digits.length; index += 1) {
+      if (!/[0-9a-fA-F]/.test(digits[index] ?? '')) {
+        return {
+          ok: false,
+          error:
+            'Invalid hexadecimal character at position ' +
+            (digitStart + index + 1) +
+            '.',
+        }
+      }
     }
+
+    if (digits.length % 2 !== 0) {
+      return cursor === input.length
+        ? { ok: false, error: 'Incomplete hex byte at the end of input.' }
+        : {
+            ok: false,
+            error: 'Incomplete hex byte before position ' + (cursor + 1) + '.',
+          }
+    }
+
+    for (let index = 0; index < digits.length; index += 2) {
+      values.push(Number.parseInt(digits.slice(index, index + 2), 16))
+    }
+  }
+
+  if (values.length === 0) {
+    return { ok: false, error: 'Hex input contains no bytes.' }
   }
 
   return success(values)
@@ -139,6 +158,53 @@ export function decodeUtf8(bytes: Uint8Array): string {
   return utf8Decoder.decode(bytes)
 }
 
+export function isValidUtf8(bytes: Uint8Array): boolean {
+  try {
+    fatalUtf8Decoder.decode(bytes)
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function parseBase64(input: string): ParseResult {
+  if (input.trim() === '') return success([])
+
+  for (let index = 0; index < input.length; index += 1) {
+    const character = input[index] ?? ''
+    if (!/\s|[A-Za-z0-9+/=_-]/.test(character)) {
+      return {
+        ok: false,
+        error: 'Invalid Base64 character at position ' + (index + 1) + '.',
+      }
+    }
+  }
+
+  const compact = input.replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/')
+  const paddingIndex = compact.indexOf('=')
+  const unpadded = paddingIndex === -1 ? compact : compact.slice(0, paddingIndex)
+  const padding = paddingIndex === -1 ? '' : compact.slice(paddingIndex)
+
+  if ((!/^={1,2}$/.test(padding) && padding !== '') || unpadded.includes('=')) {
+    return { ok: false, error: 'Base64 padding is only valid at the end.' }
+  }
+  if (padding !== '' && compact.length % 4 !== 0) {
+    return { ok: false, error: 'Invalid Base64 padding.' }
+  }
+  if (unpadded.length % 4 === 1) {
+    return { ok: false, error: 'Incomplete Base64 input.' }
+  }
+
+  const padded =
+    unpadded + (padding || '='.repeat((4 - (unpadded.length % 4)) % 4))
+  try {
+    const decoded = atob(padded)
+    return success(Array.from(decoded, (character) => character.charCodeAt(0)))
+  } catch {
+    return { ok: false, error: 'Invalid Base64 input.' }
+  }
+}
+
 export function parseInput(input: string, mode: InputMode): ParseResult {
   switch (mode) {
     case 'hex':
@@ -149,6 +215,8 @@ export function parseInput(input: string, mode: InputMode): ParseResult {
       return parseDecimal(input)
     case 'text':
       return { ok: true, bytes: encodeText(input) }
+    case 'base64':
+      return parseBase64(input)
   }
 }
 
@@ -168,6 +236,15 @@ export function formatDecimal(bytes: Uint8Array): string {
   return Array.from(bytes).join(' ')
 }
 
+export function formatBase64(bytes: Uint8Array): string {
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize))
+  }
+  return btoa(binary)
+}
+
 export function formatInput(bytes: Uint8Array, mode: InputMode): string {
   switch (mode) {
     case 'hex':
@@ -178,6 +255,8 @@ export function formatInput(bytes: Uint8Array, mode: InputMode): string {
       return formatDecimal(bytes)
     case 'text':
       return decodeUtf8(bytes)
+    case 'base64':
+      return formatBase64(bytes)
   }
 }
 
@@ -227,7 +306,8 @@ export function signedFromUnsigned(value: bigint, widthInBits: number): bigint {
   if (widthInBits <= 0) return 0n
   const signBit = 1n << BigInt(widthInBits - 1)
   const modulus = 1n << BigInt(widthInBits)
-  return (value & signBit) === 0n ? value : value - modulus
+  const normalized = value & (modulus - 1n)
+  return (normalized & signBit) === 0n ? normalized : normalized - modulus
 }
 
 export function signedBigEndian(bytes: Uint8Array): bigint {
