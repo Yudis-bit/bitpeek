@@ -4,4 +4,44 @@
     <loc>https://bitpeek-seven.vercel.app/</loc>
     <lastmod>2026-08-29</lastmod>
   </url>
+  <url>
+    <loc>https://bitpeek-seven.vercel.app/tools/hex-editor</loc>
+    <lastmod>2026-08-29</lastmod>
+  </url>
+  <url>
+    <loc>https://bitpeek-seven.vercel.app/tools/binary-viewer</loc>
+    <lastmod>2026-08-29</lastmod>
+  </url>
+  <url>
+    <loc>https://bitpeek-seven.vercel.app/tools/binary-diff</loc>
+    <lastmod>2026-08-29</lastmod>
+  </url>
+  <url>
+    <loc>https://bitpeek-seven.vercel.app/tools/file-signature-checker</loc>
+    <lastmod>2026-08-29</lastmod>
+  </url>
+  <url>
+    <loc>https://bitpeek-seven.vercel.app/tools/hex-to-text</loc>
+    <lastmod>2026-08-29</lastmod>
+  </url>
+  <url>
+    <loc>https://bitpeek-seven.vercel.app/file-formats/png</loc>
+    <lastmod>2026-08-29</lastmod>
+  </url>
+  <url>
+    <loc>https://bitpeek-seven.vercel.app/file-formats/jpeg</loc>
+    <lastmod>2026-08-29</lastmod>
+  </url>
+  <url>
+    <loc>https://bitpeek-seven.vercel.app/file-formats/pdf</loc>
+    <lastmod>2026-08-29</lastmod>
+  </url>
+  <url>
+    <loc>https://bitpeek-seven.vercel.app/file-formats/zip</loc>
+    <lastmod>2026-08-29</lastmod>
+  </url>
+  <url>
+    <loc>https://bitpeek-seven.vercel.app/file-formats/elf</loc>
+    <lastmod>2026-08-29</lastmod>
+  </url>
 </urlset>

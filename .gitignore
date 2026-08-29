@@ -10,3 +10,5 @@ coverage/
 .DS_Store
 Thumbs.db
 *.tsbuildinfo
+public/tools/*.html
+public/file-formats/*.html
