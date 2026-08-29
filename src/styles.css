@@ -158,78 +158,6 @@ code {
   color: var(--text);
 }
 
-.app-header {
-  height: 46px;
-  flex: 0 0 46px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 18px;
-  border-bottom: 1px solid var(--border);
-  background: #181b1e;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-}
-
-.brand-name {
-  color: var(--text-strong);
-  font-family: var(--mono);
-  font-size: 15px;
-  font-weight: 650;
-  letter-spacing: -0.02em;
-}
-
-.brand-separator {
-  width: 1px;
-  height: 15px;
-  margin: 0 10px;
-  background: var(--border);
-}
-
-.brand-subtitle {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 17px;
-  font-size: 12px;
-}
-
-.help-link {
-  width: 24px;
-  height: 24px;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  color: var(--muted);
-  font-family: var(--mono);
-  padding: 0;
-  background: transparent;
-  cursor: pointer;
-}
-
-.header-text-action {
-  height: 25px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.header-text-action:hover {
-  color: var(--text-strong);
-}
-
 .workbench {
   width: 100%;
   flex: 1;
@@ -1144,37 +1072,6 @@ code {
   grid-column: 2;
 }
 
-.app-footer {
-  flex: 0 0 auto;
-  min-height: 39px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 8px 18px;
-  border-top: 1px solid var(--border-subtle);
-  background: #151719;
-  color: var(--muted-quiet);
-  font-size: 10px;
-}
-
-.app-footer a {
-  color: var(--muted);
-}
-
-.footer-link {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  font-size: inherit;
-}
-
-.footer-link:hover {
-  color: var(--text-strong);
-}
-
 .copy-notice {
   position: fixed;
   right: 14px;
@@ -1658,18 +1555,6 @@ code {
     min-height: 34px;
   }
 
-  .app-header {
-    padding: 0 12px;
-  }
-
-  .brand-separator {
-    margin: 0 8px;
-  }
-
-  .header-actions {
-    gap: 10px;
-  }
-
   .input-panel {
     padding: 12px;
   }
@@ -1793,13 +1678,6 @@ code {
     padding-left: 12px;
   }
 
-  .app-footer {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 3px;
-    padding: 9px 12px;
-  }
-
   .shortcut-list > div {
     grid-template-columns: 145px 1fr;
   }
@@ -1841,13 +1719,6 @@ code {
   .support-actions button,
   .support-actions a {
     justify-content: center;
-  }
-}
-
-@media (max-width: 410px) {
-  .brand-subtitle,
-  .brand-separator {
-    display: none;
   }
 }
 

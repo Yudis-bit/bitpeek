@@ -1,13 +1,18 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { BitInspector } from './components/BitInspector'
 import { ByteTable } from './components/ByteTable'
 import { ByteTools } from './components/ByteTools'
 import { DiffBar } from './components/DiffBar'
-import { HelpDialog } from './components/HelpDialog'
 import { InputEditor } from './components/InputEditor'
 import { InterpretationPanel } from './components/InterpretationPanel'
-import { StringScannerDialog } from './components/StringScannerDialog'
-import { SupportDialog } from './components/SupportDialog'
 import { useClipboard } from './hooks/useClipboard'
 import {
   findBytePattern,
@@ -42,6 +47,22 @@ import {
   type RangeOperation,
 } from './lib/edits'
 import { ETHEREUM_ADDRESS } from './lib/support'
+
+const HelpDialog = lazy(() =>
+  import('./components/HelpDialog').then((module) => ({
+    default: module.HelpDialog,
+  })),
+)
+const StringScannerDialog = lazy(() =>
+  import('./components/StringScannerDialog').then((module) => ({
+    default: module.StringScannerDialog,
+  })),
+)
+const SupportDialog = lazy(() =>
+  import('./components/SupportDialog').then((module) => ({
+    default: module.SupportDialog,
+  })),
+)
 
 const DEFAULT_BYTES = Uint8Array.from([
   0xde, 0xad, 0xbe, 0xef, 0x00, 0x01, 0x7f, 0x80,
@@ -613,22 +634,32 @@ export default function App() {
         />
       </div>
 
-      <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
-      <StringScannerDialog
-        open={stringsOpen}
-        bytes={bytes}
-        onClose={() => setStringsOpen(false)}
-        onSelect={(offset, byteLength) => {
-          setSelection({ anchor: offset, focus: offset + byteLength - 1 })
-          setStringsOpen(false)
-        }}
-        onCopy={(value, label) => void copy(value, label)}
-      />
-      <SupportDialog
-        open={supportOpen}
-        onClose={closeSupport}
-        onCopyAddress={() => void copy(ETHEREUM_ADDRESS, 'Ethereum address')}
-      />
+      <Suspense fallback={null}>
+        {helpOpen ? (
+          <HelpDialog open onClose={() => setHelpOpen(false)} />
+        ) : null}
+        {stringsOpen ? (
+          <StringScannerDialog
+            open
+            bytes={bytes}
+            onClose={() => setStringsOpen(false)}
+            onSelect={(offset, byteLength) => {
+              setSelection({ anchor: offset, focus: offset + byteLength - 1 })
+              setStringsOpen(false)
+            }}
+            onCopy={(value, label) => void copy(value, label)}
+          />
+        ) : null}
+        {supportOpen ? (
+          <SupportDialog
+            open
+            onClose={closeSupport}
+            onCopyAddress={() =>
+              void copy(ETHEREUM_ADDRESS, 'Ethereum address')
+            }
+          />
+        ) : null}
+      </Suspense>
       <div className="copy-notice" role="status" aria-live="polite">
         {notice}
       </div>
