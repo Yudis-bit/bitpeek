@@ -3,6 +3,7 @@ import { INPUT_MODES, type InputMode } from '../lib/bytes'
 
 interface InputEditorProps {
   mode: InputMode
+  primaryAction: 'open' | 'compare' | null
   source: string
   error: string | null
   warning: string | null
@@ -36,6 +37,7 @@ const placeholders: Record<InputMode, string> = {
 
 export function InputEditor({
   mode,
+  primaryAction,
   source,
   error,
   warning,
@@ -151,7 +153,13 @@ export function InputEditor({
           )}
         </div>
         <div className="compact-actions">
-          <label className="file-action">
+          <label
+            className={
+              primaryAction === 'open'
+                ? 'file-action is-emphasized'
+                : 'file-action'
+            }
+          >
             Open
             <input
               type="file"
@@ -162,7 +170,14 @@ export function InputEditor({
               }}
             />
           </label>
-          <label className="file-action" title="Compare a local file by offset">
+          <label
+            className={
+              primaryAction === 'compare'
+                ? 'file-action is-emphasized'
+                : 'file-action'
+            }
+            title="Compare a local file by offset"
+          >
             Compare
             <input
               type="file"

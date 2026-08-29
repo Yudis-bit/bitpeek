@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">Bitpeek online hex editor and binary inspector</title>
+  <desc id="desc">A dark developer workbench card with hexadecimal bytes and local-first privacy messaging.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#121416"/>
+      <stop offset="1" stop-color="#1b252c"/>
+    </linearGradient>
+    <pattern id="grid" width="42" height="42" patternUnits="userSpaceOnUse">
+      <path d="M42 0H0V42" fill="none" stroke="#78a8c9" stroke-opacity=".06"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="630" fill="url(#background)"/>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+  <rect x="72" y="68" width="1056" height="494" rx="12" fill="#191c1f" stroke="#343a40"/>
+  <rect x="72" y="68" width="8" height="494" rx="4" fill="#78a8c9"/>
+  <text x="126" y="142" fill="#f1f4f6" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="32" font-weight="700">bitpeek</text>
+  <text x="126" y="242" fill="#f1f4f6" font-family="ui-sans-serif, -apple-system, Segoe UI, sans-serif" font-size="52" font-weight="650">Online Hex Editor</text>
+  <text x="126" y="304" fill="#aeb7bf" font-family="ui-sans-serif, -apple-system, Segoe UI, sans-serif" font-size="30">&amp; Binary Inspector</text>
+  <g font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="25">
+    <text x="126" y="397" fill="#78a8c9">000000</text>
+    <text x="260" y="397" fill="#e0e5e9">89 50 4E 47 0D 0A 1A 0A</text>
+    <text x="126" y="444" fill="#78a8c9">000008</text>
+    <text x="260" y="444" fill="#e0e5e9">00 00 00 0D 49 48 44 52</text>
+  </g>
+  <rect x="793" y="365" width="274" height="92" rx="5" fill="#202a30" stroke="#3a515f"/>
+  <text x="823" y="405" fill="#78a8c9" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="17" font-weight="700">LOCAL-FIRST</text>
+  <text x="823" y="434" fill="#c5cdd3" font-family="ui-sans-serif, -apple-system, Segoe UI, sans-serif" font-size="19">No file uploads</text>
+  <text x="126" y="520" fill="#929ba4" font-family="ui-sans-serif, -apple-system, Segoe UI, sans-serif" font-size="20">Inspect · Edit · Search · Compare</text>
+</svg>

@@ -3,7 +3,6 @@ import { BitInspector } from './components/BitInspector'
 import { ByteTable } from './components/ByteTable'
 import { ByteTools } from './components/ByteTools'
 import { DiffBar } from './components/DiffBar'
-import { Header } from './components/Header'
 import { HelpDialog } from './components/HelpDialog'
 import { InputEditor } from './components/InputEditor'
 import { InterpretationPanel } from './components/InterpretationPanel'
@@ -61,10 +60,19 @@ interface ComparisonDocument {
 }
 
 function initialMode(): InputMode {
+  const requested = new URLSearchParams(window.location.search).get('mode')
+  if (INPUT_MODES.includes(requested as InputMode)) return requested as InputMode
   const stored = window.localStorage.getItem(MODE_STORAGE_KEY)
   return INPUT_MODES.includes(stored as InputMode)
     ? (stored as InputMode)
     : 'hex'
+}
+
+function requestedAction(): 'open' | 'compare' | null {
+  const intent = new URLSearchParams(window.location.search).get('intent')
+  if (intent === 'compare') return 'compare'
+  if (intent === 'open' || intent === 'signature') return 'open'
+  return null
 }
 
 function isTextEditingTarget(target: EventTarget | null): boolean {
@@ -92,6 +100,7 @@ function downloadName(documentName: string | null, byteCount: number): string {
 
 export default function App() {
   const [mode, setMode] = useState<InputMode>(initialMode)
+  const [primaryAction] = useState(requestedAction)
   const [bytes, setBytes] = useState<Uint8Array>(() => DEFAULT_BYTES.slice())
   const [source, setSource] = useState(() => formatInput(DEFAULT_BYTES, mode))
   const [error, setError] = useState<string | null>(null)
@@ -477,15 +486,6 @@ export default function App() {
     window.setTimeout(() => URL.revokeObjectURL(url), 1_000)
   }
 
-  const openSupport = () => {
-    window.history.replaceState(
-      null,
-      '',
-      window.location.pathname + window.location.search + '#support',
-    )
-    setSupportOpen(true)
-  }
-
   const closeSupport = () => {
     if (window.location.hash === '#support') {
       window.history.replaceState(
@@ -499,10 +499,21 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Header onHelp={() => setHelpOpen(true)} onSupport={openSupport} />
-      <main className="workbench">
+      <div className="workspace-utility">
+        <span className="workspace-local-status">
+          <span className="workspace-status-dot" aria-hidden="true" />
+          Local processing
+          <span aria-hidden="true"> · </span>
+          256 KiB limit
+        </span>
+        <button type="button" onClick={() => setHelpOpen(true)}>
+          Formats &amp; shortcuts
+        </button>
+      </div>
+      <div className="workbench">
         <InputEditor
           mode={mode}
+          primaryAction={primaryAction}
           source={source}
           error={error}
           warning={inputWarning}
@@ -600,25 +611,7 @@ export default function App() {
           range={range}
           onToggle={handleToggleBit}
         />
-      </main>
-
-      <footer className="app-footer" id="privacy">
-        <span>Runs locally in your browser. No uploads.</span>
-        <span>
-          Built by{' '}
-          <a
-            href="https://github.com/Yudis-bit"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Yudis
-          </a>
-          <span aria-hidden="true"> · </span>
-          <button type="button" className="footer-link" onClick={openSupport}>
-            Support development
-          </button>
-        </span>
-      </footer>
+      </div>
 
       <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
       <StringScannerDialog
