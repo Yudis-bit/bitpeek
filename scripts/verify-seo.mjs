@@ -2,7 +2,11 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { allSeoPages, SITE_URL } from './seo-pages.mjs'
+import {
+  allSeoPages,
+  HOMEPAGE_LAST_MODIFIED,
+  SITE_URL,
+} from './seo-pages.mjs'
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const publicRoot = join(projectRoot, 'public')
@@ -29,16 +33,31 @@ function plainText(value) {
     .trim()
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function assertDate(value, label) {
+  assert.match(value, /^\d{4}-\d{2}-\d{2}$/, `${label} must use YYYY-MM-DD`)
+  assert.equal(
+    new Date(value + 'T00:00:00Z').toISOString().slice(0, 10),
+    value,
+    `${label} must be a real calendar date`,
+  )
+}
+
 const documents = [
   {
     slug: '/',
     file: join(projectRoot, 'index.html'),
     expectedCanonical: SITE_URL + '/',
+    expectedLastModified: HOMEPAGE_LAST_MODIFIED,
   },
   ...allSeoPages.map((page) => ({
     slug: page.slug,
     file: join(publicRoot, page.slug.slice(1) + '.html'),
     expectedCanonical: SITE_URL + page.slug,
+    expectedLastModified: page.lastModified,
   })),
 ]
 
@@ -93,7 +112,17 @@ for (const document of documents) {
 const sitemap = await readFile(join(publicRoot, 'sitemap.xml'), 'utf8')
 const sitemapUrls = new Set([...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]))
 assert.equal(sitemapUrls.size, documents.length, 'Sitemap URL count does not match indexable pages')
-for (const document of documents) assert.ok(sitemapUrls.has(document.expectedCanonical), `Sitemap is missing ${document.expectedCanonical}`)
+for (const document of documents) {
+  assertDate(document.expectedLastModified, `lastModified for ${document.slug}`)
+  assert.ok(sitemapUrls.has(document.expectedCanonical), `Sitemap is missing ${document.expectedCanonical}`)
+  assert.match(
+    sitemap,
+    new RegExp(
+      `<loc>${escapeRegExp(document.expectedCanonical)}</loc>\\s*<lastmod>${document.expectedLastModified}</lastmod>`,
+    ),
+    `Sitemap has an unexpected lastmod for ${document.slug}`,
+  )
+}
 
 const robots = await readFile(join(publicRoot, 'robots.txt'), 'utf8')
 assert.match(robots, /^User-agent: \*/m)

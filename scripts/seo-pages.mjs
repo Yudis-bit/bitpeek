@@ -1,10 +1,11 @@
 export const SITE_URL = 'https://bitpeek-seven.vercel.app'
-export const LAST_MODIFIED = '2026-08-29'
+export const HOMEPAGE_LAST_MODIFIED = '2026-08-29'
 
 export const toolPages = [
   {
     type: 'tool',
     slug: '/tools/hex-editor',
+    lastModified: '2026-08-29',
     label: 'Online hex editor',
     eyebrow: 'Browser-based byte editing',
     title: 'Online Hex Editor for Binary Files | Bitpeek',
@@ -27,7 +28,7 @@ export const toolPages = [
             <li><strong>Open or paste the data.</strong> Choose <em>Open</em> for a local file, or paste complete hexadecimal bytes such as <code>DE AD BE EF</code>.</li>
             <li><strong>Navigate to the target offset.</strong> Use the offset column, Go to control, or hexadecimal search. Search accepts full-byte and nibble wildcards such as <code>??</code> and <code>D?</code>.</li>
             <li><strong>Edit deliberately.</strong> Double-click a byte cell to enter a new value, select one byte to toggle bits, or use Reverse and Invert on a selection.</li>
-            <li><strong>Review and export.</strong> Undo and redo byte changes, inspect the updated representations, then save a separate <code>.bitpeek.bin</code> file.</li>
+            <li><strong>Review and export.</strong> Undo and redo byte changes, inspect the updated representations, then save a separate binary download. Opened files use a <code>.bitpeek.bin</code> suffix.</li>
           </ol>
         `,
       },
@@ -87,7 +88,7 @@ export const toolPages = [
       {
         question: 'Will saving overwrite the original?',
         answer:
-          'No. Bitpeek downloads a separate file with a .bitpeek.bin suffix so the source file remains unchanged.',
+          'No. Bitpeek downloads a separate file, and opened source files use a .bitpeek.bin suffix. The original remains unchanged.',
       },
     ],
     related: [
@@ -99,6 +100,7 @@ export const toolPages = [
   {
     type: 'tool',
     slug: '/tools/binary-viewer',
+    lastModified: '2026-08-29',
     label: 'Binary viewer',
     eyebrow: 'Local binary inspection',
     title: 'Online Binary Viewer & Byte Inspector | Bitpeek',
@@ -133,7 +135,7 @@ export const toolPages = [
         title: 'Navigate bytes by offset, pattern, or string',
         html: `
           <p>Use Go to with a decimal offset or a hexadecimal value prefixed by <code>0x</code>. Hex search accepts exact bytes and wildcard nibbles, while text search encodes the query as UTF-8 before matching.</p>
-          <p>The string scanner extracts printable ASCII, UTF-16LE, and UTF-16BE runs with their offsets. Selecting a result returns directly to the corresponding byte range.</p>
+          <p>The string scanner extracts printable ASCII and ASCII-like UTF-16LE and UTF-16BE runs with their offsets. Selecting a result returns directly to the corresponding byte range.</p>
         `,
       },
       {
@@ -172,7 +174,7 @@ export const toolPages = [
       {
         question: 'Can it extract strings?',
         answer:
-          'Yes. The string scanner identifies printable ASCII, UTF-16LE, and UTF-16BE runs and reports their byte offsets.',
+          'Yes. The string scanner identifies printable ASCII and ASCII-like UTF-16LE and UTF-16BE runs and reports their byte offsets.',
       },
     ],
     related: [
@@ -184,6 +186,7 @@ export const toolPages = [
   {
     type: 'tool',
     slug: '/tools/binary-diff',
+    lastModified: '2026-08-29',
     label: 'Binary diff',
     eyebrow: 'Offset-based comparison',
     title: 'Binary Diff Tool — Compare Files by Offset | Bitpeek',
@@ -266,6 +269,7 @@ export const toolPages = [
   {
     type: 'tool',
     slug: '/tools/file-signature-checker',
+    lastModified: '2026-08-29',
     label: 'File signature checker',
     eyebrow: 'Magic-byte inspection',
     title: 'File Signature Checker — Identify Magic Bytes | Bitpeek',
@@ -360,6 +364,7 @@ export const toolPages = [
   {
     type: 'tool',
     slug: '/tools/hex-to-text',
+    lastModified: '2026-08-29',
     label: 'Hex to text',
     eyebrow: 'Byte representation conversion',
     title: 'Hex to Text Converter — UTF-8 & ASCII | Bitpeek',
@@ -367,7 +372,7 @@ export const toolPages = [
       'Convert hexadecimal bytes to UTF-8 text or ASCII in your browser, inspect invalid sequences, and compare binary, decimal, and Base64 representations locally.',
     h1: 'Convert Hexadecimal Bytes to Text',
     lead:
-      'Paste hexadecimal bytes once and inspect their UTF-8 and ASCII representations together. Bitpeek keeps control characters visible as escapes and flags invalid UTF-8 input.',
+      'Paste hexadecimal bytes once and inspect their UTF-8 and ASCII representations together. Bitpeek keeps control characters visible as escapes, shows replacement markers for invalid UTF-8, and warns before text-mode editing.',
     ctaHref: '/?mode=hex#workspace',
     ctaLabel: 'Open the hex-to-text workspace',
     ctaHeading: 'Decode hexadecimal bytes locally',
@@ -441,6 +446,7 @@ export const formatPages = [
   {
     type: 'format',
     slug: '/file-formats/png',
+    lastModified: '2026-08-29',
     label: 'PNG file format',
     eyebrow: 'File format reference',
     title: 'PNG File Header & Magic Bytes Reference | Bitpeek',
@@ -524,6 +530,7 @@ export const formatPages = [
   {
     type: 'format',
     slug: '/file-formats/jpeg',
+    lastModified: '2026-08-29',
     label: 'JPEG file format',
     eyebrow: 'File format reference',
     title: 'JPEG File Header & Marker Reference | Bitpeek',
@@ -605,6 +612,7 @@ export const formatPages = [
   {
     type: 'format',
     slug: '/file-formats/pdf',
+    lastModified: '2026-08-29',
     label: 'PDF file format',
     eyebrow: 'File format reference',
     title: 'PDF File Header & Structure Reference | Bitpeek',
@@ -684,6 +692,7 @@ export const formatPages = [
   {
     type: 'format',
     slug: '/file-formats/zip',
+    lastModified: '2026-08-29',
     label: 'ZIP file format',
     eyebrow: 'File format reference',
     title: 'ZIP File Header & Magic Bytes Reference | Bitpeek',
@@ -768,6 +777,7 @@ export const formatPages = [
   {
     type: 'format',
     slug: '/file-formats/elf',
+    lastModified: '2026-08-29',
     label: 'ELF file format',
     eyebrow: 'File format reference',
     title: 'ELF Header & Magic Bytes Reference | Bitpeek',

@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   allSeoPages,
-  LAST_MODIFIED,
+  HOMEPAGE_LAST_MODIFIED,
   SITE_URL,
 } from './seo-pages.mjs'
 
@@ -270,14 +270,17 @@ ${jsonLd(page)}
 }
 
 function renderSitemap() {
-  const urls = ['/', ...allSeoPages.map((page) => page.slug)]
+  const pages = [
+    { slug: '/', lastModified: HOMEPAGE_LAST_MODIFIED },
+    ...allSeoPages,
+  ]
   return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls
+${pages
   .map(
-    (slug) => `  <url>
-    <loc>${SITE_URL}${slug}</loc>
-    <lastmod>${LAST_MODIFIED}</lastmod>
+    (page) => `  <url>
+    <loc>${SITE_URL}${page.slug}</loc>
+    <lastmod>${page.lastModified}</lastmod>
   </url>`,
   )
   .join('\n')}

@@ -16,6 +16,7 @@
     "test:build": "node scripts/verify-build.mjs",
     "test:seo": "node scripts/verify-seo.mjs",
     "typecheck": "tsc -b",
+    "verify:deployment": "node scripts/verify-deployment.mjs",
     "test:watch": "vitest"
   },
   "dependencies": {

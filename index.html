@@ -91,7 +91,7 @@
               "Byte-pattern search",
               "File-signature detection",
               "Checksum, hash, and entropy analysis",
-              "ASCII and UTF-16 string extraction"
+              "Printable ASCII and ASCII-like UTF-16 string extraction"
             ],
             "isPartOf": {
               "@id": "https://bitpeek-seven.vercel.app/#website"
@@ -143,12 +143,12 @@
               <dd>None</dd>
             </div>
             <div>
-              <dt>Workspace limit</dt>
-              <dd>256 KiB per file</dd>
-            </div>
-            <div>
               <dt>Access</dt>
               <dd>No sign-up</dd>
+            </div>
+            <div>
+              <dt>Workflows</dt>
+              <dd>Inspect · edit · compare</dd>
             </div>
           </dl>
         </div>
@@ -266,8 +266,10 @@
               It does not upload file contents, file names, pasted bytes, or exported patches.
             </p>
             <p class="technical-note">
-              As with any developer tool, keep a backup of important files and
-              validate exported bytes with the software that owns the format.
+              The current workspace limit is 256 KiB per opened or comparison
+              file. For larger files, extract the relevant range locally. Keep
+              a backup of important files and validate exported bytes with the
+              software that owns the format.
             </p>
           </div>
         </div>
