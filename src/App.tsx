@@ -203,6 +203,12 @@ export default function App() {
     mode === 'text' && bytes.length > 0 && !isValidUtf8(bytes)
       ? 'Invalid UTF-8; editing text will replace undecodable bytes.'
       : null
+  const statusOffset = range
+    ? '0x' + range.start.toString(16).toUpperCase().padStart(8, '0')
+    : '—'
+  const statusSelection = range
+    ? range.length + (range.length === 1 ? ' byte' : ' bytes')
+    : 'none'
 
   const applyWorkingBytes = useCallback(
     (nextBytes: Uint8Array) => {
@@ -520,15 +526,13 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <div className="workspace-utility">
-        <span className="workspace-local-status">
-          <span className="workspace-status-dot" aria-hidden="true" />
-          Local processing
-          <span aria-hidden="true"> · </span>
-          256 KiB limit
+      <div className="workspace-menubar">
+        <span className="workspace-buffer-name">
+          buffer / {documentName ?? 'untitled'}
+          {documentDirty ? ' / modified' : ''}
         </span>
         <button type="button" onClick={() => setHelpOpen(true)}>
-          Formats &amp; shortcuts
+          Help / formats / shortcuts
         </button>
       </div>
       <div className="workbench">
@@ -632,6 +636,16 @@ export default function App() {
           range={range}
           onToggle={handleToggleBit}
         />
+      </div>
+
+      <div className="workspace-status" aria-label="Workspace status">
+        <span>{bytes.length} bytes</span>
+        <span>offset {statusOffset}</span>
+        <span>selection {statusSelection}</span>
+        <span>{mode.toUpperCase()}</span>
+        <span>{comparison ? 'compare' : 'edit'}</span>
+        <span>local</span>
+        <span>limit 256 KiB</span>
       </div>
 
       <Suspense fallback={null}>

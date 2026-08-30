@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#171a1d" />
+    <meta name="theme-color" content="#0c0e0f" />
     <meta name="color-scheme" content="dark" />
     <meta
       name="description"
@@ -105,185 +105,183 @@
     <a class="skip-link" href="#workspace">Skip to the binary workspace</a>
 
     <header class="site-header">
-      <a class="site-brand" href="/" aria-label="Bitpeek home">
-        <span aria-hidden="true" class="site-brand-mark">B</span>
-        <span>bitpeek</span>
-      </a>
-      <nav class="site-nav" aria-label="Primary navigation">
-        <a href="/#tools">Tools</a>
-        <a href="/#file-formats">File formats</a>
-        <a href="/#privacy">Privacy</a>
-        <a href="https://github.com/Yudis-bit/bitpeek">GitHub</a>
-      </nav>
+      <div class="site-header-inner">
+        <a class="site-brand" href="/" aria-label="Bitpeek home">bitpeek</a>
+        <nav class="site-nav" aria-label="Primary navigation">
+          <a href="/#workspace">workspace</a>
+          <a href="/#tools">tools</a>
+          <a href="/#file-formats">formats</a>
+          <a href="https://github.com/Yudis-bit/bitpeek">source</a>
+        </nav>
+      </div>
     </header>
 
     <main>
-      <section class="home-hero" aria-labelledby="page-heading">
-        <div class="content-column hero-grid">
-          <div>
-            <p class="eyebrow">Local-first binary workbench</p>
-            <h1 id="page-heading">Inspect, Edit, and Compare Binary Files Online</h1>
-            <p class="hero-lead">
-              Bitpeek combines a hex editor, binary viewer, byte search, file
-              analysis, and offset-based diff in one focused browser tool.
-              Files stay on your device and no account is required.
-            </p>
-            <div class="hero-actions">
-              <a class="button-link is-primary" href="#workspace">Open Bitpeek</a>
-              <a class="button-link" href="/tools/hex-editor">Explore the hex editor</a>
-            </div>
-          </div>
-          <dl class="hero-facts" aria-label="Bitpeek characteristics">
-            <div>
-              <dt>Processing</dt>
-              <dd>Inside your browser</dd>
-            </div>
-            <div>
-              <dt>Uploads</dt>
-              <dd>None</dd>
-            </div>
-            <div>
-              <dt>Access</dt>
-              <dd>No sign-up</dd>
-            </div>
-            <div>
-              <dt>Workflows</dt>
-              <dd>Inspect · edit · compare</dd>
-            </div>
-          </dl>
+      <section class="utility-intro" aria-labelledby="page-heading">
+        <div class="workspace-frame">
+          <h1 id="page-heading">Bitpeek — Hex &amp; Binary Inspector</h1>
+          <p class="utility-description">
+            Inspect, edit, search, and compare binary data in your browser.
+          </p>
+          <p class="utility-facts">
+            <span>local browser processing</span>
+            <span>no upload</span>
+            <span>no account</span>
+          </p>
         </div>
       </section>
 
       <section class="workspace-section" id="workspace" aria-labelledby="workspace-heading">
-        <div class="workspace-heading-row">
-          <div>
-            <p class="eyebrow">Interactive tool</p>
-            <h2 id="workspace-heading">Binary workspace</h2>
-          </div>
+        <div class="workspace-caption">
+          <h2 id="workspace-heading">Workspace</h2>
           <p>Paste bytes or open a local file to begin.</p>
         </div>
         <div id="root"></div>
       </section>
 
-      <section class="content-section" id="tools" aria-labelledby="tools-overview-heading">
-        <div class="content-column">
-          <div class="section-intro">
-            <p class="eyebrow">Focused workflows</p>
-            <h2 id="tools-overview-heading">Choose the right binary tool</h2>
-            <p>
-              Each workflow uses the same local Bitpeek workspace, with a concise
-              guide to the relevant controls and limitations.
-            </p>
+      <div class="manual-shell">
+        <section class="manual-section" id="tools" aria-labelledby="tools-heading">
+          <div class="manual-heading">
+            <h2 id="tools-heading">Tools</h2>
+            <p>Reference pages for each operation in the workspace.</p>
           </div>
-          <div class="link-card-grid">
-            <a class="link-card" href="/tools/hex-editor">
-              <span class="card-kicker">Edit</span>
-              <h3>Online hex editor</h3>
-              <p>Edit bytes and bits, search patterns, undo changes, and export a new file.</p>
-              <span class="text-link">Use the hex editor <span aria-hidden="true">→</span></span>
-            </a>
-            <a class="link-card" href="/tools/binary-viewer">
-              <span class="card-kicker">Inspect</span>
-              <h3>Binary viewer</h3>
-              <p>Read offsets, hexadecimal bytes, ASCII, integers, floats, hashes, and entropy.</p>
-              <span class="text-link">Inspect binary data <span aria-hidden="true">→</span></span>
-            </a>
-            <a class="link-card" href="/tools/binary-diff">
-              <span class="card-kicker">Compare</span>
-              <h3>Binary diff</h3>
-              <p>Compare two local files by offset and export a reproducible JSON patch.</p>
-              <span class="text-link">Compare files <span aria-hidden="true">→</span></span>
-            </a>
-            <a class="link-card" href="/tools/file-signature-checker">
-              <span class="card-kicker">Identify</span>
-              <h3>File signature checker</h3>
-              <p>Check common magic bytes and inspect the surrounding header directly.</p>
-              <span class="text-link">Check a signature <span aria-hidden="true">→</span></span>
-            </a>
-            <a class="link-card" href="/tools/hex-to-text">
-              <span class="card-kicker">Convert</span>
-              <h3>Hex to text</h3>
-              <p>Decode hexadecimal bytes as UTF-8 or ASCII and compare other representations.</p>
-              <span class="text-link">Decode hex <span aria-hidden="true">→</span></span>
-            </a>
-          </div>
-        </div>
-      </section>
-
-      <section class="content-section is-raised" id="how-it-works" aria-labelledby="how-heading">
-        <div class="content-column split-content">
-          <div>
-            <p class="eyebrow">How it works</p>
-            <h2 id="how-heading">A byte-level workflow without a server round trip</h2>
-          </div>
-          <ol class="numbered-steps">
+          <ul class="directory-list">
             <li>
-              <strong>Load bytes.</strong>
-              Paste hex, binary, decimal, Base64, or UTF-8 text, or open a file from your device.
+              <a href="/tools/hex-editor">Hex editor</a>
+              <span>Edit raw bytes and individual bits.</span>
             </li>
             <li>
-              <strong>Inspect and change.</strong>
-              Select offsets to view representations, checksums, hashes, file signatures, and editable bits.
+              <a href="/tools/binary-viewer">Binary viewer</a>
+              <span>Read offsets, values, hashes, entropy, and text.</span>
             </li>
             <li>
-              <strong>Export deliberately.</strong>
-              Save edited bytes or export an offset patch after comparing a reference file.
+              <a href="/tools/binary-diff">Binary diff</a>
+              <span>Compare two buffers by byte offset.</span>
             </li>
-          </ol>
-        </div>
-      </section>
+            <li>
+              <a href="/tools/file-signature-checker">File signatures</a>
+              <span>Check common magic bytes at the start of a file.</span>
+            </li>
+            <li>
+              <a href="/tools/hex-to-text">Hex to text</a>
+              <span>Decode byte sequences as UTF-8 or ASCII.</span>
+            </li>
+          </ul>
+        </section>
 
-      <section class="content-section" id="file-formats" aria-labelledby="formats-heading">
-        <div class="content-column">
-          <div class="section-intro">
-            <p class="eyebrow">Header references</p>
-            <h2 id="formats-heading">Inspect common file formats</h2>
-            <p>
-              Use verified signatures and header offsets as a starting point,
-              then confirm the bytes in the Bitpeek workspace.
-            </p>
+        <section class="manual-section" id="file-formats" aria-labelledby="formats-heading">
+          <div class="manual-heading">
+            <h2 id="formats-heading">File format references</h2>
+            <p>Leading signatures are clues, not complete format validation.</p>
           </div>
-          <div class="format-link-row" aria-label="File format references">
-            <a href="/file-formats/png"><code>PNG</code><span>89 50 4E 47</span></a>
-            <a href="/file-formats/jpeg"><code>JPEG</code><span>FF D8 FF</span></a>
-            <a href="/file-formats/pdf"><code>PDF</code><span>25 50 44 46</span></a>
-            <a href="/file-formats/zip"><code>ZIP</code><span>50 4B 03 04</span></a>
-            <a href="/file-formats/elf"><code>ELF</code><span>7F 45 4C 46</span></a>
+          <div class="format-table-wrap">
+            <table class="format-table">
+              <thead>
+                <tr>
+                  <th scope="col">Format</th>
+                  <th scope="col">Signature at offset 0</th>
+                  <th scope="col">Extension</th>
+                  <th scope="col">Reference</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row"><a href="/file-formats/png">PNG</a></th>
+                  <td><code>89 50 4E 47 0D 0A 1A 0A</code></td>
+                  <td><code>.png</code></td>
+                  <td><a href="/file-formats/png">header layout</a></td>
+                </tr>
+                <tr>
+                  <th scope="row"><a href="/file-formats/jpeg">JPEG</a></th>
+                  <td><code>FF D8 FF</code></td>
+                  <td><code>.jpg .jpeg</code></td>
+                  <td><a href="/file-formats/jpeg">marker structure</a></td>
+                </tr>
+                <tr>
+                  <th scope="row"><a href="/file-formats/pdf">PDF</a></th>
+                  <td><code>25 50 44 46</code></td>
+                  <td><code>.pdf</code></td>
+                  <td><a href="/file-formats/pdf">file structure</a></td>
+                </tr>
+                <tr>
+                  <th scope="row"><a href="/file-formats/zip">ZIP</a></th>
+                  <td><code>50 4B 03 04</code></td>
+                  <td><code>.zip</code></td>
+                  <td><a href="/file-formats/zip">record layout</a></td>
+                </tr>
+                <tr>
+                  <th scope="row"><a href="/file-formats/elf">ELF</a></th>
+                  <td><code>7F 45 4C 46</code></td>
+                  <td>varies</td>
+                  <td><a href="/file-formats/elf">header fields</a></td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section class="content-section privacy-section is-raised" id="privacy" aria-labelledby="privacy-heading">
-        <div class="content-column split-content">
-          <div>
-            <p class="eyebrow">Privacy by architecture</p>
-            <h2 id="privacy-heading">Your binary data stays in the browser</h2>
+        <section class="manual-section" id="operation" aria-labelledby="operation-heading">
+          <div class="manual-heading">
+            <h2 id="operation-heading">Operation</h2>
+            <p>The workspace accepts typed data and local files.</p>
           </div>
-          <div>
-            <p>
-              Bitpeek reads selected files with browser APIs and performs parsing,
-              editing, hashing, string extraction, and comparison in local memory.
-              It does not upload file contents, file names, pasted bytes, or exported patches.
-            </p>
-            <p class="technical-note">
-              The current workspace limit is 256 KiB per opened or comparison
-              file. For larger files, extract the relevant range locally. Keep
-              a backup of important files and validate exported bytes with the
-              software that owns the format.
-            </p>
+          <div class="manual-columns">
+            <div>
+              <h3>Basic use</h3>
+              <ol>
+                <li>Enter hex, binary, decimal, Base64, or UTF-8 text, or open a file.</li>
+                <li>Select bytes to inspect integer, floating-point, text, checksum, hash, entropy, and signature values.</li>
+                <li>Edit a byte or bit, search for a pattern, reverse or invert a selection, then save the result.</li>
+              </ol>
+            </div>
+            <div>
+              <h3>Comparison</h3>
+              <p>
+                Open a reference file with <strong>Compare</strong>. Bitpeek marks
+                modified bytes and length differences at matching offsets. The
+                exported JSON patch records the reference-to-current changes.
+                It does not perform sequence alignment or format-aware comparison.
+              </p>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+
+        <section class="manual-section" id="privacy" aria-labelledby="privacy-heading">
+          <div class="manual-heading">
+            <h2 id="privacy-heading">Local processing and limits</h2>
+            <p>Files are processed in this browser. Nothing is uploaded.</p>
+          </div>
+          <div class="manual-columns">
+            <div>
+              <h3>Data handling</h3>
+              <p>
+                File contents, names, pasted input, searches, edits, hashes,
+                extracted strings, comparisons, and patches remain in browser
+                memory. Bitpeek has no file-upload endpoint and requires no account.
+              </p>
+            </div>
+            <div>
+              <h3>Workspace limit</h3>
+              <p>
+                Each opened file or comparison file is limited to 256 KiB. For
+                larger files, extract the relevant range with a trusted local tool.
+                Keep a backup and validate saved bytes with software that understands
+                the file format.
+              </p>
+            </div>
+          </div>
+        </section>
+      </div>
     </main>
 
     <footer class="site-footer">
-      <div class="content-column footer-content">
-        <p>Bitpeek is a local-first binary workbench built by Yudis.</p>
+      <div class="site-header-inner footer-content">
+        <p>bitpeek · browser hex and binary utility</p>
         <nav aria-label="Footer navigation">
-          <a href="/tools/hex-editor">Hex editor</a>
-          <a href="/file-formats/png">Format references</a>
-          <a href="https://github.com/Yudis-bit/bitpeek">Source code</a>
-          <a href="#support">Support development</a>
+          <a href="/tools/hex-editor">hex editor</a>
+          <a href="/file-formats/png">format reference</a>
+          <a href="https://github.com/Yudis-bit/bitpeek">source</a>
+          <a href="#support">support</a>
         </nav>
       </div>
     </footer>
