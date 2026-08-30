@@ -40,8 +40,8 @@ body {
   margin: 0;
   background: var(--page);
   color: var(--text);
-  font-size: 13px;
-  line-height: 1.45;
+  font-size: 15px;
+  line-height: 1.65;
 }
 
 button,
@@ -100,85 +100,62 @@ code {
 
 .app-shell {
   width: 100%;
-  height: 100vh;
-  min-height: 100vh;
+  height: min(900px, 92vh);
+  min-height: 720px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background: var(--surface);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
-.app-header {
-  height: 46px;
-  flex: 0 0 46px;
+.workspace-utility {
+  min-height: 38px;
+  flex: 0 0 38px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 18px;
+  gap: 18px;
+  padding: 0 14px;
   border-bottom: 1px solid var(--border);
   background: #181b1e;
+  color: var(--muted);
+  font-size: 11px;
 }
 
-.brand {
-  display: flex;
-  align-items: center;
+.workspace-local-status {
   min-width: 0;
-}
-
-.brand-name {
-  color: var(--text-strong);
-  font-family: var(--mono);
-  font-size: 15px;
-  font-weight: 650;
-  letter-spacing: -0.02em;
-}
-
-.brand-separator {
-  width: 1px;
-  height: 15px;
-  margin: 0 10px;
-  background: var(--border);
-}
-
-.brand-subtitle {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.header-actions {
   display: flex;
   align-items: center;
-  gap: 17px;
-  font-size: 12px;
+  gap: 5px;
 }
 
-.help-link {
-  width: 24px;
-  height: 24px;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--border);
+.workspace-status-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: #7eb394;
+  box-shadow: 0 0 0 3px rgb(126 179 148 / 9%);
+}
+
+.workspace-utility button {
+  min-height: 26px;
+  padding: 0 8px;
+  border: 1px solid transparent;
   border-radius: 3px;
-  color: var(--muted);
-  font-family: var(--mono);
-  padding: 0;
-  background: transparent;
-  cursor: pointer;
-}
-
-.header-text-action {
-  height: 25px;
-  padding: 0;
-  border: 0;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11px;
 }
 
-.header-text-action:hover {
-  color: var(--text-strong);
+.workspace-utility button:hover {
+  border-color: var(--border);
+  background: var(--surface-hover);
+  color: var(--text);
 }
 
 .workbench {
@@ -393,6 +370,12 @@ code {
 .file-action:focus-within {
   outline: 2px solid var(--focus);
   outline-offset: 1px;
+}
+
+.file-action.is-emphasized {
+  border-color: #527d99;
+  background: var(--accent-surface);
+  color: var(--text-strong);
 }
 
 .byte-tools {
@@ -1089,37 +1072,6 @@ code {
   grid-column: 2;
 }
 
-.app-footer {
-  flex: 0 0 auto;
-  min-height: 39px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 8px 18px;
-  border-top: 1px solid var(--border-subtle);
-  background: #151719;
-  color: var(--muted-quiet);
-  font-size: 10px;
-}
-
-.app-footer a {
-  color: var(--muted);
-}
-
-.footer-link {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  font-size: inherit;
-}
-
-.footer-link:hover {
-  color: var(--text-strong);
-}
-
 .copy-notice {
   position: fixed;
   right: 14px;
@@ -1553,6 +1505,7 @@ code {
 @media (max-width: 900px) {
   .app-shell {
     height: auto;
+    min-height: 0;
     overflow: visible;
   }
 
@@ -1592,16 +1545,14 @@ code {
 }
 
 @media (max-width: 600px) {
-  .app-header {
-    padding: 0 12px;
+  .workspace-utility {
+    min-height: 42px;
+    flex: 0 0 auto;
+    padding: 5px 12px;
   }
 
-  .brand-separator {
-    margin: 0 8px;
-  }
-
-  .header-actions {
-    gap: 10px;
+  .workspace-utility button {
+    min-height: 40px;
   }
 
   .input-panel {
@@ -1614,8 +1565,17 @@ code {
 
   .mode-tab {
     min-width: 0;
+    min-height: 40px;
     flex: 1;
     padding: 0 7px;
+  }
+
+  .compact-actions button,
+  .file-action,
+  .tool-group button,
+  .tool-group input,
+  .tool-group select {
+    min-height: 40px;
   }
 
   .source-editor {
@@ -1718,13 +1678,6 @@ code {
     padding-left: 12px;
   }
 
-  .app-footer {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 3px;
-    padding: 9px 12px;
-  }
-
   .shortcut-list > div {
     grid-template-columns: 145px 1fr;
   }
@@ -1765,14 +1718,8 @@ code {
 
   .support-actions button,
   .support-actions a {
+    min-height: 40px;
     justify-content: center;
-  }
-}
-
-@media (max-width: 410px) {
-  .brand-subtitle,
-  .brand-separator {
-    display: none;
   }
 }
 

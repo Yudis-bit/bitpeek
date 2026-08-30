@@ -4,22 +4,296 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#171a1d" />
+    <meta name="color-scheme" content="dark" />
     <meta
       name="description"
-      content="Inspect bytes, integers, endianness, binary, and text directly in your browser."
+      content="Inspect, edit, search, and compare binary files in a fast local-first hex workspace. Bitpeek runs in your browser—files are never uploaded."
     />
+    <meta
+      name="robots"
+      content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
+    />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <link rel="canonical" href="https://bitpeek-seven.vercel.app/" />
+
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="bitpeek — Byte Inspector" />
+    <meta property="og:site_name" content="Bitpeek" />
+    <meta property="og:locale" content="en_US" />
+    <meta
+      property="og:title"
+      content="Bitpeek — Online Hex Editor &amp; Binary Inspector"
+    />
     <meta
       property="og:description"
-      content="Inspect bytes, integers, endianness, binary, and text directly in your browser."
+      content="Inspect, edit, search, and compare binary files locally in your browser. No uploads and no account required."
     />
     <meta property="og:url" content="https://bitpeek-seven.vercel.app/" />
+    <meta
+      property="og:image"
+      content="https://bitpeek-seven.vercel.app/social/bitpeek-og.png"
+    />
+    <meta
+      property="og:image:alt"
+      content="Bitpeek local-first binary workbench showing hexadecimal bytes"
+    />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="Bitpeek — Online Hex Editor &amp; Binary Inspector"
+    />
+    <meta
+      name="twitter:description"
+      content="Inspect, edit, search, and compare binary files locally in your browser."
+    />
+    <meta
+      name="twitter:image"
+      content="https://bitpeek-seven.vercel.app/social/bitpeek-og.png"
+    />
+    <meta
+      name="twitter:image:alt"
+      content="Bitpeek local-first binary workbench showing hexadecimal bytes"
+    />
+
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>bitpeek — Byte Inspector</title>
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="stylesheet" href="/seo.css" />
+    <title>Bitpeek — Online Hex Editor &amp; Binary Inspector</title>
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://bitpeek-seven.vercel.app/#website",
+            "url": "https://bitpeek-seven.vercel.app/",
+            "name": "Bitpeek",
+            "description": "A local-first online hex editor and binary inspection workbench."
+          },
+          {
+            "@type": ["SoftwareApplication", "WebApplication"],
+            "@id": "https://bitpeek-seven.vercel.app/#application",
+            "name": "Bitpeek",
+            "url": "https://bitpeek-seven.vercel.app/",
+            "applicationCategory": "DeveloperApplication",
+            "operatingSystem": "Any",
+            "browserRequirements": "Requires a modern browser with JavaScript enabled.",
+            "description": "Inspect, edit, search, analyze, and compare binary files locally in the browser.",
+            "featureList": [
+              "Hexadecimal byte editing",
+              "Binary file viewing",
+              "Offset-based binary comparison",
+              "Byte-pattern search",
+              "File-signature detection",
+              "Checksum, hash, and entropy analysis",
+              "Printable ASCII and ASCII-like UTF-16 string extraction"
+            ],
+            "isPartOf": {
+              "@id": "https://bitpeek-seven.vercel.app/#website"
+            }
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <a class="skip-link" href="#workspace">Skip to the binary workspace</a>
+
+    <header class="site-header">
+      <a class="site-brand" href="/" aria-label="Bitpeek home">
+        <span aria-hidden="true" class="site-brand-mark">B</span>
+        <span>bitpeek</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary navigation">
+        <a href="/#tools">Tools</a>
+        <a href="/#file-formats">File formats</a>
+        <a href="/#privacy">Privacy</a>
+        <a href="https://github.com/Yudis-bit/bitpeek">GitHub</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="home-hero" aria-labelledby="page-heading">
+        <div class="content-column hero-grid">
+          <div>
+            <p class="eyebrow">Local-first binary workbench</p>
+            <h1 id="page-heading">Inspect, Edit, and Compare Binary Files Online</h1>
+            <p class="hero-lead">
+              Bitpeek combines a hex editor, binary viewer, byte search, file
+              analysis, and offset-based diff in one focused browser tool.
+              Files stay on your device and no account is required.
+            </p>
+            <div class="hero-actions">
+              <a class="button-link is-primary" href="#workspace">Open Bitpeek</a>
+              <a class="button-link" href="/tools/hex-editor">Explore the hex editor</a>
+            </div>
+          </div>
+          <dl class="hero-facts" aria-label="Bitpeek characteristics">
+            <div>
+              <dt>Processing</dt>
+              <dd>Inside your browser</dd>
+            </div>
+            <div>
+              <dt>Uploads</dt>
+              <dd>None</dd>
+            </div>
+            <div>
+              <dt>Access</dt>
+              <dd>No sign-up</dd>
+            </div>
+            <div>
+              <dt>Workflows</dt>
+              <dd>Inspect · edit · compare</dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
+      <section class="workspace-section" id="workspace" aria-labelledby="workspace-heading">
+        <div class="workspace-heading-row">
+          <div>
+            <p class="eyebrow">Interactive tool</p>
+            <h2 id="workspace-heading">Binary workspace</h2>
+          </div>
+          <p>Paste bytes or open a local file to begin.</p>
+        </div>
+        <div id="root"></div>
+      </section>
+
+      <section class="content-section" id="tools" aria-labelledby="tools-overview-heading">
+        <div class="content-column">
+          <div class="section-intro">
+            <p class="eyebrow">Focused workflows</p>
+            <h2 id="tools-overview-heading">Choose the right binary tool</h2>
+            <p>
+              Each workflow uses the same local Bitpeek workspace, with a concise
+              guide to the relevant controls and limitations.
+            </p>
+          </div>
+          <div class="link-card-grid">
+            <a class="link-card" href="/tools/hex-editor">
+              <span class="card-kicker">Edit</span>
+              <h3>Online hex editor</h3>
+              <p>Edit bytes and bits, search patterns, undo changes, and export a new file.</p>
+              <span class="text-link">Use the hex editor <span aria-hidden="true">→</span></span>
+            </a>
+            <a class="link-card" href="/tools/binary-viewer">
+              <span class="card-kicker">Inspect</span>
+              <h3>Binary viewer</h3>
+              <p>Read offsets, hexadecimal bytes, ASCII, integers, floats, hashes, and entropy.</p>
+              <span class="text-link">Inspect binary data <span aria-hidden="true">→</span></span>
+            </a>
+            <a class="link-card" href="/tools/binary-diff">
+              <span class="card-kicker">Compare</span>
+              <h3>Binary diff</h3>
+              <p>Compare two local files by offset and export a reproducible JSON patch.</p>
+              <span class="text-link">Compare files <span aria-hidden="true">→</span></span>
+            </a>
+            <a class="link-card" href="/tools/file-signature-checker">
+              <span class="card-kicker">Identify</span>
+              <h3>File signature checker</h3>
+              <p>Check common magic bytes and inspect the surrounding header directly.</p>
+              <span class="text-link">Check a signature <span aria-hidden="true">→</span></span>
+            </a>
+            <a class="link-card" href="/tools/hex-to-text">
+              <span class="card-kicker">Convert</span>
+              <h3>Hex to text</h3>
+              <p>Decode hexadecimal bytes as UTF-8 or ASCII and compare other representations.</p>
+              <span class="text-link">Decode hex <span aria-hidden="true">→</span></span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-section is-raised" id="how-it-works" aria-labelledby="how-heading">
+        <div class="content-column split-content">
+          <div>
+            <p class="eyebrow">How it works</p>
+            <h2 id="how-heading">A byte-level workflow without a server round trip</h2>
+          </div>
+          <ol class="numbered-steps">
+            <li>
+              <strong>Load bytes.</strong>
+              Paste hex, binary, decimal, Base64, or UTF-8 text, or open a file from your device.
+            </li>
+            <li>
+              <strong>Inspect and change.</strong>
+              Select offsets to view representations, checksums, hashes, file signatures, and editable bits.
+            </li>
+            <li>
+              <strong>Export deliberately.</strong>
+              Save edited bytes or export an offset patch after comparing a reference file.
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="content-section" id="file-formats" aria-labelledby="formats-heading">
+        <div class="content-column">
+          <div class="section-intro">
+            <p class="eyebrow">Header references</p>
+            <h2 id="formats-heading">Inspect common file formats</h2>
+            <p>
+              Use verified signatures and header offsets as a starting point,
+              then confirm the bytes in the Bitpeek workspace.
+            </p>
+          </div>
+          <div class="format-link-row" aria-label="File format references">
+            <a href="/file-formats/png"><code>PNG</code><span>89 50 4E 47</span></a>
+            <a href="/file-formats/jpeg"><code>JPEG</code><span>FF D8 FF</span></a>
+            <a href="/file-formats/pdf"><code>PDF</code><span>25 50 44 46</span></a>
+            <a href="/file-formats/zip"><code>ZIP</code><span>50 4B 03 04</span></a>
+            <a href="/file-formats/elf"><code>ELF</code><span>7F 45 4C 46</span></a>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-section privacy-section is-raised" id="privacy" aria-labelledby="privacy-heading">
+        <div class="content-column split-content">
+          <div>
+            <p class="eyebrow">Privacy by architecture</p>
+            <h2 id="privacy-heading">Your binary data stays in the browser</h2>
+          </div>
+          <div>
+            <p>
+              Bitpeek reads selected files with browser APIs and performs parsing,
+              editing, hashing, string extraction, and comparison in local memory.
+              It does not upload file contents, file names, pasted bytes, or exported patches.
+            </p>
+            <p class="technical-note">
+              The current workspace limit is 256 KiB per opened or comparison
+              file. For larger files, extract the relevant range locally. Keep
+              a backup of important files and validate exported bytes with the
+              software that owns the format.
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="content-column footer-content">
+        <p>Bitpeek is a local-first binary workbench built by Yudis.</p>
+        <nav aria-label="Footer navigation">
+          <a href="/tools/hex-editor">Hex editor</a>
+          <a href="/file-formats/png">Format references</a>
+          <a href="https://github.com/Yudis-bit/bitpeek">Source code</a>
+          <a href="#support">Support development</a>
+        </nav>
+      </div>
+    </footer>
+
+    <noscript>
+      <div class="noscript-note">
+        Bitpeek needs JavaScript for interactive binary processing. The tool and
+        format guides remain readable without it.
+      </div>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

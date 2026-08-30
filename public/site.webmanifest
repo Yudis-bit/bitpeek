@@ -1,0 +1,22 @@
+{
+  "name": "Bitpeek — Binary Workbench",
+  "short_name": "Bitpeek",
+  "description": "A local-first hex editor and binary inspection workbench.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#121416",
+  "theme_color": "#171a1d",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

@@ -4,10 +4,19 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "generate:seo": "node scripts/generate-seo-pages.mjs",
+    "predev": "npm run generate:seo",
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "prebuild": "npm run generate:seo",
+    "build": "npm run typecheck && vite build && npm run test:build",
+    "preview": "vite preview",
     "lint": "eslint .",
-    "test": "vitest run",
+    "pretest": "npm run generate:seo",
+    "test": "vitest run && npm run test:seo",
+    "test:build": "node scripts/verify-build.mjs",
+    "test:seo": "node scripts/verify-seo.mjs",
+    "typecheck": "tsc -b",
+    "verify:deployment": "node scripts/verify-deployment.mjs",
     "test:watch": "vitest"
   },
   "dependencies": {

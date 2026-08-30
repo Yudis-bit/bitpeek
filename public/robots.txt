@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://bitpeek-seven.vercel.app/sitemap.xml

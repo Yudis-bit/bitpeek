@@ -11,7 +11,7 @@ A local-first binary workbench for inspecting and editing raw bytes in the brows
 - Compare two buffers by offset, navigate changes, and export reproducible patches
 - Find exact or wildcard byte patterns and jump directly to offsets
 - Inspect signed integers, floats, text, CRCs, cryptographic hashes, entropy, and file signatures
-- Extract printable ASCII and UTF-16 strings with their byte offsets
+- Extract printable ASCII and ASCII-like UTF-16 strings with their byte offsets
 - Edit bytes and bits directly with selection transforms and undo/redo
 - Navigate large inputs through a virtualized hex and ASCII view
 
@@ -34,7 +34,15 @@ npm run lint
 npm run build
 ```
 
-bitpeek is entirely client-side. No data leaves the browser.
+Binary inputs and local file contents are processed client-side and are not
+uploaded by bitpeek.
+
+To verify a deployed Preview or Production URL with the same route and metadata
+checks, run:
+
+```sh
+npm run verify:deployment -- https://your-deployment.example
+```
 
 ## Support
 
