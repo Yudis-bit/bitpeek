@@ -1552,7 +1552,7 @@ code {
   }
 
   .workspace-utility button {
-    min-height: 34px;
+    min-height: 40px;
   }
 
   .input-panel {
@@ -1565,7 +1565,7 @@ code {
 
   .mode-tab {
     min-width: 0;
-    min-height: 36px;
+    min-height: 40px;
     flex: 1;
     padding: 0 7px;
   }
@@ -1575,7 +1575,7 @@ code {
   .tool-group button,
   .tool-group input,
   .tool-group select {
-    min-height: 34px;
+    min-height: 40px;
   }
 
   .source-editor {
@@ -1718,6 +1718,7 @@ code {
 
   .support-actions button,
   .support-actions a {
+    min-height: 40px;
     justify-content: center;
   }
 }
