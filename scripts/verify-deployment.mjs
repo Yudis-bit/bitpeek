@@ -80,6 +80,13 @@ for (const page of indexablePages) {
     /name="robots"\s+content="index,follow/i,
     `${page.slug} must be indexable`,
   )
+  if (page.slug === '/') {
+    assert.match(
+      html,
+      /name="google-site-verification"\s+content="Jn0K5vK7EtJ9tpYr_JzwqkUNXm-OeVXELznWLvX7lns"/i,
+      'Homepage must include the Google site verification token',
+    )
+  }
   assert.ok(plainText(html).length > 1_000, `${page.slug} has thin HTML`)
 
   const structuredData = [

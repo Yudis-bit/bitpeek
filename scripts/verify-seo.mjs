@@ -85,6 +85,13 @@ for (const document of documents) {
   assert.equal(countMatches(html, /<h1\b/gi), 1, `${document.slug} must have exactly one H1`)
   assert.equal(canonical, document.expectedCanonical, `${document.slug} has an unexpected canonical`)
   assert.match(html, /name="robots"\s+content="index,follow/i, `${document.slug} must be indexable`)
+  if (document.slug === '/') {
+    assert.match(
+      html,
+      /name="google-site-verification"\s+content="Jn0K5vK7EtJ9tpYr_JzwqkUNXm-OeVXELznWLvX7lns"/i,
+      'Homepage must include the Google site verification token',
+    )
+  }
   assert.ok(title.length >= 30 && title.length <= 65, `${document.slug} title length is ${title.length}`)
   assert.ok(description.length >= 100 && description.length <= 170, `${document.slug} description length is ${description.length}`)
   assert.ok(plainText(html).length > 1_000, `${document.slug} initial HTML is too thin`)
