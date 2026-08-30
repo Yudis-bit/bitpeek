@@ -22,11 +22,17 @@ const homepagePath = join(distRoot, 'index.html')
 const homepage = await readFile(homepagePath, 'utf8')
 const entryScript = requiredMatch(homepage, /<script\s+type="module"[^>]+src="([^"]+)"/i, 'entry script')
 const appStylesheet = requiredMatch(homepage, /<link\s+rel="stylesheet"[^>]+href="([^"]*\/assets\/[^"]+\.css)"/i, 'application stylesheet')
+const appCssPath = join(distRoot, appStylesheet.slice(1))
+const seoCssPath = join(distRoot, 'seo.css')
+const [appCss, seoCss] = await Promise.all([
+  readFile(appCssPath, 'utf8'),
+  readFile(seoCssPath, 'utf8'),
+])
 
 const homepageGzip = await gzipBytes(homepagePath)
 const scriptGzip = await gzipBytes(join(distRoot, entryScript.slice(1)))
-const appCssGzip = await gzipBytes(join(distRoot, appStylesheet.slice(1)))
-const seoCssGzip = await gzipBytes(join(distRoot, 'seo.css'))
+const appCssGzip = gzipSync(appCss).byteLength
+const seoCssGzip = gzipSync(seoCss).byteLength
 const initialGzip = homepageGzip + scriptGzip + appCssGzip + seoCssGzip
 
 assert.ok(homepageGzip <= 6 * 1024, `Homepage HTML exceeds 6 KiB gzip: ${homepageGzip}`)
@@ -35,8 +41,10 @@ assert.ok(appCssGzip <= 7 * 1024, `Application CSS exceeds 7 KiB gzip: ${appCssG
 assert.ok(seoCssGzip <= 7 * 1024, `Shared SEO CSS exceeds 7 KiB gzip: ${seoCssGzip}`)
 assert.ok(initialGzip <= 100 * 1024, `Initial homepage payload exceeds 100 KiB gzip: ${initialGzip}`)
 
-assert.match(homepage, /<h1\b[^>]*>Inspect, Edit, and Compare Binary Files Online<\/h1>/)
+assert.match(homepage, /<h1\b[^>]*>Bitpeek — Hex &amp; Binary Inspector<\/h1>/)
 assert.match(homepage, /<link rel="canonical" href="https:\/\/bitpeek-seven\.vercel\.app\/"/)
+assert.doesNotMatch(homepage, /home-hero|hero-facts|link-card|card-grid/i)
+assert.doesNotMatch(appCss + seoCss, /(?:linear|radial)-gradient|backdrop-filter|box-shadow/i)
 
 for (const page of allSeoPages) {
   const outputPath = join(distRoot, page.slug.slice(1) + '.html')

@@ -64,29 +64,28 @@ function siteHeader() {
   return `
     <a class="skip-link" href="#main-content">Skip to the main content</a>
     <header class="site-header">
-      <a class="site-brand" href="/" aria-label="Bitpeek home">
-        <span aria-hidden="true" class="site-brand-mark">B</span>
-        <span>bitpeek</span>
-      </a>
-      <nav class="site-nav" aria-label="Primary navigation">
-        <a href="/#tools">Tools</a>
-        <a href="/#file-formats">File formats</a>
-        <a href="/#privacy">Privacy</a>
-        <a href="https://github.com/Yudis-bit/bitpeek">GitHub</a>
-      </nav>
+      <div class="site-header-inner">
+        <a class="site-brand" href="/" aria-label="Bitpeek home">bitpeek</a>
+        <nav class="site-nav" aria-label="Primary navigation">
+          <a href="/#workspace">workspace</a>
+          <a href="/#tools">tools</a>
+          <a href="/#file-formats">formats</a>
+          <a href="https://github.com/Yudis-bit/bitpeek">source</a>
+        </nav>
+      </div>
     </header>`
 }
 
 function siteFooter() {
   return `
     <footer class="site-footer">
-      <div class="content-column footer-content">
-        <p>Bitpeek is a local-first binary workbench built by Yudis.</p>
+      <div class="site-header-inner footer-content">
+        <p>bitpeek · browser hex and binary utility</p>
         <nav aria-label="Footer navigation">
-          <a href="/">Open Bitpeek</a>
-          <a href="/tools/hex-editor">Hex editor</a>
-          <a href="/file-formats/png">Format references</a>
-          <a href="https://github.com/Yudis-bit/bitpeek">Source code</a>
+          <a href="/">workspace</a>
+          <a href="/tools/hex-editor">hex editor</a>
+          <a href="/file-formats/png">format reference</a>
+          <a href="https://github.com/Yudis-bit/bitpeek">source</a>
         </nav>
       </div>
     </footer>`
@@ -125,19 +124,18 @@ function renderFaqs(page) {
 function renderRelated(page) {
   return `
     <section class="related-section" id="related" aria-labelledby="related-heading">
-      <p class="eyebrow">Continue inspecting</p>
       <h2 id="related-heading">Related Bitpeek references</h2>
-      <div class="related-grid">
+      <ul class="related-list">
         ${page.related
           .map(
             (item) => `
-              <a href="${escapeHtml(item.slug)}">
-                ${escapeHtml(item.label)}
+              <li>
+                <a href="${escapeHtml(item.slug)}">${escapeHtml(item.label)}</a>
                 <span>${escapeHtml(item.note)}</span>
-              </a>`,
+              </li>`,
           )
           .join('')}
-      </div>
+      </ul>
     </section>`
 }
 
@@ -168,7 +166,8 @@ function renderAside(page) {
 
 function renderPage(page) {
   const url = SITE_URL + page.slug
-  const category = page.type === 'format' ? 'File format' : 'Tool'
+  const category = page.type === 'format' ? 'File formats' : 'Tools'
+  const categoryHref = page.type === 'format' ? '/#file-formats' : '/#tools'
   const source = page.source
     ? `<p class="source-note">Technical reference: <a href="${escapeHtml(page.source.url)}" rel="noreferrer">${escapeHtml(page.source.label)}</a>.</p>`
     : ''
@@ -178,7 +177,7 @@ function renderPage(page) {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#171a1d" />
+    <meta name="theme-color" content="#0c0e0f" />
     <meta name="color-scheme" content="dark" />
     <meta name="description" content="${escapeHtml(page.description)}" />
     <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
@@ -215,27 +214,26 @@ ${jsonLd(page)}
   <body>
     ${siteHeader()}
     <main id="main-content">
-      <section class="page-hero" aria-labelledby="page-heading">
-        <div class="content-column">
+      <header class="reference-header" aria-labelledby="page-heading">
+        <div class="reference-column">
           <ol class="breadcrumb-list" aria-label="Breadcrumb">
             <li><a href="/">Bitpeek</a></li>
             <li aria-hidden="true">/</li>
-            <li>${escapeHtml(category)}</li>
+            <li><a href="${categoryHref}">${escapeHtml(category)}</a></li>
             <li aria-hidden="true">/</li>
             <li aria-current="page">${escapeHtml(page.label)}</li>
           </ol>
-          <p class="eyebrow">${escapeHtml(page.eyebrow)}</p>
           <h1 id="page-heading">${escapeHtml(page.h1)}</h1>
           <p class="page-lead">${escapeHtml(page.lead)}</p>
-          <div class="hero-actions">
+          <div class="reference-actions">
             <a class="button-link is-primary" href="${escapeHtml(page.ctaHref)}">${escapeHtml(page.ctaLabel)}</a>
-            <a class="button-link" href="/#privacy">How local processing works</a>
+            <a href="#privacy">Local processing notes</a>
           </div>
         </div>
-      </section>
+      </header>
 
       <div class="page-main">
-        <div class="content-column article-layout">
+        <div class="reference-column article-layout">
           <article class="article-main">
             ${renderSections(page)}
 
@@ -247,16 +245,6 @@ ${jsonLd(page)}
 
             ${source}
             ${renderFaqs(page)}
-
-            <section class="cta-panel" aria-labelledby="cta-heading">
-              <h2 id="cta-heading">${escapeHtml(page.ctaHeading)}</h2>
-              <p>${escapeHtml(page.ctaText)}</p>
-              <div class="cta-actions">
-                <a class="button-link is-primary" href="${escapeHtml(page.ctaHref)}">${escapeHtml(page.ctaLabel)}</a>
-                <a class="button-link" href="/">View the full workbench</a>
-              </div>
-            </section>
-
             ${renderRelated(page)}
           </article>
           ${renderAside(page)}
