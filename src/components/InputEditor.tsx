@@ -5,7 +5,8 @@ interface InputEditorProps {
   mode: InputMode
   source: string
   error: string | null
-  warning: string | null
+  operationError: string | null
+  stale: boolean
   byteCount: number
   documentName: string | null
   documentDirty: boolean
@@ -16,13 +17,14 @@ interface InputEditorProps {
   onSaveFile: () => void
   onClear: () => void
   onCopy: () => void
+  onRestoreSource: () => void
 }
 
 const labels: Record<InputMode, string> = {
   hex: 'Hex',
   binary: 'Binary',
   decimal: 'Decimal',
-  text: 'Text',
+  text: 'UTF-8 Text',
   base64: 'Base64',
 }
 
@@ -38,7 +40,8 @@ export function InputEditor({
   mode,
   source,
   error,
-  warning,
+  operationError,
+  stale,
   byteCount,
   documentName,
   documentDirty,
@@ -49,6 +52,7 @@ export function InputEditor({
   onSaveFile,
   onClear,
   onCopy,
+  onRestoreSource,
 }: InputEditorProps) {
   const [dragging, setDragging] = useState(false)
 
@@ -99,6 +103,12 @@ export function InputEditor({
             type="button"
             aria-pressed={mode === inputMode}
             className={mode === inputMode ? 'mode-tab is-active' : 'mode-tab'}
+            disabled={stale && mode !== inputMode}
+            title={
+              stale && mode !== inputMode
+                ? 'Restore or correct the current source before changing format.'
+                : undefined
+            }
             onClick={() => onModeChange(inputMode)}
           >
             {labels[inputMode]}
@@ -116,9 +126,13 @@ export function InputEditor({
         placeholder={placeholders[mode]}
         onChange={(event) => onSourceChange(event.target.value)}
         aria-invalid={error !== null}
-        aria-describedby={
-          error ? 'input-error' : warning ? 'input-warning' : 'input-summary'
-        }
+        aria-describedby={[
+          error ? 'input-error' : 'input-summary',
+          mode === 'text' && !error ? 'input-encoding-note' : '',
+          operationError ? 'input-operation-error' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
         spellCheck={false}
         autoCapitalize="off"
         autoCorrect="off"
@@ -127,28 +141,45 @@ export function InputEditor({
       <div className="input-status-row">
         <div className="input-message">
           {error ? (
-            <span id="input-error" className="input-error" role="alert">
-              {error}
+            <div id="input-error" className="input-error" role="alert">
+              <span>{error}</span>
               {byteCount > 0 ? (
-                <span className="last-valid-note">
-                  {' '}
-                  Inspector shows the last valid bytes.
-                </span>
+                <>
+                  <span className="last-valid-note">
+                    Showing previous valid data.
+                  </span>
+                  <button
+                    type="button"
+                    className="restore-source"
+                    onClick={onRestoreSource}
+                  >
+                    Restore last valid source
+                  </button>
+                </>
               ) : null}
-            </span>
+            </div>
           ) : (
             <>
               <span id="input-summary" className="input-summary">
                 {byteCount} {byteCount === 1 ? 'byte' : 'bytes'} ·{' '}
                 {byteCount * 8} bits
               </span>
-              {warning ? (
-                <span id="input-warning" className="input-warning">
-                  {warning}
+              {mode === 'text' ? (
+                <span id="input-encoding-note" className="input-warning">
+                  Text is encoded as UTF-8. Unicode is not normalized.
                 </span>
               ) : null}
             </>
           )}
+          {operationError ? (
+            <span
+              id="input-operation-error"
+              className="operation-error"
+              role="alert"
+            >
+              {operationError}
+            </span>
+          ) : null}
         </div>
         <div className="compact-actions">
           <label className="file-action">
@@ -162,11 +193,19 @@ export function InputEditor({
               }}
             />
           </label>
-          <label className="file-action" title="Compare a local file by offset">
+          <label
+            className={stale ? 'file-action is-disabled' : 'file-action'}
+            title={
+              stale
+                ? 'Restore or correct the current source before comparing.'
+                : 'Compare a local file by offset'
+            }
+          >
             Compare
             <input
               type="file"
               aria-label="Open comparison file"
+              disabled={stale}
               onChange={(event) => {
                 const file = event.target.files?.[0]
                 if (file) onOpenComparison(file)
@@ -177,7 +216,7 @@ export function InputEditor({
           <button
             type="button"
             onClick={onSaveFile}
-            disabled={byteCount === 0}
+            disabled={byteCount === 0 || stale}
           >
             Save
           </button>

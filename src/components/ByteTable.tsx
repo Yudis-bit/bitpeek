@@ -25,6 +25,7 @@ const COLUMN_LABELS = Array.from({ length: BYTES_PER_ROW }, (_, index) =>
 interface ByteTableProps {
   bytes: Uint8Array
   selection: ByteSelection | null
+  readOnly: boolean
   searchOffsets: number[]
   searchLength: number
   activeSearchOffset: number | null
@@ -47,6 +48,7 @@ function isWithin(index: number, start: number, end: number): boolean {
 export function ByteTable({
   bytes,
   selection,
+  readOnly,
   searchOffsets,
   searchLength,
   activeSearchOffset,
@@ -63,6 +65,7 @@ export function ByteTable({
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportHeight, setViewportHeight] = useState(360)
   const [editing, setEditing] = useState<EditState | null>(null)
+  const activeEditing = readOnly ? null : editing
   const range = getSelectionRange(selection, bytes.length)
   const diffIndexes = useMemo(() => new Set(diffOffsets), [diffOffsets])
   const totalRows = Math.ceil(bytes.length / BYTES_PER_ROW)
@@ -120,6 +123,7 @@ export function ByteTable({
       window.removeEventListener('pointercancel', stopDragging)
     }
   }, [])
+
 
   useEffect(() => {
     const viewport = scrollRef.current
@@ -188,6 +192,7 @@ export function ByteTable({
   }
 
   const startEditing = (index: number, value: number) => {
+    if (readOnly) return
     setEditing({
       index,
       value: value.toString(16).toUpperCase().padStart(2, '0'),
@@ -213,6 +218,7 @@ export function ByteTable({
     event: KeyboardEvent<HTMLButtonElement>,
   ) => {
     if (event.key === 'Enter' || event.key === 'F2') {
+      if (readOnly) return
       event.preventDefault()
       startEditing(index, byte)
       return
@@ -266,7 +272,10 @@ export function ByteTable({
   }
 
   return (
-    <section className="bytes-panel" aria-labelledby="bytes-heading">
+    <section
+      className={readOnly ? 'bytes-panel is-read-only' : 'bytes-panel'}
+      aria-labelledby="bytes-heading"
+    >
       <div className="panel-heading">
         <h2 id="bytes-heading" className="section-title">
           Bytes
@@ -336,21 +345,21 @@ export function ByteTable({
                           .filter(Boolean)
                           .join(' ')
 
-                        return editing?.index === index ? (
+                        return activeEditing?.index === index ? (
                           <input
                             key={index}
                             className={
-                              editing.error
+                              activeEditing.error
                                 ? 'byte-edit-input has-error'
                                 : 'byte-edit-input'
                             }
-                            value={editing.value}
+                            value={activeEditing.value}
                             maxLength={2}
                             autoFocus
                             aria-label={
                               'Edit byte ' + index + ' as hexadecimal'
                             }
-                            aria-invalid={editing.error}
+                            aria-invalid={activeEditing.error}
                             onChange={(event) => {
                               const value = event.target.value.toUpperCase()
                               if (/^[0-9A-F]{0,2}$/.test(value)) {

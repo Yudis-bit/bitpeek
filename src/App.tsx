@@ -7,6 +7,7 @@ import { Header } from './components/Header'
 import { HelpDialog } from './components/HelpDialog'
 import { InputEditor } from './components/InputEditor'
 import { InterpretationPanel } from './components/InterpretationPanel'
+import { ScopeBar } from './components/ScopeBar'
 import { StringScannerDialog } from './components/StringScannerDialog'
 import { SupportDialog } from './components/SupportDialog'
 import { useClipboard } from './hooks/useClipboard'
@@ -17,11 +18,9 @@ import {
   type SearchMode,
 } from './lib/analysis'
 import {
-  formatInput,
   getSelectionRange,
   INPUT_MODES,
   isValidUtf8,
-  parseInput,
   setByte,
   sliceSelection,
   toggleBit,
@@ -42,6 +41,18 @@ import {
   type BytePatch,
   type RangeOperation,
 } from './lib/edits'
+import {
+  applySourceInput,
+  changeMode,
+  createInspectionState,
+  equalBytes,
+  getAnalysisScope,
+  getDocumentScope,
+  replaceDocument,
+  restoreSource,
+  setInspectionSelection,
+  updateDocument,
+} from './lib/inspection'
 import { ETHEREUM_ADDRESS } from './lib/support'
 
 const DEFAULT_BYTES = Uint8Array.from([
@@ -77,11 +88,6 @@ function isTextEditingTarget(target: EventTarget | null): boolean {
   )
 }
 
-function equalBytes(left: Uint8Array, right: Uint8Array): boolean {
-  if (left.length !== right.length) return false
-  return left.every((value, index) => right[index] === value)
-}
-
 function downloadName(documentName: string | null, byteCount: number): string {
   if (!documentName) return 'bitpeek-' + byteCount + '-bytes.bin'
   if (documentName.toLowerCase().endsWith('.bitpeek.bin')) return documentName
@@ -91,14 +97,13 @@ function downloadName(documentName: string | null, byteCount: number): string {
 }
 
 export default function App() {
-  const [mode, setMode] = useState<InputMode>(initialMode)
-  const [bytes, setBytes] = useState<Uint8Array>(() => DEFAULT_BYTES.slice())
-  const [source, setSource] = useState(() => formatInput(DEFAULT_BYTES, mode))
-  const [error, setError] = useState<string | null>(null)
-  const [selection, setSelection] = useState<ByteSelection | null>({
-    anchor: 0,
-    focus: 3,
-  })
+  const [inspection, setInspection] = useState(() =>
+    createInspectionState(DEFAULT_BYTES, initialMode(), {
+      anchor: 0,
+      focus: 3,
+    }),
+  )
+  const [operationError, setOperationError] = useState<string | null>(null)
   const [documentName, setDocumentName] = useState<string | null>(null)
   const [documentDirty, setDocumentDirty] = useState(false)
   const [history, setHistory] = useState<HistoryState>({
@@ -118,7 +123,14 @@ export default function App() {
   const baselineRef = useRef<Uint8Array | null>(null)
   const { notice, copy } = useClipboard()
 
+  const { source: sourceState, document: byteDocument } = inspection
+  const { mode, value: source, error } = sourceState
+  const { bytes, selection } = byteDocument
+
   const range = getSelectionRange(selection, bytes.length)
+  const scope = useMemo(() => getAnalysisScope(inspection), [inspection])
+  const documentScope = useMemo(() => getDocumentScope(inspection), [inspection])
+  const stale = scope.status === 'last-valid'
   const selectedBytes = useMemo(
     () => sliceSelection(bytes, selection),
     [bytes, selection],
@@ -169,22 +181,27 @@ export default function App() {
       : Math.min(activeMatchIndex, search.offsets.length - 1)
   const activeSearchOffset =
     activeMatch >= 0 ? (search.offsets[activeMatch] ?? null) : null
-  const inputWarning =
-    mode === 'text' && bytes.length > 0 && !isValidUtf8(bytes)
-      ? 'Invalid UTF-8; editing text will replace undecodable bytes.'
-      : null
+
+  const handleSelectionChange = useCallback(
+    (nextSelection: ByteSelection | null) => {
+      setInspection((current) =>
+        setInspectionSelection(current, nextSelection),
+      )
+    },
+    [],
+  )
 
   const applyWorkingBytes = useCallback(
     (nextBytes: Uint8Array) => {
-      setBytes(nextBytes)
-      setSource(formatInput(nextBytes, mode))
-      setError(null)
+      if (inspection.source.validity !== 'valid') return
+      setInspection(updateDocument(inspection, nextBytes))
+      setOperationError(null)
       setActiveMatchIndex(-1)
       if (documentName && baselineRef.current) {
         setDocumentDirty(!equalBytes(nextBytes, baselineRef.current))
       }
     },
-    [documentName, mode],
+    [documentName, inspection],
   )
 
   const handleUndo = useCallback(() => {
@@ -233,12 +250,12 @@ export default function App() {
         return
       }
       if (event.key === 'Escape' && !isTextEditingTarget(event.target)) {
-        setSelection(null)
+        handleSelectionChange(null)
       }
     }
     window.addEventListener('keydown', handleGlobalKeys)
     return () => window.removeEventListener('keydown', handleGlobalKeys)
-  }, [handleRedo, handleUndo])
+  }, [handleRedo, handleSelectionChange, handleUndo])
 
   useEffect(() => {
     const syncSupportHash = () => {
@@ -254,6 +271,7 @@ export default function App() {
     end: number,
     label: string,
   ) => {
+    if (stale) return
     if (equalBytes(bytes, nextBytes)) return
     const patch = createPatch(bytes, nextBytes, start, end, label)
     setHistory((current) => ({
@@ -264,46 +282,56 @@ export default function App() {
   }
 
   const handleSourceChange = (nextSource: string) => {
-    setSource(nextSource)
-    const result = parseInput(nextSource, mode)
-    if (!result.ok) {
-      setError(result.error)
-      return
-    }
-    if (result.bytes.length > MAX_DOCUMENT_BYTES) {
-      setError('Input exceeds the 256 KiB workspace limit.')
-      return
-    }
+    const nextInspection = applySourceInput(
+      inspection,
+      nextSource,
+      MAX_DOCUMENT_BYTES,
+    )
+    setInspection(nextInspection)
+    setOperationError(null)
 
-    setError(null)
-    setBytes(result.bytes)
-    setHistory({ undo: [], redo: [] })
-    setActiveMatchIndex(-1)
-    if (documentName && baselineRef.current) {
-      setDocumentDirty(!equalBytes(result.bytes, baselineRef.current))
+    if (nextInspection.document.version !== byteDocument.version) {
+      setHistory({ undo: [], redo: [] })
+      setActiveMatchIndex(-1)
     }
-    setSelection((current) => {
-      if (result.bytes.length === 0 || current === null) return null
-      return {
-        anchor: Math.min(current.anchor, result.bytes.length - 1),
-        focus: Math.min(current.focus, result.bytes.length - 1),
-      }
-    })
+    if (
+      nextInspection.source.validity === 'valid' &&
+      documentName &&
+      baselineRef.current
+    ) {
+      setDocumentDirty(
+        !equalBytes(nextInspection.document.bytes, baselineRef.current),
+      )
+    }
   }
 
   const handleModeChange = (nextMode: InputMode) => {
     if (nextMode === mode) return
-    setMode(nextMode)
+    if (stale) {
+      setOperationError(
+        'Restore or correct the current source before changing format.',
+      )
+      return
+    }
+    if (nextMode === 'text' && !isValidUtf8(bytes)) {
+      setOperationError(
+        'The byte document is not valid UTF-8. Inspect its UTF-8 diagnostic before replacing it as text.',
+      )
+      return
+    }
+    setInspection(changeMode(inspection, nextMode))
     window.localStorage.setItem(MODE_STORAGE_KEY, nextMode)
-    setSource(formatInput(bytes, nextMode))
-    setError(null)
+    setOperationError(null)
+  }
+
+  const handleRestoreSource = () => {
+    setInspection(restoreSource(inspection))
+    setOperationError(null)
   }
 
   const handleClear = () => {
-    setSource('')
-    setBytes(new Uint8Array())
-    setSelection(null)
-    setError(null)
+    setInspection(replaceDocument(inspection, new Uint8Array(), null))
+    setOperationError(null)
     setDocumentName(null)
     setDocumentDirty(false)
     baselineRef.current = null
@@ -315,32 +343,34 @@ export default function App() {
 
   const handleOpenFile = async (file: File) => {
     if (file.size > MAX_DOCUMENT_BYTES) {
-      setError('File exceeds the 256 KiB workspace limit.')
+      setOperationError('File exceeds the 256 KiB workspace limit.')
       return
     }
     try {
       const nextBytes = new Uint8Array(await file.arrayBuffer())
-      setBytes(nextBytes)
-      setSource(formatInput(nextBytes, mode))
-      setError(null)
+      setInspection((current) =>
+        replaceDocument(
+          current,
+          nextBytes,
+          nextBytes.length === 0
+            ? null
+            : { anchor: 0, focus: Math.min(7, nextBytes.length - 1) },
+        ),
+      )
+      setOperationError(null)
       setDocumentName(file.name)
       setDocumentDirty(false)
       baselineRef.current = nextBytes.slice()
       setHistory({ undo: [], redo: [] })
-      setSelection(
-        nextBytes.length === 0
-          ? null
-          : { anchor: 0, focus: Math.min(7, nextBytes.length - 1) },
-      )
       setActiveMatchIndex(-1)
     } catch {
-      setError('The selected file could not be read.')
+      setOperationError('The selected file could not be read.')
     }
   }
 
   const handleOpenComparison = async (file: File) => {
     if (file.size > MAX_DOCUMENT_BYTES) {
-      setError('Comparison file exceeds the 256 KiB workspace limit.')
+      setOperationError('Comparison file exceeds the 256 KiB workspace limit.')
       return
     }
     try {
@@ -348,13 +378,13 @@ export default function App() {
       const nextDiff = diffBytes(bytes, referenceBytes)
       setComparison({ name: file.name, bytes: referenceBytes })
       setActiveDifferenceIndex(nextDiff.offsets.length > 0 ? 0 : -1)
-      setError(null)
+      setOperationError(null)
       const firstOffset = nextDiff.offsets[0]
       if (firstOffset !== undefined && firstOffset < bytes.length) {
-        setSelection({ anchor: firstOffset, focus: firstOffset })
+        handleSelectionChange({ anchor: firstOffset, focus: firstOffset })
       }
     } catch {
-      setError('The comparison file could not be read.')
+      setOperationError('The comparison file could not be read.')
     }
   }
 
@@ -413,7 +443,7 @@ export default function App() {
     const offset = search.offsets[next]
     if (offset === undefined) return
     setActiveMatchIndex(next)
-    setSelection({
+    handleSelectionChange({
       anchor: offset,
       focus: offset + search.patternLength - 1,
     })
@@ -422,7 +452,7 @@ export default function App() {
   const handleGoToOffset = (input: string): string | null => {
     const parsed = parseOffset(input, bytes.length)
     if (!parsed.ok) return parsed.error
-    setSelection({ anchor: parsed.value, focus: parsed.value })
+    handleSelectionChange({ anchor: parsed.value, focus: parsed.value })
     return null
   }
 
@@ -438,7 +468,7 @@ export default function App() {
     const offset = comparisonDiff.offsets[next]
     if (offset === undefined) return
     setActiveDifferenceIndex(next)
-    if (offset < bytes.length) setSelection({ anchor: offset, focus: offset })
+    if (offset < bytes.length) handleSelectionChange({ anchor: offset, focus: offset })
   }
 
   const createPatchText = async (): Promise<string> => {
@@ -505,7 +535,8 @@ export default function App() {
           mode={mode}
           source={source}
           error={error}
-          warning={inputWarning}
+          operationError={operationError}
+          stale={stale}
           byteCount={bytes.length}
           documentName={documentName}
           documentDirty={documentDirty}
@@ -516,11 +547,13 @@ export default function App() {
           onSaveFile={handleSaveFile}
           onClear={handleClear}
           onCopy={() => void copy(source, mode + ' input')}
+          onRestoreSource={handleRestoreSource}
         />
 
         <ByteTools
           byteCount={bytes.length}
           selectionLength={range?.length ?? 0}
+          readOnly={stale}
           searchMode={searchMode}
           searchQuery={searchQuery}
           searchError={search.error}
@@ -543,7 +576,7 @@ export default function App() {
           onGoToOffset={handleGoToOffset}
           onSelectAll={() => {
             if (bytes.length > 0) {
-              setSelection({ anchor: 0, focus: bytes.length - 1 })
+              handleSelectionChange({ anchor: 0, focus: bytes.length - 1 })
             }
           }}
           onTransform={handleTransform}
@@ -570,10 +603,13 @@ export default function App() {
           />
         ) : null}
 
+        <ScopeBar scope={scope} />
+
         <div className="split-workspace">
           <ByteTable
             bytes={bytes}
             selection={selection}
+            readOnly={stale}
             searchOffsets={search.offsets}
             searchLength={search.patternLength}
             activeSearchOffset={activeSearchOffset}
@@ -584,13 +620,14 @@ export default function App() {
                 ? activeDifferenceOffset
                 : null
             }
-            onSelectionChange={setSelection}
+            onSelectionChange={handleSelectionChange}
             onByteEdit={handleByteEdit}
           />
           <InterpretationPanel
             bytes={selectedBytes}
             documentBytes={bytes}
-            range={range}
+            scope={scope}
+            documentScope={documentScope}
             onCopy={(value, label) => void copy(value, label)}
           />
         </div>
@@ -598,6 +635,7 @@ export default function App() {
         <BitInspector
           bytes={selectedBytes}
           range={range}
+          readOnly={stale}
           onToggle={handleToggleBit}
         />
       </main>
@@ -626,7 +664,7 @@ export default function App() {
         bytes={bytes}
         onClose={() => setStringsOpen(false)}
         onSelect={(offset, byteLength) => {
-          setSelection({ anchor: offset, focus: offset + byteLength - 1 })
+          handleSelectionChange({ anchor: offset, focus: offset + byteLength - 1 })
           setStringsOpen(false)
         }}
         onCopy={(value, label) => void copy(value, label)}

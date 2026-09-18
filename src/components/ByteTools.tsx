@@ -5,6 +5,7 @@ import type { RangeOperation } from '../lib/edits'
 interface ByteToolsProps {
   byteCount: number
   selectionLength: number
+  readOnly: boolean
   searchMode: SearchMode
   searchQuery: string
   searchError: string | null
@@ -29,6 +30,7 @@ interface ByteToolsProps {
 export function ByteTools({
   byteCount,
   selectionLength,
+  readOnly,
   searchMode,
   searchQuery,
   searchError,
@@ -177,14 +179,14 @@ export function ByteTools({
         <button
           type="button"
           onClick={() => onTransform('reverse')}
-          disabled={selectionLength < 2}
+          disabled={selectionLength < 2 || readOnly}
         >
           Reverse
         </button>
         <button
           type="button"
           onClick={() => onTransform('invert')}
-          disabled={selectionLength === 0}
+          disabled={selectionLength === 0 || readOnly}
         >
           Invert
         </button>
@@ -196,8 +198,12 @@ export function ByteTools({
         <button
           type="button"
           onClick={onOpenStrings}
-          disabled={byteCount === 0}
-          title="Extract printable ASCII and UTF-16 strings"
+          disabled={byteCount === 0 || readOnly}
+          title={
+            readOnly
+              ? 'Restore or correct the current source before analyzing strings.'
+              : 'Extract printable ASCII and UTF-16 strings'
+          }
         >
           Strings
         </button>
@@ -209,7 +215,7 @@ export function ByteTools({
         <button
           type="button"
           onClick={onUndo}
-          disabled={!canUndo}
+          disabled={!canUndo || readOnly}
           title={undoLabel ? 'Undo ' + undoLabel : 'Undo'}
         >
           Undo
@@ -217,7 +223,7 @@ export function ByteTools({
         <button
           type="button"
           onClick={onRedo}
-          disabled={!canRedo}
+          disabled={!canRedo || readOnly}
           title={redoLabel ? 'Redo ' + redoLabel : 'Redo'}
         >
           Redo

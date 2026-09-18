@@ -3,16 +3,24 @@ import type { SelectionRange } from '../lib/bytes'
 interface BitInspectorProps {
   bytes: Uint8Array
   range: SelectionRange | null
+  readOnly: boolean
   onToggle: (bit: number) => void
 }
 
 const BITS = [7, 6, 5, 4, 3, 2, 1, 0]
 
-export function BitInspector({ bytes, range, onToggle }: BitInspectorProps) {
+export function BitInspector({
+  bytes,
+  range,
+  readOnly,
+  onToggle,
+}: BitInspectorProps) {
   const singleByte = bytes.length === 1 ? bytes[0] : undefined
+  const className =
+    singleByte === undefined ? 'bits-panel is-compact' : 'bits-panel'
 
   return (
-    <section className="bits-panel" aria-labelledby="bits-heading">
+    <section className={className} aria-labelledby="bits-heading">
       <div className="panel-heading bits-heading-row">
         <h2 id="bits-heading" className="section-title">
           Bits
@@ -49,6 +57,7 @@ export function BitInspector({ bytes, range, onToggle }: BitInspectorProps) {
                 className={active ? 'bit-toggle is-active' : 'bit-toggle'}
                 aria-label={`Toggle bit ${bit}`}
                 aria-pressed={active}
+                disabled={readOnly}
                 onClick={() => onToggle(bit)}
               >
                 {active ? '1' : '0'}
