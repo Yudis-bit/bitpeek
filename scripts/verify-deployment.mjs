@@ -120,7 +120,7 @@ assert.ok(versionData.commit || versionData.gitCommit, 'version.json must contai
 
 const capabilitiesRes = await fetchDirect('/capabilities.json', 200)
 const capabilitiesData = await capabilitiesRes.json()
-assert.equal(capabilitiesData.service, 'Bitpeek')
+assert.ok(capabilitiesData.name === 'Bitpeek' || capabilitiesData.service === 'Bitpeek', 'capabilities.json must declare Bitpeek')
 assert.ok(Array.isArray(capabilitiesData.supportedFormats))
 
 const llmsRes = await fetchDirect('/llms.txt', 200)

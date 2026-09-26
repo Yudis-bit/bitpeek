@@ -1,5 +1,6 @@
 {
   "name": "Bitpeek",
+  "service": "Bitpeek",
   "version": "1.0.0",
   "description": "A local-first binary workbench for inspecting bytes, checking structure, and reproducing changes.",
   "engine": "Bitpeek TypeScript Core v1.0.0",
