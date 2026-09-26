@@ -1,0 +1,14 @@
+{
+  "version": "1.0.0",
+  "commit": "9cde6ffd2bc127f30a6c3b2d23b205e96dad0652",
+  "buildTime": "2026-09-26T17:16:11.671Z",
+  "schemaVersions": {
+    "offsetPatch": [
+      1,
+      2
+    ],
+    "recipe": 1,
+    "evidenceReport": 1,
+    "customSchema": 1
+  }
+}

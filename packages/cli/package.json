@@ -1,0 +1,13 @@
+{
+  "name": "@bitpeek/cli",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "bitpeek": "./bin/bitpeek.js"
+  },
+  "main": "./src/cli.ts",
+  "scripts": {
+    "build": "tsc -b"
+  }
+}

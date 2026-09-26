@@ -111,7 +111,7 @@ for (const document of documents) {
   assert.ok(structuredData.length >= 1, `${document.slug} is missing structured data`)
   for (const match of structuredData) JSON.parse(match[1])
 
-  for (const hrefMatch of html.matchAll(/href="(\/(?:tools|file-formats)\/[^"?#]+)[^\"]*"/g)) {
+  for (const hrefMatch of html.matchAll(/href="(\/(?:tools|file-formats|docs)(?:\/[^"?#]+)?)[^\"]*"/g)) {
     assert.ok(knownRoutes.has(hrefMatch[1]), `${document.slug} links to missing route ${hrefMatch[1]}`)
   }
 }

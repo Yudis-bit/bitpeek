@@ -1,3 +1,5 @@
+import { docsPages } from './docs-pages.mjs'
+
 export const SITE_URL = 'https://bitpeek-seven.vercel.app'
 export const HOMEPAGE_LAST_MODIFIED = '2026-08-29'
 
@@ -856,4 +858,5 @@ export const formatPages = [
   },
 ]
 
-export const allSeoPages = [...toolPages, ...formatPages]
+export { docsPages }
+export const allSeoPages = [...toolPages, ...formatPages, ...docsPages]

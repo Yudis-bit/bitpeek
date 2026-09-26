@@ -1,0 +1,13 @@
+{
+  "name": "@bitpeek/mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "bitpeek-mcp": "./bin/bitpeek-mcp.js"
+  },
+  "main": "./src/server.ts",
+  "scripts": {
+    "build": "tsc -b"
+  }
+}

@@ -10,6 +10,8 @@ interface InputEditorProps {
   byteCount: number
   documentName: string | null
   documentDirty: boolean
+  isDraftInvalid?: boolean
+  documentLoaded?: boolean
   onModeChange: (mode: InputMode) => void
   onSourceChange: (source: string) => void
   onOpenFile: (file: File) => void
@@ -17,6 +19,7 @@ interface InputEditorProps {
   onSaveFile: () => void
   onClear: () => void
   onCopy: () => void
+  onCopyBytes?: () => void
 }
 
 const labels: Record<InputMode, string> = {
@@ -44,6 +47,8 @@ export function InputEditor({
   byteCount,
   documentName,
   documentDirty,
+  isDraftInvalid = false,
+  documentLoaded = true,
   onModeChange,
   onSourceChange,
   onOpenFile,
@@ -51,6 +56,7 @@ export function InputEditor({
   onSaveFile,
   onClear,
   onCopy,
+  onCopyBytes,
 }: InputEditorProps) {
   const [dragging, setDragging] = useState(false)
 
@@ -134,7 +140,7 @@ export function InputEditor({
               {byteCount > 0 ? (
                 <span className="last-valid-note">
                   {' '}
-                  Inspector shows the last valid bytes.
+                  Inspector and export retain the last valid bytes ({byteCount} B).
                 </span>
               ) : null}
             </span>
@@ -192,17 +198,39 @@ export function InputEditor({
           <button
             type="button"
             onClick={onSaveFile}
-            disabled={byteCount === 0}
+            disabled={!documentLoaded}
+            title={
+              isDraftInvalid
+                ? `Draft has syntax errors. Export will save last valid bytes (${byteCount} B).`
+                : byteCount === 0
+                ? 'Save empty binary file (0 bytes)'
+                : `Save ${byteCount} bytes as binary file`
+            }
           >
-            Save
-          </button>
-          <button type="button" onClick={onCopy} disabled={source.length === 0}>
-            Copy
+            {isDraftInvalid ? 'Save valid' : 'Save'}
           </button>
           <button
             type="button"
+            onClick={onCopy}
+            disabled={source.length === 0}
+            title="Copy raw input text"
+          >
+            Copy input
+          </button>
+          {onCopyBytes && (
+            <button
+              type="button"
+              onClick={onCopyBytes}
+              disabled={byteCount === 0}
+              title="Copy formatted committed bytes"
+            >
+              Copy bytes
+            </button>
+          )}
+          <button
+            type="button"
             onClick={onClear}
-            disabled={source.length === 0 && byteCount === 0}
+            disabled={source.length === 0 && byteCount === 0 && !documentLoaded}
           >
             Clear
           </button>

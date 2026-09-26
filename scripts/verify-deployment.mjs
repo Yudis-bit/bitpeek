@@ -113,6 +113,33 @@ for (const page of indexablePages) {
 const manifest = await fetchDirect('/site.webmanifest', 200)
 assert.equal((await manifest.json()).start_url, '/')
 
+const versionRes = await fetchDirect('/version.json', 200)
+const versionData = await versionRes.json()
+assert.equal(versionData.version, '1.0.0', 'version.json must declare 1.0.0')
+assert.ok(versionData.gitCommit, 'version.json must contain gitCommit')
+
+const capabilitiesRes = await fetchDirect('/capabilities.json', 200)
+const capabilitiesData = await capabilitiesRes.json()
+assert.equal(capabilitiesData.service, 'Bitpeek')
+assert.ok(Array.isArray(capabilitiesData.supportedFormats))
+
+const llmsRes = await fetchDirect('/llms.txt', 200)
+const llmsText = await llmsRes.text()
+assert.ok(llmsText.includes('Bitpeek'), 'llms.txt must describe Bitpeek')
+
+const schemaFiles = [
+  '/schemas/offset-patch-v1.json',
+  '/schemas/offset-patch-v2.json',
+  '/schemas/recipe-v1.json',
+  '/schemas/evidence-report-v1.json',
+  '/schemas/schema-definition-v1.json',
+]
+for (const schemaPath of schemaFiles) {
+  const schemaRes = await fetchDirect(schemaPath, 200)
+  const schemaJson = await schemaRes.json()
+  assert.ok(schemaJson.$schema || schemaJson.title, `${schemaPath} must be valid json schema`)
+}
+
 for (const asset of ['/favicon.svg', '/social/bitpeek-og.png']) {
   const response = await fetchDirect(asset, 200)
   assert.ok((await response.arrayBuffer()).byteLength > 0, `${asset} is empty`)
@@ -124,5 +151,6 @@ assert.match(notFoundHtml, /name="robots"\s+content="noindex,follow"/i)
 assert.equal(countMatches(notFoundHtml, /<h1\b/gi), 1, '404 page must have one H1')
 
 console.log(
-  `Verified ${indexablePages.length} indexable pages, public SEO assets, and the custom 404 at ${target.origin}.`,
+  `Verified ${indexablePages.length} indexable pages, public SEO assets, manifests, schemas, and custom 404 at ${target.origin}.`,
 )
+

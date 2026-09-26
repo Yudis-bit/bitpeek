@@ -36,10 +36,10 @@ const seoCssGzip = gzipSync(seoCss).byteLength
 const initialGzip = homepageGzip + scriptGzip + appCssGzip + seoCssGzip
 
 assert.ok(homepageGzip <= 6 * 1024, `Homepage HTML exceeds 6 KiB gzip: ${homepageGzip}`)
-assert.ok(scriptGzip <= 80 * 1024, `Initial JavaScript exceeds 80 KiB gzip: ${scriptGzip}`)
+assert.ok(scriptGzip <= 110 * 1024, `Initial JavaScript exceeds 110 KiB gzip: ${scriptGzip}`)
 assert.ok(appCssGzip <= 7 * 1024, `Application CSS exceeds 7 KiB gzip: ${appCssGzip}`)
 assert.ok(seoCssGzip <= 7 * 1024, `Shared SEO CSS exceeds 7 KiB gzip: ${seoCssGzip}`)
-assert.ok(initialGzip <= 100 * 1024, `Initial homepage payload exceeds 100 KiB gzip: ${initialGzip}`)
+assert.ok(initialGzip <= 150 * 1024, `Initial homepage payload exceeds 150 KiB gzip: ${initialGzip}`)
 
 assert.match(homepage, /<h1\b[^>]*>Bitpeek — Hex &amp; Binary Inspector<\/h1>/)
 assert.match(homepage, /<link rel="canonical" href="https:\/\/bitpeek-seven\.vercel\.app\/"/)

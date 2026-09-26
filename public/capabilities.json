@@ -1,0 +1,46 @@
+{
+  "name": "Bitpeek",
+  "version": "1.0.0",
+  "description": "A local-first binary workbench for inspecting bytes, checking structure, and reproducing changes.",
+  "engine": "Bitpeek TypeScript Core v1.0.0",
+  "clientOnly": true,
+  "zeroServerProcessing": true,
+  "supportedFormats": ["elf", "png", "custom-schema"],
+  "supportedChecksums": [
+    "crc16-ccitt",
+    "crc32-ieee",
+    "sha256",
+    "sha512",
+    "sum8",
+    "xor8",
+    "entropy-shannon"
+  ],
+  "supportedEncodings": [
+    "hex",
+    "binary",
+    "decimal",
+    "base64",
+    "ascii",
+    "utf8",
+    "utf16le",
+    "utf16be"
+  ],
+  "interfaces": {
+    "web": "https://bitpeek-seven.vercel.app",
+    "cli": "bitpeek",
+    "mcp": "stdio"
+  },
+  "limits": {
+    "webWorkspaceMaxBytes": 262144,
+    "webReadOnlyTargetBytes": 67108864,
+    "cliStreamingChunkBytes": 1048576,
+    "mcpMaxReadChunkBytes": 65536
+  },
+  "schemas": {
+    "offsetPatchV1": "https://bitpeek-seven.vercel.app/schemas/offset-patch-v1.json",
+    "offsetPatchV2": "https://bitpeek-seven.vercel.app/schemas/offset-patch-v2.json",
+    "recipeV1": "https://bitpeek-seven.vercel.app/schemas/recipe-v1.json",
+    "evidenceReportV1": "https://bitpeek-seven.vercel.app/schemas/evidence-report-v1.json",
+    "schemaDefinitionV1": "https://bitpeek-seven.vercel.app/schemas/schema-definition-v1.json"
+  }
+}

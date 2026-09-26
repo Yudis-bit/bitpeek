@@ -13,6 +13,7 @@ import { ByteTools } from './components/ByteTools'
 import { DiffBar } from './components/DiffBar'
 import { InputEditor } from './components/InputEditor'
 import { InterpretationPanel } from './components/InterpretationPanel'
+import { StructureInspector } from './components/StructureInspector'
 import { useClipboard } from './hooks/useClipboard'
 import {
   findBytePattern,
@@ -23,7 +24,6 @@ import {
 import {
   formatInput,
   getSelectionRange,
-  INPUT_MODES,
   isValidUtf8,
   parseInput,
   setByte,
@@ -39,13 +39,25 @@ import {
   serializeOffsetPatch,
 } from './lib/diff'
 import {
-  appendPatch,
-  applyPatch,
   createPatch,
   transformRange,
-  type BytePatch,
   type RangeOperation,
+  type UnifiedHistoryState,
+  createEmptyHistory,
+  pushTransaction,
+  applyUndo,
+  applyRedo,
 } from './lib/edits'
+import { generateEvidenceReport } from './lib/evidence'
+import {
+  createSafeStorage,
+  resolveInitialMode,
+  MODE_STORAGE_KEY,
+} from './lib/storage'
+import {
+  autoDetectAndParseStructure,
+  type CustomStructureSchema,
+} from './lib/structures'
 import { ETHEREUM_ADDRESS } from './lib/support'
 
 const HelpDialog = lazy(() =>
@@ -67,26 +79,12 @@ const SupportDialog = lazy(() =>
 const DEFAULT_BYTES = Uint8Array.from([
   0xde, 0xad, 0xbe, 0xef, 0x00, 0x01, 0x7f, 0x80,
 ])
-const MODE_STORAGE_KEY = 'bitpeek.inputMode'
 const MAX_DOCUMENT_BYTES = 256 * 1024
-
-interface HistoryState {
-  undo: BytePatch[]
-  redo: BytePatch[]
-}
+const storage = createSafeStorage()
 
 interface ComparisonDocument {
   name: string
   bytes: Uint8Array
-}
-
-function initialMode(): InputMode {
-  const requested = new URLSearchParams(window.location.search).get('mode')
-  if (INPUT_MODES.includes(requested as InputMode)) return requested as InputMode
-  const stored = window.localStorage.getItem(MODE_STORAGE_KEY)
-  return INPUT_MODES.includes(stored as InputMode)
-    ? (stored as InputMode)
-    : 'hex'
 }
 
 function requestedAction(): 'open' | 'compare' | null {
@@ -120,7 +118,7 @@ function downloadName(documentName: string | null, byteCount: number): string {
 }
 
 export default function App() {
-  const [mode, setMode] = useState<InputMode>(initialMode)
+  const [mode, setMode] = useState<InputMode>(() => resolveInitialMode(storage))
   const [primaryAction] = useState(requestedAction)
   const [bytes, setBytes] = useState<Uint8Array>(() => DEFAULT_BYTES.slice())
   const [source, setSource] = useState(() => formatInput(DEFAULT_BYTES, mode))
@@ -131,10 +129,9 @@ export default function App() {
   })
   const [documentName, setDocumentName] = useState<string | null>(null)
   const [documentDirty, setDocumentDirty] = useState(false)
-  const [history, setHistory] = useState<HistoryState>({
-    undo: [],
-    redo: [],
-  })
+  const [history, setHistory] = useState<UnifiedHistoryState>(() => createEmptyHistory())
+  const [structureOpen, setStructureOpen] = useState(false)
+  const [customSchema, setCustomSchema] = useState<CustomStructureSchema | null>(null)
   const [searchMode, setSearchMode] = useState<SearchMode>('hex')
   const [searchQuery, setSearchQuery] = useState('')
   const [activeMatchIndex, setActiveMatchIndex] = useState(-1)
@@ -147,6 +144,12 @@ export default function App() {
   )
   const baselineRef = useRef<Uint8Array | null>(null)
   const { notice, copy } = useClipboard()
+
+  const structure = useMemo(
+    () => autoDetectAndParseStructure(bytes, customSchema ?? undefined),
+    [bytes, customSchema],
+  )
+  const showStructure = structureOpen || structure !== null
 
   const range = getSelectionRange(selection, bytes.length)
   const selectedBytes = useMemo(
@@ -224,25 +227,17 @@ export default function App() {
   )
 
   const handleUndo = useCallback(() => {
-    const patch = history.undo.at(-1)
-    if (!patch) return
-    const nextBytes = applyPatch(bytes, patch, 'undo')
-    setHistory({
-      undo: history.undo.slice(0, -1),
-      redo: [...history.redo, patch],
-    })
-    applyWorkingBytes(nextBytes)
+    const res = applyUndo(bytes, history)
+    if (!res) return
+    setHistory(res.history)
+    applyWorkingBytes(res.nextBytes)
   }, [applyWorkingBytes, bytes, history])
 
   const handleRedo = useCallback(() => {
-    const patch = history.redo.at(-1)
-    if (!patch) return
-    const nextBytes = applyPatch(bytes, patch, 'redo')
-    setHistory({
-      undo: appendPatch(history.undo, patch),
-      redo: history.redo.slice(0, -1),
-    })
-    applyWorkingBytes(nextBytes)
+    const res = applyRedo(bytes, history)
+    if (!res) return
+    setHistory(res.history)
+    applyWorkingBytes(res.nextBytes)
   }, [applyWorkingBytes, bytes, history])
 
   useEffect(() => {
@@ -292,10 +287,13 @@ export default function App() {
   ) => {
     if (equalBytes(bytes, nextBytes)) return
     const patch = createPatch(bytes, nextBytes, start, end, label)
-    setHistory((current) => ({
-      undo: appendPatch(current.undo, patch),
-      redo: [],
-    }))
+    setHistory((current) =>
+      pushTransaction(current, {
+        type: 'patch',
+        patch,
+        label,
+      }),
+    )
     applyWorkingBytes(nextBytes)
   }
 
@@ -312,8 +310,17 @@ export default function App() {
     }
 
     setError(null)
+    if (!equalBytes(bytes, result.bytes)) {
+      setHistory((current) =>
+        pushTransaction(current, {
+          type: 'replace',
+          before: bytes.slice(),
+          after: result.bytes.slice(),
+          label: 'Edit input',
+        }),
+      )
+    }
     setBytes(result.bytes)
-    setHistory({ undo: [], redo: [] })
     setActiveMatchIndex(-1)
     if (documentName && baselineRef.current) {
       setDocumentDirty(!equalBytes(result.bytes, baselineRef.current))
@@ -330,12 +337,20 @@ export default function App() {
   const handleModeChange = (nextMode: InputMode) => {
     if (nextMode === mode) return
     setMode(nextMode)
-    window.localStorage.setItem(MODE_STORAGE_KEY, nextMode)
+    storage.setItem(MODE_STORAGE_KEY, nextMode)
     setSource(formatInput(bytes, nextMode))
     setError(null)
   }
 
   const handleClear = () => {
+    if (
+      documentDirty &&
+      !window.confirm(
+        'You have unsaved edits in this buffer. Discard changes?',
+      )
+    ) {
+      return
+    }
     setSource('')
     setBytes(new Uint8Array())
     setSelection(null)
@@ -343,13 +358,22 @@ export default function App() {
     setDocumentName(null)
     setDocumentDirty(false)
     baselineRef.current = null
-    setHistory({ undo: [], redo: [] })
+    setHistory(createEmptyHistory())
     setActiveMatchIndex(-1)
     setComparison(null)
     setActiveDifferenceIndex(-1)
+    setCustomSchema(null)
   }
 
   const handleOpenFile = async (file: File) => {
+    if (
+      documentDirty &&
+      !window.confirm(
+        'You have unsaved edits in this buffer. Discard changes and open file?',
+      )
+    ) {
+      return
+    }
     if (file.size > MAX_DOCUMENT_BYTES) {
       setError('File exceeds the 256 KiB workspace limit.')
       return
@@ -362,7 +386,7 @@ export default function App() {
       setDocumentName(file.name)
       setDocumentDirty(false)
       baselineRef.current = nextBytes.slice()
-      setHistory({ undo: [], redo: [] })
+      setHistory(createEmptyHistory())
       setSelection(
         nextBytes.length === 0
           ? null
@@ -395,9 +419,8 @@ export default function App() {
   }
 
   const handleSaveFile = () => {
-    if (bytes.length === 0) return
     const name = downloadName(documentName, bytes.length)
-    const blob = new Blob([bytes.slice().buffer], {
+    const blob = new Blob([bytes as unknown as BlobPart], {
       type: 'application/octet-stream',
     })
     const url = URL.createObjectURL(blob)
@@ -411,6 +434,38 @@ export default function App() {
     setDocumentName(name)
     baselineRef.current = bytes.slice()
     setDocumentDirty(false)
+  }
+
+  const handleExportEvidence = async () => {
+    const resultData = structure
+      ? {
+          format: structure.format,
+          status: structure.status,
+          fieldCount: structure.fields.length,
+          warnings: structure.warnings,
+          selectedRange: range
+            ? { start: range.start, end: range.end }
+            : null,
+        }
+      : {
+          byteCount: bytes.length,
+          selection: range ? { start: range.start, end: range.end } : null,
+        }
+
+    const { humanSummary } = generateEvidenceReport(
+      structure
+        ? `${structure.format.toUpperCase()} structure inspection`
+        : 'Byte inspection',
+      bytes,
+      resultData,
+      {
+        fileName: documentName ?? 'sample.bin',
+        range: range ? { start: range.start, end: range.end } : undefined,
+        warnings: structure?.warnings,
+      },
+    )
+
+    await copy(humanSummary, 'evidence report summary')
   }
 
   const handleToggleBit = (bit: number) => {
@@ -531,9 +586,24 @@ export default function App() {
           buffer / {documentName ?? 'untitled'}
           {documentDirty ? ' / modified' : ''}
         </span>
-        <button type="button" onClick={() => setHelpOpen(true)}>
-          Help / formats / shortcuts
-        </button>
+        <div className="menubar-actions">
+          <button
+            type="button"
+            className={showStructure ? 'menubar-btn is-active' : 'menubar-btn'}
+            onClick={() => setStructureOpen((prev) => !prev)}
+            aria-pressed={showStructure}
+            title="Toggle structure inspector panel"
+          >
+            Structure {structure ? `(${structure.format.toUpperCase()})` : ''}
+          </button>
+          <button
+            type="button"
+            className="menubar-btn"
+            onClick={() => setHelpOpen(true)}
+          >
+            Help / formats / shortcuts
+          </button>
+        </div>
       </div>
       <div className="workbench">
         <InputEditor
@@ -545,6 +615,8 @@ export default function App() {
           byteCount={bytes.length}
           documentName={documentName}
           documentDirty={documentDirty}
+          isDraftInvalid={error !== null}
+          documentLoaded={true}
           onModeChange={handleModeChange}
           onSourceChange={handleSourceChange}
           onOpenFile={(file) => void handleOpenFile(file)}
@@ -552,6 +624,9 @@ export default function App() {
           onSaveFile={handleSaveFile}
           onClear={handleClear}
           onCopy={() => void copy(source, mode + ' input')}
+          onCopyBytes={() =>
+            void copy(formatInput(bytes, mode), 'committed ' + mode + ' bytes')
+          }
         />
 
         <ByteTools
@@ -606,7 +681,31 @@ export default function App() {
           />
         ) : null}
 
-        <div className="split-workspace">
+        <div
+          className={
+            showStructure
+              ? 'split-workspace has-structure'
+              : 'split-workspace'
+          }
+        >
+          {showStructure ? (
+            <StructureInspector
+              structure={structure}
+              selectedRange={range}
+              onSelectRange={(start, endInclusive) => {
+                setSelection({ anchor: start, focus: endInclusive })
+              }}
+              onExportEvidence={() => void handleExportEvidence()}
+              onLoadCustomSchema={(schemaJson) => {
+                try {
+                  const parsed = JSON.parse(schemaJson) as CustomStructureSchema
+                  setCustomSchema(parsed)
+                } catch {
+                  setError('Invalid custom schema JSON.')
+                }
+              }}
+            />
+          ) : null}
           <ByteTable
             bytes={bytes}
             selection={selection}

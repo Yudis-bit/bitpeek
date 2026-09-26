@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitpeek-seven.vercel.app/schemas/offset-patch-v1.json",
+  "title": "BitpeekOffsetPatchV1",
+  "description": "Offset-aligned binary patch format version 1",
+  "type": "object",
+  "required": ["format", "version", "targetLength", "operations"],
+  "properties": {
+    "format": {
+      "type": "string",
+      "const": "bitpeek-offset-patch"
+    },
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "referenceName": {
+      "type": "string"
+    },
+    "currentName": {
+      "type": "string"
+    },
+    "referenceSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "currentSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "targetLength": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["offset", "bytes"],
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "bytes": {
+            "type": "string",
+            "pattern": "^(?:[0-9A-Fa-f]{2} *)*$"
+          },
+          "precondition": {
+            "type": "string",
+            "pattern": "^(?:[0-9A-Fa-f]{2} *)*$"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

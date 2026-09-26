@@ -68,8 +68,10 @@ function siteHeader() {
         <a class="site-brand" href="/" aria-label="Bitpeek home">bitpeek</a>
         <nav class="site-nav" aria-label="Primary navigation">
           <a href="/#workspace">workspace</a>
-          <a href="/#tools">tools</a>
-          <a href="/#file-formats">formats</a>
+          <a href="/docs">docs</a>
+          <a href="/examples">examples</a>
+          <a href="/benchmarks">benchmarks</a>
+          <a href="/about">about</a>
           <a href="https://github.com/Yudis-bit/bitpeek">source</a>
         </nav>
       </div>
@@ -80,9 +82,14 @@ function siteFooter() {
   return `
     <footer class="site-footer">
       <div class="site-header-inner footer-content">
-        <p>bitpeek · browser hex and binary utility</p>
+        <p>bitpeek · local-first binary workbench · built by Yudistira Putra (Yudis-bit)</p>
         <nav aria-label="Footer navigation">
           <a href="/">workspace</a>
+          <a href="/docs">docs</a>
+          <a href="/examples">examples</a>
+          <a href="/benchmarks">benchmarks</a>
+          <a href="/about">about</a>
+          <a href="/changelog">changelog</a>
           <a href="/tools/hex-editor">hex editor</a>
           <a href="/file-formats/png">format reference</a>
           <a href="https://github.com/Yudis-bit/bitpeek">source</a>
@@ -284,4 +291,32 @@ for (const page of allSeoPages) {
 
 await writeFile(join(publicRoot, 'sitemap.xml'), renderSitemap(), 'utf8')
 
-console.log(`Generated ${allSeoPages.length} SEO pages and sitemap.xml.`)
+let currentCommit = '9cde6ffd2bc127f30a6c3b2d23b205e96dad0652'
+try {
+  const { execSync } = await import('node:child_process')
+  currentCommit = execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim()
+} catch {
+  // fallback
+}
+
+await writeFile(
+  join(publicRoot, 'version.json'),
+  JSON.stringify(
+    {
+      version: '1.0.0',
+      commit: currentCommit,
+      buildTime: new Date().toISOString(),
+      schemaVersions: {
+        offsetPatch: [1, 2],
+        recipe: 1,
+        evidenceReport: 1,
+        customSchema: 1,
+      },
+    },
+    null,
+    2,
+  ) + '\n',
+  'utf8',
+)
+
+console.log(`Generated ${allSeoPages.length} SEO pages, sitemap.xml, and version.json.`)

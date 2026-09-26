@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitpeek-seven.vercel.app/schemas/recipe-v1.json",
+  "title": "BitpeekRecipeV1",
+  "description": "Deterministic Declarative Binary Operation Recipe version 1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "recipeId",
+    "name",
+    "engineCompatibility",
+    "inputs",
+    "steps"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "recipeId": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "engineCompatibility": {
+      "type": "string"
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "byteLength", "sha256"],
+        "properties": {
+          "id": { "type": "string" },
+          "byteLength": { "type": "integer", "minimum": 0 },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "description": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "operation"],
+        "properties": {
+          "id": { "type": "string" },
+          "operation": {
+            "type": "string",
+            "enum": [
+              "inspect-scalar",
+              "reverse",
+              "invert",
+              "xor-mask",
+              "fill",
+              "byteswap",
+              "find-pattern",
+              "extract-strings",
+              "compute-hash",
+              "inspect-structure",
+              "diff",
+              "apply-patch"
+            ]
+          },
+          "input": { "type": "string" },
+          "range": {
+            "type": "object",
+            "required": ["start", "end"],
+            "properties": {
+              "start": { "type": "integer", "minimum": 0 },
+              "end": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "parameters": { "type": "object" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "expectedOutputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["stepId", "checks"],
+        "properties": {
+          "stepId": { "type": "string" },
+          "checks": { "type": "object" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

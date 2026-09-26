@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitpeek-seven.vercel.app/schemas/evidence-report-v1.json",
+  "title": "BitpeekEvidenceReportV1",
+  "description": "Reproducible Binary Evidence Report version 1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "operation",
+    "version",
+    "target",
+    "result",
+    "completeness"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "operation": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "target": {
+      "type": "object",
+      "required": ["length"],
+      "properties": {
+        "name": { "type": "string" },
+        "length": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "range": {
+      "type": "object",
+      "required": ["start", "end"],
+      "properties": {
+        "start": { "type": "integer", "minimum": 0 },
+        "end": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "parameters": {
+      "type": "object"
+    },
+    "result": {
+      "type": "object"
+    },
+    "completeness": {
+      "type": "string",
+      "enum": ["complete", "truncated", "partial"]
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "replayRecipe": {
+      "type": "object"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "timestamp": { "type": "string" },
+        "environment": { "type": "string" },
+        "tool": { "type": "string" }
+      }
+    }
+  },
+  "additionalProperties": false
+}

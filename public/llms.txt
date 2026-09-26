@@ -1,0 +1,46 @@
+# Bitpeek: Local-First Binary Workbench
+
+> A client-only binary workbench for inspecting bytes, parsing file structures, and generating reproducible evidence reports and patches.
+
+## Overview
+- **Zero server processing**: All byte operations, hashing, parsing, and patch creation execute entirely client-side in browser memory or local process via CLI/MCP.
+- **Unified Engine**: The same TypeScript core powers the web interface, the `bitpeek` CLI tool, and the local Model Context Protocol (MCP) server.
+- **Engineered by**: Yudistira Putra (Yudis-bit).
+
+## Machine-Readable Manifests & Schemas
+- [Capabilities Manifest](https://bitpeek-seven.vercel.app/capabilities.json): Supported formats, checksums, interfaces, and operational limits.
+- [Version & Commit Info](https://bitpeek-seven.vercel.app/version.json): Current release version, build commit SHA, and schema version numbers.
+- [Offset Patch Schema v1](https://bitpeek-seven.vercel.app/schemas/offset-patch-v1.json)
+- [Offset Patch Schema v2](https://bitpeek-seven.vercel.app/schemas/offset-patch-v2.json)
+- [Recipe Schema v1](https://bitpeek-seven.vercel.app/schemas/recipe-v1.json)
+- [Evidence Report Schema v1](https://bitpeek-seven.vercel.app/schemas/evidence-report-v1.json)
+- [Custom Structure Schema v1](https://bitpeek-seven.vercel.app/schemas/schema-definition-v1.json)
+
+## Documentation & Guides
+- [Documentation Index](https://bitpeek-seven.vercel.app/docs): Comprehensive technical manual for human engineers and automated agents.
+- [Quickstart Guide](https://bitpeek-seven.vercel.app/docs/quickstart): 3 practical tasks (hex inspect, header validation, diff patching).
+- [Byte Semantics](https://bitpeek-seven.vercel.app/docs/byte-semantics): Ranges, endianness, signed integer representation, IEEE-754 floats, encodings.
+- [Structures Inspector](https://bitpeek-seven.vercel.app/docs/structures): In-depth guide to ELF, PNG, and declarative custom schemas.
+- [Patches & Diff](https://bitpeek-seven.vercel.app/docs/patches): Offset-aligned diff semantics, precondition checks, and atomic verified patch apply.
+- [Recipes & Replay](https://bitpeek-seven.vercel.app/docs/recipes): Declarative execution pipelines for deterministic automation.
+- [CLI Reference](https://bitpeek-seven.vercel.app/docs/cli): `bitpeek` command-line syntax, JSON output piping, and exit codes.
+- [MCP Server](https://bitpeek-seven.vercel.app/docs/mcp): Local stdio server implementation and security sandbox model.
+- [Limits & Guarantees](https://bitpeek-seven.vercel.app/docs/limits): Resource bounds, memory constraints, and browser capabilities.
+- [Privacy Model](https://bitpeek-seven.vercel.app/docs/privacy): Strict local-first privacy boundary and zero-upload guarantee.
+- [Replayable Examples](https://bitpeek-seven.vercel.app/examples): 4 core technical demonstrations with verifiable input and output.
+- [Performance Benchmarks](https://bitpeek-seven.vercel.app/benchmarks): Measured latency, memory usage, and throughput across file sizes.
+- [About & Upstream Contributions](https://bitpeek-seven.vercel.app/about): Background on Yudis-bit's upstream contributions in LLVM, Vulkan, secp256k1, OpenSBI, MsQuic, and Kafel.
+- [Changelog](https://bitpeek-seven.vercel.app/changelog): Detailed version history and feature roadmap.
+
+## Tool Usage for AI Agents
+Agents interacting with local files should run the local MCP stdio server or invoke the `bitpeek` CLI:
+```sh
+bitpeek inspect <file> --offset <n> --length <n> --type <t> --endian <le|be> --json
+bitpeek find <file> --hex "<pattern>" --limit 100 --json
+bitpeek strings <file> --min-length 4 --json
+bitpeek hash <file> --algorithm sha256 --json
+bitpeek structure <file> --format <elf|png> --json
+bitpeek diff <reference> <current> --json
+bitpeek patch verify <patch.json> --source <reference> --json
+bitpeek recipe run <recipe.json> --input id=<file> --dry-run --json
+```

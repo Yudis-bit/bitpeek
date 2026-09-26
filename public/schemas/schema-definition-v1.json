@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitpeek-seven.vercel.app/schemas/schema-definition-v1.json",
+  "title": "BitpeekCustomStructureSchemaV1",
+  "description": "Declarative Custom Binary Structure Schema version 1",
+  "type": "object",
+  "required": ["schemaVersion", "name", "fields"],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "defaultEndian": {
+      "type": "string",
+      "enum": ["big", "little"]
+    },
+    "fields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "offset", "type"],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "offset": { "type": "integer", "minimum": 0 },
+          "type": {
+            "type": "string",
+            "enum": [
+              "u8", "i8", "u16", "i16", "u32", "i32", "u64", "i64",
+              "f32", "f64", "bytes", "ascii", "utf8", "bitfield", "struct", "array"
+            ]
+          },
+          "endian": { "type": "string", "enum": ["big", "little"] },
+          "length": { "type": "integer", "minimum": 0 },
+          "containerType": { "type": "string", "enum": ["u8", "u16", "u32", "u64"] },
+          "lsb": { "type": "integer", "minimum": 0, "maximum": 63 },
+          "width": { "type": "integer", "minimum": 1, "maximum": 64 },
+          "count": { "type": "integer", "minimum": 0 },
+          "itemType": {
+            "type": "string",
+            "enum": ["u8", "i8", "u16", "i16", "u32", "i32", "u64", "i64", "f32", "f64", "bytes", "ascii"]
+          },
+          "itemLength": { "type": "integer", "minimum": 0 },
+          "description": { "type": "string" },
+          "specLink": { "type": "string" }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

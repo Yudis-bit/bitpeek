@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitpeek-seven.vercel.app/schemas/offset-patch-v2.json",
+  "title": "BitpeekOffsetPatchV2",
+  "description": "Offset-aligned binary patch format version 2 with mandatory cryptographic integrity hashes",
+  "type": "object",
+  "required": [
+    "format",
+    "version",
+    "sourceLength",
+    "targetLength",
+    "sourceSha256",
+    "targetSha256",
+    "operations"
+  ],
+  "properties": {
+    "format": {
+      "type": "string",
+      "const": "bitpeek-offset-patch"
+    },
+    "version": {
+      "type": "integer",
+      "const": 2
+    },
+    "sourceLength": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "targetLength": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "sourceSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "targetSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["offset", "bytes"],
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "bytes": {
+            "type": "string",
+            "pattern": "^(?:[0-9A-Fa-f]{2} *)*$"
+          },
+          "precondition": {
+            "type": "string",
+            "pattern": "^(?:[0-9A-Fa-f]{2} *)*$"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
