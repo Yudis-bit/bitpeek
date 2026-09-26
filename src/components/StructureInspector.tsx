@@ -35,6 +35,7 @@ export function StructureInspector({
         {onLoadCustomSchema && schemaModalOpen ? (
           <div className="schema-input-dialog">
             <textarea
+              aria-label="Custom structure schema JSON"
               className="source-editor"
               value={customSchemaText}
               onChange={(e) => setCustomSchemaText(e.target.value)}
@@ -110,6 +111,7 @@ export function StructureInspector({
             <button
               type="button"
               className="tree-toggle"
+              aria-label={(isCollapsed ? 'Expand ' : 'Collapse ') + field.label}
               aria-expanded={!isCollapsed}
               onClick={() => toggleCollapse(field.id)}
             >
@@ -186,7 +188,7 @@ export function StructureInspector({
         </div>
       )}
 
-      <div className="structure-tree" role="tree">
+      <div className="structure-tree" aria-label="Structure fields">
         {structure.fields.map((f) => renderFieldTree(f, 0))}
       </div>
     </section>

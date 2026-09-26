@@ -131,6 +131,7 @@ export default function App() {
   const [documentDirty, setDocumentDirty] = useState(false)
   const [history, setHistory] = useState<UnifiedHistoryState>(() => createEmptyHistory())
   const [structureOpen, setStructureOpen] = useState(false)
+  const [mobileView, setMobileView] = useState<'bytes' | 'inspector' | 'structure'>('bytes')
   const [customSchema, setCustomSchema] = useState<CustomStructureSchema | null>(null)
   const [searchMode, setSearchMode] = useState<SearchMode>('hex')
   const [searchQuery, setSearchQuery] = useState('')
@@ -149,7 +150,7 @@ export default function App() {
     () => autoDetectAndParseStructure(bytes, customSchema ?? undefined),
     [bytes, customSchema],
   )
-  const showStructure = structureOpen || structure !== null
+  const showStructure = structureOpen
 
   const range = getSelectionRange(selection, bytes.length)
   const selectedBytes = useMemo(
@@ -580,17 +581,21 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-mobile-view={mobileView}>
       <div className="workspace-menubar">
-        <span className="workspace-buffer-name">
-          buffer / {documentName ?? 'untitled'}
-          {documentDirty ? ' / modified' : ''}
-        </span>
+        <div className="workspace-document">
+          <span className="window-mark" aria-hidden="true">B</span>
+          <span className="workspace-buffer-name">{documentName ?? 'Untitled buffer'}</span>
+          <span className="document-state">{documentDirty ? 'Modified' : documentName ? 'Local file' : 'Scratchpad'}</span>
+        </div>
         <div className="menubar-actions">
           <button
             type="button"
             className={showStructure ? 'menubar-btn is-active' : 'menubar-btn'}
-            onClick={() => setStructureOpen((prev) => !prev)}
+            onClick={() => {
+              setStructureOpen((prev) => !prev)
+              setMobileView(showStructure ? 'bytes' : 'structure')
+            }}
             aria-pressed={showStructure}
             title="Toggle structure inspector panel"
           >
@@ -601,7 +606,7 @@ export default function App() {
             className="menubar-btn"
             onClick={() => setHelpOpen(true)}
           >
-            Help / formats / shortcuts
+            Help & shortcuts
           </button>
         </div>
       </div>
@@ -681,6 +686,12 @@ export default function App() {
           />
         ) : null}
 
+        <div className="mobile-workspace-switch" role="group" aria-label="Workspace view">
+          <button type="button" aria-pressed={mobileView === 'bytes'} onClick={() => setMobileView('bytes')}>Bytes</button>
+          <button type="button" aria-pressed={mobileView === 'inspector'} onClick={() => setMobileView('inspector')}>Inspector</button>
+          <button type="button" aria-pressed={mobileView === 'structure'} onClick={() => { setStructureOpen(true); setMobileView('structure') }}>Structure</button>
+        </div>
+
         <div
           className={
             showStructure
@@ -694,6 +705,7 @@ export default function App() {
               selectedRange={range}
               onSelectRange={(start, endInclusive) => {
                 setSelection({ anchor: start, focus: endInclusive })
+                setMobileView('bytes')
               }}
               onExportEvidence={() => void handleExportEvidence()}
               onLoadCustomSchema={(schemaJson) => {
@@ -738,13 +750,11 @@ export default function App() {
       </div>
 
       <div className="workspace-status" aria-label="Workspace status">
-        <span>{bytes.length} bytes</span>
-        <span>offset {statusOffset}</span>
-        <span>selection {statusSelection}</span>
-        <span>{mode.toUpperCase()}</span>
-        <span>{comparison ? 'compare' : 'edit'}</span>
-        <span>local</span>
-        <span>limit 256 KiB</span>
+        <span className="local-status"><i aria-hidden="true" />Local processing</span>
+        <span>{bytes.length.toLocaleString('en-US')} bytes</span>
+        <span>Offset {statusOffset}</span>
+        <span>Selection {statusSelection}</span>
+        <span className="workspace-limit">256 KiB / file</span>
       </div>
 
       <Suspense fallback={null}>

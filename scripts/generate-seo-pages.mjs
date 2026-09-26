@@ -67,12 +67,10 @@ function siteHeader() {
       <div class="site-header-inner">
         <a class="site-brand" href="/" aria-label="Bitpeek home">bitpeek</a>
         <nav class="site-nav" aria-label="Primary navigation">
-          <a href="/#workspace">workspace</a>
-          <a href="/docs">docs</a>
-          <a href="/examples">examples</a>
-          <a href="/benchmarks">benchmarks</a>
-          <a href="/about">about</a>
-          <a href="https://github.com/Yudis-bit/bitpeek">source</a>
+          <a href="/#workspace">Workbench</a>
+          <a href="/#file-formats">References</a>
+          <a href="/docs">Docs</a>
+          <a href="https://github.com/Yudis-bit/bitpeek">GitHub ↗</a>
         </nav>
       </div>
     </header>`
@@ -184,8 +182,8 @@ function renderPage(page) {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0c0e0f" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#eeeade" />
+    <meta name="color-scheme" content="light" />
     <meta name="description" content="${escapeHtml(page.description)}" />
     <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />

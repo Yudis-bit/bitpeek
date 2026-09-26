@@ -1,30 +1,30 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
-  <title id="title">Bitpeek online hex editor and binary inspector</title>
-  <desc id="desc">A dark developer workbench card with hexadecimal bytes and local-first privacy messaging.</desc>
-  <defs>
-    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#121416"/>
-      <stop offset="1" stop-color="#1b252c"/>
-    </linearGradient>
-    <pattern id="grid" width="42" height="42" patternUnits="userSpaceOnUse">
-      <path d="M42 0H0V42" fill="none" stroke="#78a8c9" stroke-opacity=".06"/>
-    </pattern>
-  </defs>
-  <rect width="1200" height="630" fill="url(#background)"/>
-  <rect width="1200" height="630" fill="url(#grid)"/>
-  <rect x="72" y="68" width="1056" height="494" rx="12" fill="#191c1f" stroke="#343a40"/>
-  <rect x="72" y="68" width="8" height="494" rx="4" fill="#78a8c9"/>
-  <text x="126" y="142" fill="#f1f4f6" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="32" font-weight="700">bitpeek</text>
-  <text x="126" y="242" fill="#f1f4f6" font-family="ui-sans-serif, -apple-system, Segoe UI, sans-serif" font-size="52" font-weight="650">Online Hex Editor</text>
-  <text x="126" y="304" fill="#aeb7bf" font-family="ui-sans-serif, -apple-system, Segoe UI, sans-serif" font-size="30">&amp; Binary Inspector</text>
-  <g font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="25">
-    <text x="126" y="397" fill="#78a8c9">000000</text>
-    <text x="260" y="397" fill="#e0e5e9">89 50 4E 47 0D 0A 1A 0A</text>
-    <text x="126" y="444" fill="#78a8c9">000008</text>
-    <text x="260" y="444" fill="#e0e5e9">00 00 00 0D 49 48 44 52</text>
-  </g>
-  <rect x="793" y="365" width="274" height="92" rx="5" fill="#202a30" stroke="#3a515f"/>
-  <text x="823" y="405" fill="#78a8c9" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="17" font-weight="700">LOCAL-FIRST</text>
-  <text x="823" y="434" fill="#c5cdd3" font-family="ui-sans-serif, -apple-system, Segoe UI, sans-serif" font-size="19">No file uploads</text>
-  <text x="126" y="520" fill="#929ba4" font-family="ui-sans-serif, -apple-system, Segoe UI, sans-serif" font-size="20">Inspect · Edit · Search · Compare</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#eeeade"/>
+  <rect x="48" y="44" width="48" height="48" rx="2" fill="#243a4b"/>
+  <text x="59" y="80" font-family="Consolas,monospace" font-size="34" font-weight="bold" fill="#fffdf6">B</text>
+  <text x="110" y="81" font-family="Consolas,monospace" font-size="34" font-weight="bold" fill="#243a4b">bitpeek</text>
+  <text x="1152" y="74" text-anchor="end" font-family="Consolas,monospace" font-size="16" fill="#59635f">INDEPENDENT SOFTWARE / YUDIS-BIT</text>
+  <path d="M48 114H1152" stroke="#90988c"/>
+  <text x="48" y="185" font-family="Georgia,serif" font-size="48" fill="#243a4b">Hex &amp; Binary Inspector</text>
+  <text x="48" y="228" font-family="Arial,sans-serif" font-size="22" fill="#59635f">Open a file. Follow the bytes. Understand what’s inside.</text>
+  <rect x="50" y="274" width="1102" height="258" rx="3" fill="#fffdf6" stroke="#243a4b" stroke-width="3"/>
+  <path d="M50 277H1152V323H50Z" fill="#243a4b"/>
+  <text x="72" y="306" font-family="Consolas,monospace" font-size="18" fill="#fffdf6">untitled.bin</text>
+  <text x="1128" y="306" text-anchor="end" font-family="Consolas,monospace" font-size="16" fill="#fffdf6">LOCAL WORKBENCH</text>
+  <path d="M770 323V532" stroke="#90988c"/>
+  <text x="72" y="356" font-family="Consolas,monospace" font-size="14" fill="#59635f">OFFSET</text>
+  <text x="195" y="356" font-family="Consolas,monospace" font-size="14" fill="#59635f">00  01  02  03  04  05  06  07</text>
+  <rect x="188" y="381" width="202" height="38" fill="#243a4b"/>
+  <text x="72" y="407" font-family="Consolas,monospace" font-size="21" fill="#59635f">000000</text>
+  <text x="195" y="407" font-family="Consolas,monospace" font-size="24" xml:space="preserve" fill="#fffdf6">DE AD BE EF</text>
+  <text x="413" y="407" font-family="Consolas,monospace" font-size="24" xml:space="preserve" fill="#243a4b">00 01 7F 80</text>
+  <text x="794" y="357" font-family="Consolas,monospace" font-size="14" fill="#a33c25">INSPECTOR / UINT32</text>
+  <text x="794" y="397" font-family="Arial,sans-serif" font-size="17" fill="#59635f">Big endian</text>
+  <text x="794" y="434" font-family="Consolas,monospace" font-size="27" fill="#243a4b">3735928559</text>
+  <path d="M50 479H1152" stroke="#d1d2c4"/>
+  <rect x="73" y="501" width="8" height="8" fill="#285d41"/>
+  <text x="92" y="513" font-family="Consolas,monospace" font-size="15" fill="#285d41">Your files stay local</text>
+  <text x="1128" y="513" text-anchor="end" font-family="Consolas,monospace" font-size="15" fill="#59635f">8 bytes / 4 selected</text>
+  <text x="48" y="586" font-family="Consolas,monospace" font-size="16" fill="#59635f">INSPECT · EDIT · SEARCH · COMPARE</text>
+  <text x="1152" y="586" text-anchor="end" font-family="Consolas,monospace" font-size="16" fill="#a33c25">FREE &amp; OPEN SOURCE</text>
 </svg>

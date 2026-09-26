@@ -94,8 +94,8 @@ export function ByteTools({
             : String(matchCount) + (matchesTruncated ? '+' : '') + ' matches'
 
   return (
-    <section className="byte-tools" aria-labelledby="tools-heading">
-      <h2 id="tools-heading" className="section-title tools-title">
+    <section className="byte-tools" aria-labelledby="byte-tools-heading">
+      <h2 id="byte-tools-heading" className="sr-only">
         Tools
       </h2>
 
@@ -129,6 +129,7 @@ export function ByteTools({
         </span>
         <button
           type="button"
+          aria-label="Previous search match"
           onClick={() => onNavigateMatch(-1)}
           disabled={matchCount === 0 || searchError !== null}
         >
@@ -136,6 +137,7 @@ export function ByteTools({
         </button>
         <button
           type="button"
+          aria-label="Next search match"
           onClick={() => onNavigateMatch(1)}
           disabled={matchCount === 0 || searchError !== null}
         >
@@ -172,7 +174,7 @@ export function ByteTools({
           {selectionLength > 0 ? selectionLength + ' selected' : 'Selection'}
         </span>
         <button type="button" onClick={onSelectAll} disabled={byteCount === 0}>
-          All
+          Select all
         </button>
         <button
           type="button"
@@ -223,6 +225,7 @@ export function ByteTools({
           Redo
         </button>
       </div>
+      {offsetError ? <p className="offset-error" role="alert">{offsetError}</p> : null}
     </section>
   )
 }

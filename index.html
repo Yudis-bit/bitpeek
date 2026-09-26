@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0c0e0f" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#eeeade" />
+    <meta name="color-scheme" content="light" />
     <meta
       name="description"
       content="Inspect, edit, search, and compare binary files in a fast local-first hex workspace. Bitpeek runs in your browser—files are never uploaded."
@@ -112,10 +112,10 @@
       <div class="site-header-inner">
         <a class="site-brand" href="/" aria-label="Bitpeek home">bitpeek</a>
         <nav class="site-nav" aria-label="Primary navigation">
-          <a href="/#workspace">workspace</a>
-          <a href="/#tools">tools</a>
-          <a href="/#file-formats">formats</a>
-          <a href="https://github.com/Yudis-bit/bitpeek">source</a>
+          <a href="/#workspace" aria-current="page">Workbench</a>
+          <a href="/#file-formats">References</a>
+          <a href="/docs">Docs</a>
+          <a href="https://github.com/Yudis-bit/bitpeek">GitHub ↗</a>
         </nav>
       </div>
     </header>
@@ -123,22 +123,23 @@
     <main>
       <section class="utility-intro" aria-labelledby="page-heading">
         <div class="workspace-frame">
+          <p class="utility-kicker">Independent software · by Yudis-bit</p>
           <h1 id="page-heading">Bitpeek — Hex &amp; Binary Inspector</h1>
           <p class="utility-description">
-            Inspect, edit, search, and compare binary data in your browser.
+            Open a file. Follow the bytes. Understand what’s inside.
           </p>
           <p class="utility-facts">
-            <span>local browser processing</span>
-            <span>no upload</span>
-            <span>no account</span>
+            <span>Runs in your browser</span>
+            <span>Your files stay local</span>
+            <span>Free &amp; open source</span>
           </p>
         </div>
       </section>
 
       <section class="workspace-section" id="workspace" aria-labelledby="workspace-heading">
         <div class="workspace-caption">
-          <h2 id="workspace-heading">Workspace</h2>
-          <p>Paste bytes or open a local file to begin.</p>
+          <h2 id="workspace-heading">Workbench</h2>
+          <p>Hex · Binary · Decimal · Text · Base64</p>
         </div>
         <div id="root"></div>
       </section>
@@ -280,7 +281,7 @@
 
     <footer class="site-footer">
       <div class="site-header-inner footer-content">
-        <p>bitpeek · browser hex and binary utility</p>
+        <p>bitpeek · Made with care by <a href="https://github.com/Yudis-bit">Yudis-bit</a></p>
         <nav aria-label="Footer navigation">
           <a href="/tools/hex-editor">hex editor</a>
           <a href="/file-formats/png">format reference</a>

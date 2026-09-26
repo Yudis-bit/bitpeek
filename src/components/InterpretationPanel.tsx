@@ -60,9 +60,10 @@ function ValueWithCopy({
         type="button"
         className="inline-copy"
         aria-label={'Copy ' + label}
+        title={'Copy ' + label}
         onClick={copyCurrentValue}
       >
-        Copy
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="1" /><path d="M16 8V4H4v12h4" /></svg>
       </button>
     </span>
   )
@@ -94,6 +95,7 @@ export function InterpretationPanel({
   range,
   onCopy,
 }: InterpretationPanelProps) {
+  const [view, setView] = useState<'values' | 'analysis' | 'text'>('values')
   const [digests, setDigests] = useState<{
     source: Uint8Array | null
     sha256: string | null
@@ -161,9 +163,15 @@ export function InterpretationPanel({
     >
       <div className="panel-heading">
         <h2 id="interpretation-heading" className="section-title">
-          Interpretation
+          Inspector
         </h2>
-        {signature ? <span>{signature.name}</span> : null}
+        <span>{signature ? signature.name : 'Selected bytes'}</span>
+      </div>
+
+      <div className="inspector-tabs" role="group" aria-label="Inspector view">
+        <button type="button" aria-pressed={view === 'values'} onClick={() => setView('values')}>Values</button>
+        <button type="button" aria-pressed={view === 'analysis'} onClick={() => setView('analysis')}>Analysis</button>
+        <button type="button" aria-pressed={view === 'text'} onClick={() => setView('text')}>Text & encoding</button>
       </div>
 
       {range === null ? (
@@ -204,6 +212,7 @@ export function InterpretationPanel({
           <section
             className="inspector-section"
             aria-labelledby="integer-heading"
+            hidden={view !== 'values'}
           >
             <h3 id="integer-heading">Integer · {bitWidth}-bit</h3>
             {length === 1 ? (
@@ -288,6 +297,7 @@ export function InterpretationPanel({
             <section
               className="inspector-section"
               aria-labelledby="float-heading"
+              hidden={view !== 'values'}
             >
               <h3 id="float-heading">Floating point</h3>
               <div className="integer-table-wrap">
@@ -326,6 +336,7 @@ export function InterpretationPanel({
           <section
             className="inspector-section"
             aria-labelledby="analysis-heading"
+            hidden={view !== 'analysis'}
           >
             <h3 id="analysis-heading">Analysis</h3>
             <dl className="property-list numeric-list">
@@ -419,6 +430,7 @@ export function InterpretationPanel({
           <section
             className="inspector-section"
             aria-labelledby="representations-heading"
+            hidden={view !== 'text'}
           >
             <h3 id="representations-heading">Representations</h3>
             <dl className="representation-list">

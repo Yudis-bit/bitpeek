@@ -2,6 +2,14 @@
 
 All notable changes to Bitpeek are documented here in accordance with Semantic Versioning.
 
+## Workbench interface refresh - 2026-09-27
+
+- Rebuilt the interface around a warm paper palette, navy window chrome, clear type, and consistent desktop-style controls across the workbench, reference pages, and dialogs.
+- Split the inspector into Values, Analysis, and Text & encoding views; added dedicated Bytes, Inspector, and Structure views on smaller screens.
+- Added responsive eight-byte rows with matching keyboard navigation, larger byte cells, and visible editing hints.
+- Improved file-action labels, copy controls, focus indicators, offset error feedback, and the structure panel toggle.
+- Updated the site identity and install metadata while preserving byte-processing behavior and public routes.
+
 ## [1.0.0] - 2026-09-27
 
 ### Added

@@ -86,7 +86,7 @@ export function InputEditor({
       <div className="section-title-row">
         <div className="input-heading-group">
           <h2 id="input-heading" className="section-title">
-            Input
+            Source input
           </h2>
           {documentName ? (
             <span className="document-name" title={documentName}>
@@ -95,9 +95,7 @@ export function InputEditor({
             </span>
           ) : null}
         </div>
-        <span className="mode-hint">
-          {dragging ? 'Drop file to inspect' : labels[mode] + ' source'}
-        </span>
+        <span className="mode-hint">{dragging ? 'Drop your file here' : 'Paste data or drop a local file'}</span>
       </div>
 
       <div className="mode-tabs" role="group" aria-label="Input format">
@@ -118,6 +116,7 @@ export function InputEditor({
         {labels[mode]} byte input
       </label>
       <textarea
+        rows={2}
         id="byte-source"
         className={error ? 'source-editor has-error' : 'source-editor'}
         value={source}
@@ -166,9 +165,10 @@ export function InputEditor({
                 : 'file-action'
             }
           >
-            Open
+            Open file
             <input
               type="file"
+              aria-label="Open local file"
               onChange={(event) => {
                 const file = event.target.files?.[0]
                 if (file) onOpenFile(file)
@@ -197,6 +197,7 @@ export function InputEditor({
           </label>
           <button
             type="button"
+            className="save-action"
             onClick={onSaveFile}
             disabled={!documentLoaded}
             title={
@@ -207,7 +208,7 @@ export function InputEditor({
                 : `Save ${byteCount} bytes as binary file`
             }
           >
-            {isDraftInvalid ? 'Save valid' : 'Save'}
+            {isDraftInvalid ? 'Save valid bytes' : 'Save file'}
           </button>
           <button
             type="button"

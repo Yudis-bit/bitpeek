@@ -14,11 +14,10 @@ import {
   useState,
 } from 'react'
 
-const BYTES_PER_ROW = 16
-const ROW_HEIGHT = 27
-const HEADER_HEIGHT = 26
+const ROW_HEIGHT = 36
+const HEADER_HEIGHT = 36
 const OVERSCAN_ROWS = 8
-const COLUMN_LABELS = Array.from({ length: BYTES_PER_ROW }, (_, index) =>
+const COLUMN_LABELS = Array.from({ length: 16 }, (_, index) =>
   index.toString(16).toUpperCase().padStart(2, '0'),
 )
 
@@ -62,10 +61,12 @@ export function ByteTable({
   const scrollRef = useRef<HTMLDivElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportHeight, setViewportHeight] = useState(360)
+  const [bytesPerRow, setBytesPerRow] = useState(16)
   const [editing, setEditing] = useState<EditState | null>(null)
+  const hasBytes = bytes.length > 0
   const range = getSelectionRange(selection, bytes.length)
   const diffIndexes = useMemo(() => new Set(diffOffsets), [diffOffsets])
-  const totalRows = Math.ceil(bytes.length / BYTES_PER_ROW)
+  const totalRows = Math.ceil(bytes.length / bytesPerRow)
   const bodyScrollTop = Math.max(0, scrollTop - HEADER_HEIGHT)
   const firstRow = Math.max(
     0,
@@ -78,22 +79,22 @@ export function ByteTable({
   const rows = useMemo(() => {
     const result: Array<{ offset: number; values: number[] }> = []
     for (let row = firstRow; row < finalRow; row += 1) {
-      const offset = row * BYTES_PER_ROW
+      const offset = row * bytesPerRow
       result.push({
         offset,
-        values: Array.from(bytes.slice(offset, offset + BYTES_PER_ROW)),
+        values: Array.from(bytes.slice(offset, offset + bytesPerRow)),
       })
     }
     return result
-  }, [bytes, finalRow, firstRow])
+  }, [bytes, bytesPerRow, finalRow, firstRow])
 
   const visibleMatchIndexes = useMemo(() => {
     const result = new Set<number>()
     if (searchLength === 0) return result
-    const visibleStart = firstRow * BYTES_PER_ROW
+    const visibleStart = firstRow * bytesPerRow
     const visibleEnd = Math.min(
       bytes.length - 1,
-      finalRow * BYTES_PER_ROW - 1,
+      finalRow * bytesPerRow - 1,
     )
     for (const offset of searchOffsets) {
       const matchEnd = offset + searchLength - 1
@@ -107,7 +108,7 @@ export function ByteTable({
       }
     }
     return result
-  }, [bytes.length, finalRow, firstRow, searchLength, searchOffsets])
+  }, [bytes.length, bytesPerRow, finalRow, firstRow, searchLength, searchOffsets])
 
   useEffect(() => {
     const stopDragging = () => {
@@ -124,19 +125,22 @@ export function ByteTable({
   useEffect(() => {
     const viewport = scrollRef.current
     if (!viewport) return
-    const resizeObserver = new ResizeObserver(() => {
+    const syncViewport = () => {
+      if (viewport.clientWidth === 0) return
       setViewportHeight(viewport.clientHeight)
-    })
+      setBytesPerRow(viewport.clientWidth < 732 ? 8 : 16)
+    }
+    const resizeObserver = new ResizeObserver(syncViewport)
     resizeObserver.observe(viewport)
-    setViewportHeight(viewport.clientHeight)
+    syncViewport()
     return () => resizeObserver.disconnect()
-  }, [])
+  }, [hasBytes])
 
   useEffect(() => {
     const focus = selection?.focus
     const viewport = scrollRef.current
     if (focus === undefined || !viewport) return
-    const targetRow = Math.floor(focus / BYTES_PER_ROW)
+    const targetRow = Math.floor(focus / bytesPerRow)
     const targetTop = HEADER_HEIGHT + targetRow * ROW_HEIGHT
     const targetBottom = targetTop + ROW_HEIGHT
     const visibleTop = viewport.scrollTop + HEADER_HEIGHT
@@ -147,7 +151,7 @@ export function ByteTable({
         targetTop - Math.floor(viewport.clientHeight / 2),
       )
     }
-  }, [selection])
+  }, [selection, bytesPerRow])
 
   useEffect(() => {
     const target = focusAfterRender.current
@@ -227,18 +231,18 @@ export function ByteTable({
         next = index + 1
         break
       case 'ArrowUp':
-        next = index - BYTES_PER_ROW
+        next = index - bytesPerRow
         break
       case 'ArrowDown':
-        next = index + BYTES_PER_ROW
+        next = index + bytesPerRow
         break
       case 'Home':
-        next = Math.floor(index / BYTES_PER_ROW) * BYTES_PER_ROW
+        next = Math.floor(index / bytesPerRow) * bytesPerRow
         break
       case 'End':
         next = Math.min(
           bytes.length - 1,
-          Math.floor(index / BYTES_PER_ROW) * BYTES_PER_ROW + 15,
+          Math.floor(index / bytesPerRow) * bytesPerRow + bytesPerRow - 1,
         )
         break
       case 'Escape':
@@ -269,27 +273,27 @@ export function ByteTable({
     <section className="bytes-panel" aria-labelledby="bytes-heading">
       <div className="panel-heading">
         <h2 id="bytes-heading" className="section-title">
-          Bytes
+          Hex view
         </h2>
-        <span>
+        <span className="byte-count">
           {bytes.length} {bytes.length === 1 ? 'byte' : 'bytes'} · {totalRows}{' '}
           {totalRows === 1 ? 'row' : 'rows'}
         </span>
       </div>
 
       {bytes.length === 0 ? (
-        <div className="workspace-placeholder">No bytes to inspect.</div>
+        <div className="workspace-placeholder"><strong>A blank canvas for your bytes.</strong><span>Paste data above or open a local file to begin.</span></div>
       ) : (
         <div
           ref={scrollRef}
           className="byte-table-scroll"
           onScroll={handleScroll}
         >
-          <div className="byte-table" aria-label="Byte data">
+          <div className="byte-table" data-columns={bytesPerRow} aria-label="Byte data">
             <div className="byte-table-header">
               <span className="offset-heading">Offset</span>
               <div className="hex-column-headings" aria-label="Hex byte columns">
-                {COLUMN_LABELS.map((label) => (
+                {COLUMN_LABELS.slice(0, bytesPerRow).map((label) => (
                   <span key={label}>{label}</span>
                 ))}
               </div>
@@ -450,6 +454,7 @@ export function ByteTable({
           </div>
         </div>
       )}
+      <div className="byte-view-hint"><span><kbd>Click</kbd> select · <kbd>Shift</kbd> extend</span><span><kbd>Double-click</kbd> edit a byte</span></div>
     </section>
   )
 }
