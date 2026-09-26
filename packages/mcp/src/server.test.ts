@@ -121,15 +121,23 @@ describe('Bitpeek MCP Server (Section 13)', () => {
   })
 
   it('rejects access to file outside allowed input roots', async () => {
-    const callHandler = (server as unknown as ServerInternal)._requestHandlers.get('tools/call')!
-    const res = await callHandler({
-      method: 'tools/call',
-      params: {
-        name: 'bitpeek_open',
-        arguments: { filePath: 'C:\\Windows\\System32\\drivers\\etc\\hosts' },
-      },
-    })
-    expect(res.isError).toBe(true)
-    expect(res.content[0]?.text).toContain('Access denied')
+    const restrictedServer = createBitpeekMcpServer(new McpSecurityManager({
+      allowedInputRoots: [join(tempDir, 'bitpeek-allowed-inputs')],
+    }))
+    await writeFile(tempFile, Uint8Array.from([0x01]))
+    try {
+      const callHandler = (restrictedServer as unknown as ServerInternal)._requestHandlers.get('tools/call')!
+      const res = await callHandler({
+        method: 'tools/call',
+        params: {
+          name: 'bitpeek_open',
+          arguments: { filePath: tempFile },
+        },
+      })
+      expect(res.isError).toBe(true)
+      expect(res.content[0]?.text).toContain('Access denied')
+    } finally {
+      await unlink(tempFile)
+    }
   })
 })
