@@ -1007,7 +1007,7 @@ bitpeek --help</code></pre>
     faqs: [
       {
         question: 'How can I get in touch with the author?',
-        answer: 'You can reach Yudistira Putra via GitHub at github.com/Yudis-bit or via email at yudis.engineering@gmail.com.',
+        answer: 'You can reach Yudistira Putra via GitHub at github.com/Yudis-bit or via email at pyudistira519@gmail.com.',
       },
       {
         question: 'Is Bitpeek affiliated with Google or Microsoft?',

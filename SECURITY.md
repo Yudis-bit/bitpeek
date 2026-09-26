@@ -9,7 +9,7 @@ Bitpeek operates under a zero-server upload security model:
 
 ## Reporting a Vulnerability
 If you discover a security vulnerability in Bitpeek, please report it responsibly:
-- **Email**: `yudis.engineering@gmail.com` (or create a private GitHub Security Advisory at [github.com/Yudis-bit/bitpeek/security/advisories](https://github.com/Yudis-bit/bitpeek/security/advisories)).
+- **Email**: `pyudistira519@gmail.com` (or create a private GitHub Security Advisory at [github.com/Yudis-bit/bitpeek/security/advisories](https://github.com/Yudis-bit/bitpeek/security/advisories)).
 - Please include:
   1. Description of the issue (e.g. parser hang, directory traversal escape, improper memory exhaustion).
   2. Minimal reproducible steps and proof-of-concept fixture.
