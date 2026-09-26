@@ -47,7 +47,6 @@ code, pre { font-family: var(--mono); font-variant-numeric: tabular-nums slashed
 .workspace-frame, .workspace-section { width: min(1560px, calc(100% - 64px)); margin-inline: auto; }
 .utility-intro { padding: 30px 0 18px; }
 .utility-kicker { display: flex; align-items: center; gap: 12px; margin: 0 0 9px; color: var(--accent); font: 600 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
-.utility-kicker::before { content: ''; width: 22px; height: 2px; background: currentColor; }
 .utility-intro h1 { margin: 0; font: 400 clamp(26px, 3vw, 42px)/1.22 Georgia, "Times New Roman", serif; letter-spacing: -.035em; }
 .utility-description { margin: 10px 0 0; color: var(--muted); font-size: 16px; }
 .utility-facts { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 20px; margin: 14px 0 0; color: var(--muted); font: 12px var(--mono); }

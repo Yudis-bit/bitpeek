@@ -41,7 +41,7 @@ assert.ok(appCssGzip <= 7 * 1024, `Application CSS exceeds 7 KiB gzip: ${appCssG
 assert.ok(seoCssGzip <= 7 * 1024, `Shared SEO CSS exceeds 7 KiB gzip: ${seoCssGzip}`)
 assert.ok(initialGzip <= 150 * 1024, `Initial homepage payload exceeds 150 KiB gzip: ${initialGzip}`)
 
-assert.match(homepage, /<h1\b[^>]*>Bitpeek — Hex &amp; Binary Inspector<\/h1>/)
+assert.match(homepage, /<h1\b[^>]*>Bitpeek Hex &amp; Binary Inspector<\/h1>/)
 assert.match(homepage, /<link rel="canonical" href="https:\/\/bitpeek-seven\.vercel\.app\/"/)
 assert.doesNotMatch(homepage, /home-hero|hero-facts|link-card|card-grid/i)
 assert.doesNotMatch(appCss + seoCss, /(?:linear|radial)-gradient|backdrop-filter|box-shadow/i)
