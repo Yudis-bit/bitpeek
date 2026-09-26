@@ -305,6 +305,7 @@ await writeFile(
     {
       version: '1.0.0',
       commit: currentCommit,
+      gitCommit: currentCommit,
       buildTime: new Date().toISOString(),
       schemaVersions: {
         offsetPatch: [1, 2],

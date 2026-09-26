@@ -116,7 +116,7 @@ assert.equal((await manifest.json()).start_url, '/')
 const versionRes = await fetchDirect('/version.json', 200)
 const versionData = await versionRes.json()
 assert.equal(versionData.version, '1.0.0', 'version.json must declare 1.0.0')
-assert.ok(versionData.gitCommit, 'version.json must contain gitCommit')
+assert.ok(versionData.commit || versionData.gitCommit, 'version.json must contain commit')
 
 const capabilitiesRes = await fetchDirect('/capabilities.json', 200)
 const capabilitiesData = await capabilitiesRes.json()
