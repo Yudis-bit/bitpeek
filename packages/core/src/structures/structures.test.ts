@@ -231,4 +231,68 @@ describe('Structure Inspector (ELF, PNG, Custom Schema)', () => {
       expect(lengthField?.interpretedValue).toBe(1024)
     })
   })
+
+  describe('New Ultra Format Adapters', () => {
+    it('parses SafeTensors weights header and maps tensor payload boundaries', async () => {
+      const { parseSafeTensors, parseStructureByFormat } = await import('./index')
+      const jsonStr = JSON.stringify({
+        'layer.weight': {
+          dtype: 'F32',
+          shape: [1, 2],
+          data_offsets: [0, 8],
+        },
+      })
+      const jsonBytes = new TextEncoder().encode(jsonStr)
+      const buffer = new Uint8Array(8 + jsonBytes.length + 8)
+      const view = new DataView(buffer.buffer)
+      view.setBigUint64(0, BigInt(jsonBytes.length), true)
+      buffer.set(jsonBytes, 8)
+
+      const res = parseSafeTensors(buffer)
+      expect(res).not.toBeNull()
+      expect(res?.format).toBe('safetensors')
+      expect(res?.status).toBe('valid')
+      expect(res?.fields.some((f) => f.name === 'header_length')).toBe(true)
+
+      // Test format dispatcher
+      const dispatchRes = parseStructureByFormat(buffer, 'safetensors')
+      expect(dispatchRes?.format).toBe('safetensors')
+    })
+
+    it('parses Bitcoin raw transaction with exact inputs and outputs', async () => {
+      const { parseBitcoinTx, parseStructureByFormat } = await import('./index')
+      // Minimal legacy Bitcoin tx:
+      // version: 1 (4B: 01 00 00 00)
+      // inCount: 1 (01)
+      // prevTx: 32B zero
+      // vout: 0 (00 00 00 00)
+      // scriptSigLen: 0 (00)
+      // sequence: 0xFFFFFFFF (ff ff ff ff)
+      // outCount: 1 (01)
+      // value: 50,000 satoshis (50 c3 00 00 00 00 00 00)
+      // scriptPubKeyLen: 1 (01)
+      // scriptPubKey: 51 (OP_1)
+      // locktime: 0 (00 00 00 00)
+      const txBytes = new Uint8Array([
+        0x01, 0x00, 0x00, 0x00,
+        0x01,
+        ...new Array(32).fill(0),
+        0x00, 0x00, 0x00, 0x00,
+        0x00,
+        0xff, 0xff, 0xff, 0xff,
+        0x01,
+        0x50, 0xc3, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x01, 0x51,
+        0x00, 0x00, 0x00, 0x00,
+      ])
+
+      const res = parseBitcoinTx(txBytes)
+      expect(res).not.toBeNull()
+      expect(res?.format).toBe('bitcoin')
+      expect(res?.status).toBe('valid')
+
+      const autoRes = parseStructureByFormat(txBytes, 'auto')
+      expect(autoRes?.format).toBe('bitcoin')
+    })
+  })
 })

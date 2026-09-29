@@ -390,5 +390,17 @@ export function detectFileSignature(
   if (asciiAt(bytes, 0, 'RIFF') && asciiAt(bytes, 8, 'WEBP')) {
     return { name: 'WebP image', mime: 'image/webp' }
   }
+  if (startsWith(bytes, [0x4d, 0x5a])) {
+    return { name: 'PE executable', mime: 'application/vnd.microsoft.portable-executable' }
+  }
+  if (bytes.length >= 10 && bytes[8] === 0x7b) {
+    return { name: 'SafeTensors weights', mime: 'application/octet-stream' }
+  }
+  if (startsWith(bytes, [0x55, 0x42, 0x49, 0x23]) || startsWith(bytes, [0x55, 0x42, 0x49, 0x21])) {
+    return { name: 'UBI volume image', mime: 'application/octet-stream' }
+  }
+  if (startsWith(bytes, [0x68, 0x73, 0x71, 0x73])) {
+    return { name: 'SquashFS filesystem', mime: 'application/octet-stream' }
+  }
   return null
 }

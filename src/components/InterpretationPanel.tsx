@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { ReferenceDisassembler } from '../../packages/core/src/native/disassembler'
 import {
   crc16CcittFalse,
   crc32Ieee,
@@ -95,13 +96,25 @@ export function InterpretationPanel({
   range,
   onCopy,
 }: InterpretationPanelProps) {
-  const [view, setView] = useState<'values' | 'analysis' | 'text'>('values')
+  const [view, setView] = useState<'values' | 'disasm' | 'analysis' | 'text'>('values')
+  const [disasmArch, setDisasmArch] = useState<'x86_64' | 'aarch64'>('x86_64')
   const [digests, setDigests] = useState<{
     source: Uint8Array | null
     sha256: string | null
     sha512: string | null
     error: boolean
   }>({ source: null, sha256: null, sha512: null, error: false })
+
+  const disasmTarget = bytes.length > 0 ? bytes : documentBytes.subarray(0, 128)
+  const disasmInstructions = useMemo(() => {
+    if (disasmTarget.length === 0) return []
+    const base = range ? BigInt(range.start) : 0n
+    return ReferenceDisassembler.disassemble(disasmTarget, {
+      arch: disasmArch,
+      baseAddress: base,
+      maxInstructions: 64,
+    })
+  }, [disasmTarget, disasmArch, range])
   const length = bytes.length
   const bitWidth = length * 8
   const hasInteger = length > 0 && length <= 8
@@ -170,6 +183,7 @@ export function InterpretationPanel({
 
       <div className="inspector-tabs" role="group" aria-label="Inspector view">
         <button type="button" aria-pressed={view === 'values'} onClick={() => setView('values')}>Values</button>
+        <button type="button" aria-pressed={view === 'disasm'} onClick={() => setView('disasm')}>Disasm</button>
         <button type="button" aria-pressed={view === 'analysis'} onClick={() => setView('analysis')}>Analysis</button>
         <button type="button" aria-pressed={view === 'text'} onClick={() => setView('text')}>Text & encoding</button>
       </div>
@@ -332,6 +346,70 @@ export function InterpretationPanel({
               </div>
             </section>
           ) : null}
+
+          <section
+            className="inspector-section"
+            aria-labelledby="disasm-heading"
+            hidden={view !== 'disasm'}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <h3 id="disasm-heading" style={{ margin: 0 }}>Disassembly</h3>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <select
+                  value={disasmArch}
+                  onChange={(e) => setDisasmArch(e.target.value as 'x86_64' | 'aarch64')}
+                  aria-label="Architecture"
+                  style={{
+                    padding: '2px 6px',
+                    fontSize: '12px',
+                    fontFamily: 'var(--mono)',
+                    background: 'var(--paper)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--ink)',
+                  }}
+                >
+                  <option value="x86_64">x86-64</option>
+                  <option value="aarch64">AArch64</option>
+                </select>
+                <button
+                  type="button"
+                  className="compact-button"
+                  style={{ minHeight: '26px', padding: '2px 8px', fontSize: '12px' }}
+                  onClick={() => {
+                    const fullText = disasmInstructions
+                      .map((i) => `0x${i.address.toString(16).toUpperCase().padStart(8, '0')}:  ${i.mnemonic.padEnd(8)} ${i.operands}`)
+                      .join('\n')
+                    onCopy(fullText, 'disassembly')
+                  }}
+                >
+                  Copy ASM
+                </button>
+              </div>
+            </div>
+            {disasmInstructions.length === 0 ? (
+              <p className="inspector-note">No code bytes to disassemble.</p>
+            ) : (
+              <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--mono)', fontSize: '12px' }}>
+                  <tbody>
+                    {disasmInstructions.map((inst, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)', lineHeight: '1.6' }}>
+                        <td style={{ color: 'var(--muted)', width: '75px', padding: '2px 4px' }}>
+                          +0x{inst.address.toString(16).toUpperCase().padStart(4, '0')}
+                        </td>
+                        <td style={{ color: 'var(--muted)', width: '90px', padding: '2px 4px', whiteSpace: 'nowrap' }}>
+                          {Array.from(inst.bytes).map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ')}
+                        </td>
+                        <td style={{ padding: '2px 4px', color: inst.isValid ? 'var(--ink)' : 'var(--error)' }}>
+                          <strong>{inst.mnemonic}</strong> {inst.operands}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
 
           <section
             className="inspector-section"

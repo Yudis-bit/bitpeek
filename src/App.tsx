@@ -55,7 +55,7 @@ import {
   MODE_STORAGE_KEY,
 } from './lib/storage'
 import {
-  autoDetectAndParseStructure,
+  parseStructureByFormat,
   type CustomStructureSchema,
 } from './lib/structures'
 import { ETHEREUM_ADDRESS } from './lib/support'
@@ -133,6 +133,7 @@ export default function App() {
   const [structureOpen, setStructureOpen] = useState(false)
   const [mobileView, setMobileView] = useState<'bytes' | 'inspector' | 'structure'>('bytes')
   const [customSchema, setCustomSchema] = useState<CustomStructureSchema | null>(null)
+  const [structureFormat, setStructureFormat] = useState<string>('auto')
   const [searchMode, setSearchMode] = useState<SearchMode>('hex')
   const [searchQuery, setSearchQuery] = useState('')
   const [activeMatchIndex, setActiveMatchIndex] = useState(-1)
@@ -147,8 +148,8 @@ export default function App() {
   const { notice, copy } = useClipboard()
 
   const structure = useMemo(
-    () => autoDetectAndParseStructure(bytes, customSchema ?? undefined),
-    [bytes, customSchema],
+    () => parseStructureByFormat(bytes, structureFormat, customSchema ?? undefined),
+    [bytes, structureFormat, customSchema],
   )
   const showStructure = structureOpen
 
@@ -702,6 +703,8 @@ export default function App() {
           {showStructure ? (
             <StructureInspector
               structure={structure}
+              selectedFormat={structureFormat}
+              onSelectFormat={(format) => setStructureFormat(format)}
               selectedRange={range}
               onSelectRange={(start, endInclusive) => {
                 setSelection({ anchor: start, focus: endInclusive })
@@ -712,6 +715,7 @@ export default function App() {
                 try {
                   const parsed = JSON.parse(schemaJson) as CustomStructureSchema
                   setCustomSchema(parsed)
+                  setStructureFormat('custom-schema')
                 } catch {
                   setError('Invalid custom schema JSON.')
                 }

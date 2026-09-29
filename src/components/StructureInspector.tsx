@@ -4,6 +4,8 @@ import type { SelectionRange } from '../lib/bytes'
 
 interface StructureInspectorProps {
   structure: StructureParseResult | null
+  selectedFormat?: string
+  onSelectFormat?: (format: string) => void
   selectedRange: SelectionRange | null
   onSelectRange: (start: number, endInclusive: number) => void
   onExportEvidence: () => void
@@ -12,6 +14,8 @@ interface StructureInspectorProps {
 
 export function StructureInspector({
   structure,
+  selectedFormat = 'auto',
+  onSelectFormat,
   selectedRange,
   onSelectRange,
   onExportEvidence,
@@ -21,28 +25,100 @@ export function StructureInspector({
   const [schemaModalOpen, setSchemaModalOpen] = useState(false)
   const [customSchemaText, setCustomSchemaText] = useState('')
 
+  const formatSelector = onSelectFormat ? (
+    <select
+      aria-label="Format parser"
+      className="compact-select"
+      value={selectedFormat}
+      onChange={(e) => onSelectFormat(e.target.value)}
+      style={{
+        height: '28px',
+        padding: '2px 8px',
+        fontSize: '12px',
+        fontFamily: 'var(--mono)',
+        background: 'var(--paper)',
+        border: '1px solid var(--border)',
+        color: 'var(--ink)',
+      }}
+    >
+      <option value="auto">Auto Detect</option>
+      <option value="elf">ELF (Linux/BSD)</option>
+      <option value="pe">PE / COFF (Windows)</option>
+      <option value="wasm">WASM (WebAssembly)</option>
+      <option value="png">PNG Image</option>
+      <option value="zip">ZIP Archive</option>
+      <option value="gpt">GPT Partition Table</option>
+      <option value="ubi">UBI Volume</option>
+      <option value="squashfs">SquashFS Superblock</option>
+      <option value="safetensors">SafeTensors Weights</option>
+      <option value="bitcoin">Bitcoin TX</option>
+      <option value="ethereum">Ethereum RLP</option>
+      <option value="custom-schema">Custom Schema</option>
+    </select>
+  ) : null
+
   if (!structure) {
     return (
       <section className="structure-panel" aria-labelledby="structure-heading">
         <div className="section-title-row">
-          <h2 id="structure-heading" className="section-title">
-            Structure
-          </h2>
+          <div className="structure-heading-group">
+            <h2 id="structure-heading" className="section-title">
+              Structure
+            </h2>
+            {formatSelector}
+          </div>
         </div>
         <p className="empty-structure-note">
-          No structured format recognized. Open an ELF or PNG file, or load a custom structure schema.
+          No structured format recognized. Select a parser above (ELF, PE, WASM, PNG, ZIP, GPT, UBI, SquashFS, SafeTensors, Bitcoin, Ethereum), or load a custom schema.
         </p>
+        <div className="compact-actions" style={{ marginTop: '10px' }}>
+          {onLoadCustomSchema && (
+            <button
+              type="button"
+              className="compact-button"
+              onClick={() => {
+                const sample = JSON.stringify(
+                  {
+                    schemaVersion: 2,
+                    name: 'Header_V2',
+                    magic: [0x42, 0x49, 0x54, 0x50],
+                    fields: [
+                      { name: 'magic', offset: 0, length: 4, type: 'hex' },
+                      { name: 'version', offset: 4, length: 2, type: 'u16_le' },
+                      { name: 'flags', offset: 6, length: 2, type: 'u16_le' },
+                      { name: 'dataLength', offset: 8, length: 4, type: 'u32_le' },
+                    ],
+                  },
+                  null,
+                  2,
+                )
+                onLoadCustomSchema(sample)
+              }}
+            >
+              Load Sample Schema
+            </button>
+          )}
+          {onLoadCustomSchema && !schemaModalOpen && (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => setSchemaModalOpen(true)}
+            >
+              Custom Schema JSON
+            </button>
+          )}
+        </div>
         {onLoadCustomSchema && schemaModalOpen ? (
-          <div className="schema-input-dialog">
+          <div className="schema-input-dialog" style={{ marginTop: '12px' }}>
             <textarea
               aria-label="Custom structure schema JSON"
               className="source-editor"
               value={customSchemaText}
               onChange={(e) => setCustomSchemaText(e.target.value)}
-              placeholder='Paste JSON schema: {"schemaVersion": 1, "name": "Header", ...}'
+              placeholder='Paste JSON schema: {"schemaVersion": 2, "name": "Header", ...}'
               rows={6}
             />
-            <div className="compact-actions">
+            <div className="compact-actions" style={{ marginTop: '6px' }}>
               <button
                 type="button"
                 className="compact-button"
@@ -64,14 +140,6 @@ export function StructureInspector({
               </button>
             </div>
           </div>
-        ) : onLoadCustomSchema ? (
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => setSchemaModalOpen(true)}
-          >
-            Load Custom Schema
-          </button>
         ) : null}
       </section>
     )
@@ -165,6 +233,7 @@ export function StructureInspector({
           <span className={`format-status status-${structure.status}`}>
             {structure.status}
           </span>
+          {formatSelector}
         </div>
         <div className="structure-actions">
           <button
