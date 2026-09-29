@@ -140,6 +140,11 @@ export function applyOffsetPatch(
   ) {
     throw new TypeError('Unsupported bitpeek patch format.')
   }
+  if (!patch.source || !patch.target || !patch.changes) {
+    const applied = applyVerifiedPatch(reference, patch)
+    if (!applied.ok) throw new Error(applied.error)
+    return applied.target
+  }
   if (reference.length !== patch.source.length) {
     throw new RangeError('Reference length does not match the patch source.')
   }

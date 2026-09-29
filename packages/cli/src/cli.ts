@@ -23,6 +23,7 @@ import {
   formatFloat,
   formatHex,
   BitpeekError,
+  BitpeekDoctor,
 } from '../../core/src/index'
 
 export const EXIT_SUCCESS = 0
@@ -217,6 +218,7 @@ Usage:
   bitpeek patch verify <patch.json> --source <reference> [--json]
   bitpeek patch apply <patch.json> --source <reference> --output <result> [--force]
   bitpeek recipe run <recipe.json> [--input <id=file>...] [--dry-run] [--output <id=out>] [--json]
+  bitpeek doctor [--json]
   bitpeek --version
   bitpeek --help
 `
@@ -226,6 +228,21 @@ Usage:
 
   try {
     switch (command) {
+      case 'doctor': {
+        const report = await BitpeekDoctor.runDiagnostics()
+        if (options.json) {
+          process.stdout.write(JSON.stringify(report, null, 2) + '\n')
+        } else {
+          process.stdout.write(`Bitpeek System Doctor Report [${report.overallStatus.toUpperCase()}]\n`)
+          process.stdout.write(`Platform: ${report.platform} (${report.arch}), Node: ${report.nodeVersion}\n\n`)
+          for (const c of report.checks) {
+            const sym = c.status === 'pass' ? '✓' : c.status === 'warn' ? '⚠' : '✗'
+            process.stdout.write(`[${sym}] ${c.category.toUpperCase()}: ${c.name} - ${c.details}\n`)
+          }
+        }
+        return report.overallStatus === 'failing' ? EXIT_INTERNAL_OR_IO : EXIT_SUCCESS
+      }
+
       case 'inspect': {
         const file = files[0]
         if (!file) {

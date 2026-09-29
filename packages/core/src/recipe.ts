@@ -134,7 +134,7 @@ export function runRecipe(
 
   // Work with active document copy
   const firstInputId = recipe.inputs[0]?.id
-  let currentBytes = firstInputId && inputBuffers[firstInputId] ? inputBuffers[firstInputId]!.slice() : new Uint8Array(0)
+  let currentBytes: Uint8Array<ArrayBufferLike> = firstInputId && inputBuffers[firstInputId] ? inputBuffers[firstInputId]!.slice() : new Uint8Array(0)
 
   // 2. Execute steps in order
   for (const step of recipe.steps) {

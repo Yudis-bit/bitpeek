@@ -1,7 +1,11 @@
-import { open, stat, type FileHandle } from 'node:fs/promises'
+import { open, type FileHandle } from 'node:fs/promises'
 import { BitpeekError } from './errors'
-import type { ByteSource } from './byte-source'
+import { type ByteSource, checkRange, checkChunkSize } from './byte-source'
 
+/**
+ * FileByteSource provides Node.js filesystem access.
+ * Note: For clean platform separation, preferred import is from '@bitpeek/io-node'.
+ */
 export class FileByteSource implements ByteSource {
   readonly size: number
   readonly revision: string
@@ -17,11 +21,12 @@ export class FileByteSource implements ByteSource {
 
   static async open(filePath: string): Promise<FileByteSource> {
     try {
-      const fileStat = await stat(filePath)
+      const handle = await open(filePath, 'r')
+      const fileStat = await handle.stat()
       if (!fileStat.isFile()) {
+        await handle.close()
         throw new BitpeekError('INVALID_INPUT', `Path is not a regular file: ${filePath}`)
       }
-      const handle = await open(filePath, 'r')
       return new FileByteSource(filePath, fileStat.size, fileStat.mtimeMs, handle)
     } catch (err: unknown) {
       if (err instanceof BitpeekError) throw err
@@ -36,28 +41,30 @@ export class FileByteSource implements ByteSource {
     if (!this.handle) {
       throw new BitpeekError('IO_ERROR', 'FileByteSource is closed.')
     }
-    if (!Number.isSafeInteger(offset) || offset < 0) {
-      throw new BitpeekError('INVALID_RANGE', `Offset must be a non-negative safe integer: ${offset}`)
-    }
-    if (!Number.isSafeInteger(length) || length < 0) {
-      throw new BitpeekError('INVALID_RANGE', `Length must be a non-negative safe integer: ${length}`)
-    }
-    if (offset + length > this.size) {
-      throw new BitpeekError(
-        'INVALID_RANGE',
-        `Requested range [${offset}, ${offset + length}) exceeds file size ${this.size}.`,
-      )
-    }
+    checkRange(offset, length, this.size)
     if (length === 0) return new Uint8Array(0)
 
     const buffer = new Uint8Array(length)
+    let totalRead = 0
+
     try {
-      const { bytesRead } = await this.handle.read(buffer, 0, length, offset)
-      if (bytesRead !== length) {
-        throw new BitpeekError(
-          'TRUNCATED_INPUT',
-          `Expected ${length} bytes at offset ${offset}, but only read ${bytesRead} bytes.`,
+      while (totalRead < length) {
+        if (signal?.aborted) {
+          throw new BitpeekError('CANCELLED', 'Operation was aborted.')
+        }
+        const { bytesRead } = await this.handle.read(
+          buffer,
+          totalRead,
+          length - totalRead,
+          offset + totalRead,
         )
+        if (bytesRead === 0) {
+          throw new BitpeekError(
+            'TRUNCATED_INPUT',
+            `Expected ${length} bytes at offset ${offset}, but reached EOF after ${totalRead} bytes.`,
+          )
+        }
+        totalRead += bytesRead
       }
       return buffer
     } catch (err: unknown) {
@@ -74,8 +81,25 @@ export class FileByteSource implements ByteSource {
     chunkSize = 1024 * 1024,
     signal?: AbortSignal,
   ): AsyncIterable<Uint8Array> {
+    checkChunkSize(chunkSize)
+    if (!this.handle) {
+      throw new BitpeekError('IO_ERROR', 'FileByteSource is closed.')
+    }
+
     const start = range?.start ?? 0
     const end = range?.endExclusive ?? this.size
+
+    if (!Number.isSafeInteger(start) || start < 0) {
+      throw new BitpeekError('INVALID_RANGE', `start must be a non-negative safe integer: ${start}`)
+    }
+    if (!Number.isSafeInteger(end) || end < start || end > this.size) {
+      throw new BitpeekError('INVALID_RANGE', `endExclusive must be between start and size [${start}, ${this.size}]: ${end}`)
+    }
+
+    if (start === end) {
+      return
+    }
+
     let cursor = start
     while (cursor < end) {
       if (signal?.aborted) {
@@ -90,8 +114,9 @@ export class FileByteSource implements ByteSource {
 
   async close(): Promise<void> {
     if (this.handle) {
-      await this.handle.close()
+      const h = this.handle
       this.handle = null
+      await h.close()
     }
   }
 }

@@ -17,6 +17,11 @@ describe('Bitpeek CLI (Section 12)', () => {
     expect(code).toBe(EXIT_SUCCESS)
   })
 
+  it('runs doctor command and returns exit code 0 (CLI-02)', async () => {
+    const code = await runCli(['doctor', '--json'])
+    expect(code).toBe(EXIT_SUCCESS)
+  })
+
   it('returns usage exit code 2 when argument is missing', async () => {
     const code = await runCli(['inspect'])
     expect(code).toBe(EXIT_USAGE)

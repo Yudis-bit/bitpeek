@@ -1,0 +1,2108 @@
+[
+  {
+    "id": "CORE-01",
+    "section": "03",
+    "title": "package boundaries and exports",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/index.ts"
+    ],
+    "testIds": [
+      "AC010",
+      "packages/core/src/types.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "CORE-02",
+    "section": "04",
+    "title": "exact types/ranges/values",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/types.ts"
+    ],
+    "testIds": [
+      "AC006",
+      "AC007",
+      "AC008",
+      "packages/core/src/types.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "CORE-03",
+    "section": "04",
+    "title": "bounded checked reader",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/reader.ts"
+    ],
+    "testIds": [
+      "AC001",
+      "AC002",
+      "AC003",
+      "packages/core/src/reader.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "CORE-04",
+    "section": "05",
+    "title": "immutable/source snapshot semantics",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/byte-source.ts"
+    ],
+    "testIds": [
+      "AC004",
+      "AC005",
+      "packages/core/src/byte-source.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "CORE-05",
+    "section": "05",
+    "title": "resource budgets/cancellation",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/context.ts",
+      "packages/core/src/reader.ts"
+    ],
+    "testIds": [
+      "AC020",
+      "packages/core/src/reader.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "CORE-06",
+    "section": "03",
+    "title": "operation registry/capabilities",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/operations/registry.ts"
+    ],
+    "testIds": [
+      "AC084",
+      "packages/core/src/operations-sdk-p9.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "DATA-01",
+    "section": "06",
+    "title": "streaming hash/checksum/entropy",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/streaming.ts"
+    ],
+    "testIds": [
+      "AC011",
+      "packages/core/src/streaming.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "DATA-02",
+    "section": "06",
+    "title": "streaming search",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/streaming.ts"
+    ],
+    "testIds": [
+      "AC012",
+      "packages/core/src/streaming.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "DATA-03",
+    "section": "06",
+    "title": "streaming strings",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/streaming.ts"
+    ],
+    "testIds": [
+      "AC013",
+      "packages/core/src/streaming.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "DATA-04",
+    "section": "06",
+    "title": "bounded offset and semantic diff",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/diff.ts"
+    ],
+    "testIds": [
+      "AC014",
+      "packages/core/src/diff.test.ts",
+      "src/lib/diff.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "DATA-05",
+    "section": "05",
+    "title": "persistent edits/streamed export",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/piece-table.ts",
+      "packages/core/src/edits.ts"
+    ],
+    "testIds": [
+      "AC015",
+      "AC016",
+      "AC019",
+      "packages/core/src/edits.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "DATA-06",
+    "section": "06",
+    "title": "transforms/mapping",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/transforms.ts"
+    ],
+    "testIds": [
+      "AC021",
+      "packages/core/src/streaming.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "PROV-01",
+    "section": "07",
+    "title": "graph identities/integrity",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/provenance.ts"
+    ],
+    "testIds": [
+      "AC024",
+      "AC025",
+      "packages/core/src/provenance.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "PROV-02",
+    "section": "07",
+    "title": "mapping queries/composition",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/provenance.ts"
+    ],
+    "testIds": [
+      "AC021",
+      "AC022",
+      "packages/core/src/provenance.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "PROV-03",
+    "section": "07",
+    "title": "uncertainty and alternatives",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/provenance.ts"
+    ],
+    "testIds": [
+      "AC009",
+      "AC023",
+      "packages/core/src/provenance.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "PROJ-01",
+    "section": "08",
+    "title": "project persistence/recovery",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/project.ts"
+    ],
+    "testIds": [
+      "AC026",
+      "AC027",
+      "packages/core/src/provenance.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "PROJ-02",
+    "section": "08",
+    "title": "portable import/export",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/project.ts"
+    ],
+    "testIds": [
+      "AC028",
+      "packages/core/src/provenance.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "PROJ-03",
+    "section": "08",
+    "title": "migrations/relocation",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/project.ts"
+    ],
+    "testIds": [
+      "AC026",
+      "packages/core/src/provenance.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "FMT-01",
+    "section": "09",
+    "title": "existing format migration",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/structures/elf.ts",
+      "packages/core/src/structures/png.ts"
+    ],
+    "testIds": [
+      "AC031",
+      "packages/core/src/structures/structures.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "FMT-02",
+    "section": "09",
+    "title": "PE",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/structures/pe.ts"
+    ],
+    "testIds": [
+      "AC032",
+      "packages/core/src/structures-p4.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "FMT-03",
+    "section": "09",
+    "title": "Wasm",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/structures/wasm.ts"
+    ],
+    "testIds": [
+      "AC033",
+      "packages/core/src/structures-p4.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "FMT-04",
+    "section": "09",
+    "title": "ZIP",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/structures/zip.ts"
+    ],
+    "testIds": [
+      "AC033",
+      "packages/core/src/structures-p4.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "FMT-05",
+    "section": "09",
+    "title": "GPT/MBR",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/structures/gpt.ts"
+    ],
+    "testIds": [
+      "AC034",
+      "packages/core/src/structures-p4.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "FMT-06",
+    "section": "09",
+    "title": "UBI",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/structures/ubi.ts"
+    ],
+    "testIds": [
+      "AC034",
+      "packages/core/src/structures-p4.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "FMT-07",
+    "section": "09",
+    "title": "filesystem declared subsets",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/structures/squashfs.ts"
+    ],
+    "testIds": [
+      "AC035",
+      "packages/core/src/structures-p4.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "FMT-08",
+    "section": "09",
+    "title": "custom schema interpreter",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/structures/schema-v2.ts"
+    ],
+    "testIds": [
+      "AC036",
+      "packages/core/src/structures-p4.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "NATIVE-01",
+    "section": "10",
+    "title": "address mapping",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/native/address-map.ts"
+    ],
+    "testIds": [
+      "AC051",
+      "packages/core/src/native-trace-runner-p6.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "NATIVE-02",
+    "section": "10",
+    "title": "disassembly adapter",
+    "classification": "INTEGRATION-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/native/disassembler.ts"
+    ],
+    "testIds": [
+      "AC052",
+      "packages/core/src/native-trace-runner-p6.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "NATIVE-03",
+    "section": "10",
+    "title": "memory/core/minidump subsets",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/native/memory-dump.ts"
+    ],
+    "testIds": [
+      "AC053",
+      "packages/core/src/native-trace-runner-p6.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "NATIVE-04",
+    "section": "10",
+    "title": "compiler/debug associations",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/native/memory-dump.ts"
+    ],
+    "testIds": [
+      "AC054",
+      "packages/core/src/native-trace-runner-p6.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "NATIVE-05",
+    "section": "10",
+    "title": "paging/MMIO/SVD profiles",
+    "classification": "PROFILE-DEPENDENT",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/captures/svd.ts"
+    ],
+    "testIds": [
+      "AC050",
+      "packages/core/src/nand-captures-p5.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "TRACE-01",
+    "section": "11",
+    "title": "storage/index/query",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/trace/trace-store.ts"
+    ],
+    "testIds": [
+      "AC055",
+      "packages/core/src/native-trace-runner-p6.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "TRACE-02",
+    "section": "11",
+    "title": "time domains/loss metadata",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/trace/trace-store.ts"
+    ],
+    "testIds": [
+      "AC056",
+      "packages/core/src/native-trace-runner-p6.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "TRACE-03",
+    "section": "11",
+    "title": "ASan/UBSan imports",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/trace/sanitizers.ts"
+    ],
+    "testIds": [
+      "AC054",
+      "packages/core/src/native-trace-runner-p6.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "TRACE-04",
+    "section": "11",
+    "title": "GDB/MI adapter",
+    "classification": "INTEGRATION-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/trace/gdb-mi.ts"
+    ],
+    "testIds": [
+      "AC057",
+      "packages/core/src/native-trace-runner-p6.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "TRACE-05",
+    "section": "11",
+    "title": "QEMU integration",
+    "classification": "INTEGRATION-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/trace/qemu.ts"
+    ],
+    "testIds": [
+      "AC057",
+      "packages/core/src/native-trace-runner-p6.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "RUN-01",
+    "section": "12",
+    "title": "job specifications/lifecycle",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/runner/specs.ts"
+    ],
+    "testIds": [
+      "AC058",
+      "packages/core/src/native-trace-runner-p6.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "RUN-02",
+    "section": "12",
+    "title": "isolation backend/probing",
+    "classification": "INTEGRATION-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/runner/isolation.ts"
+    ],
+    "testIds": [
+      "AC059",
+      "packages/core/src/native-trace-runner-p6.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "RUN-03",
+    "section": "12",
+    "title": "deterministic mutations/oracles",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/runner/mutator.ts",
+      "packages/core/src/runner/oracle.ts"
+    ],
+    "testIds": [
+      "AC060",
+      "packages/core/src/native-trace-runner-p6.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "RUN-04",
+    "section": "12",
+    "title": "reducer/checkpoint",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/runner/reducer.ts"
+    ],
+    "testIds": [
+      "AC060",
+      "packages/core/src/native-trace-runner-p6.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "RUN-05",
+    "section": "12",
+    "title": "differential testing",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/runner/differential.ts"
+    ],
+    "testIds": [
+      "AC064",
+      "packages/core/src/native-trace-runner-p6.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "RUN-06",
+    "section": "12",
+    "title": "fuzzer adapter",
+    "classification": "INTEGRATION-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/runner/mutator.ts"
+    ],
+    "testIds": [
+      "AC060",
+      "packages/core/src/native-trace-runner-p6.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "NAND-01",
+    "section": "13",
+    "title": "geometry/navigation",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/nand/geometry.ts"
+    ],
+    "testIds": [
+      "AC041",
+      "packages/core/src/nand-captures-p5.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "NAND-02",
+    "section": "13",
+    "title": "profile/layout validation",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/nand/geometry.ts"
+    ],
+    "testIds": [
+      "AC042",
+      "packages/core/src/nand-captures-p5.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "NAND-03",
+    "section": "13",
+    "title": "multi-read analysis",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/nand/multi-read.ts"
+    ],
+    "testIds": [
+      "AC046",
+      "packages/core/src/nand-captures-p5.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "NAND-04",
+    "section": "13",
+    "title": "ECC reference codec/ledger",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/nand/ecc.ts"
+    ],
+    "testIds": [
+      "AC044",
+      "AC045",
+      "packages/core/src/nand-captures-p5.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "NAND-05",
+    "section": "13",
+    "title": "reconstruction reference profile",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/nand/ftl.ts"
+    ],
+    "testIds": [
+      "AC047",
+      "packages/core/src/nand-captures-p5.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "NAND-06",
+    "section": "13",
+    "title": "real-layout profile availability",
+    "classification": "PROFILE-DEPENDENT",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/nand/geometry.ts"
+    ],
+    "testIds": [
+      "AC048",
+      "packages/core/src/nand-captures-p5.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "CAP-01",
+    "section": "14",
+    "title": "normalized captures/import",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/captures/waveform.ts"
+    ],
+    "testIds": [
+      "AC049",
+      "packages/core/src/nand-captures-p5.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "CAP-02",
+    "section": "14",
+    "title": "UART/SPI/I2C subsets",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/captures/protocols.ts"
+    ],
+    "testIds": [
+      "AC049",
+      "packages/core/src/nand-captures-p5.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "CAP-03",
+    "section": "14",
+    "title": "acquisition adapter contract",
+    "classification": "PROFILE-DEPENDENT",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/captures/waveform.ts"
+    ],
+    "testIds": [
+      "AC049",
+      "packages/core/src/nand-captures-p5.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "CAP-04",
+    "section": "14",
+    "title": "physical-measurement import contract",
+    "classification": "RESEARCH-EXTENSION",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/captures/waveform.ts"
+    ],
+    "testIds": [
+      "AC067",
+      "packages/core/src/nand-captures-p5.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "BCHAIN-01",
+    "section": "15",
+    "title": "Bitcoin parser/vectors",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/bchain/bitcoin.ts"
+    ],
+    "testIds": [
+      "AC061",
+      "AC062",
+      "packages/core/src/bchain-p7.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "BCHAIN-02",
+    "section": "15",
+    "title": "RLP/envelope subsets",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/bchain/ethereum.ts"
+    ],
+    "testIds": [
+      "AC063",
+      "packages/core/src/bchain-p7.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "BCHAIN-03",
+    "section": "15",
+    "title": "VM traces/reference adapter",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/bchain/evm.ts"
+    ],
+    "testIds": [
+      "AC064",
+      "packages/core/src/bchain-p7.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "BCHAIN-04",
+    "section": "15",
+    "title": "limb/crypto reference analysis",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/bchain/limbs.ts"
+    ],
+    "testIds": [
+      "AC066",
+      "packages/core/src/bchain-p7.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "BCHAIN-05",
+    "section": "15",
+    "title": "timing evidence import",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/bchain/limbs.ts"
+    ],
+    "testIds": [
+      "AC067",
+      "packages/core/src/bchain-p7.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "AI-01",
+    "section": "16",
+    "title": "SafeTensors",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/ai/safetensors.ts"
+    ],
+    "testIds": [
+      "AC068",
+      "packages/core/src/ai-p8.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "AI-02",
+    "section": "16",
+    "title": "ONNX",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/ai/onnx.ts"
+    ],
+    "testIds": [
+      "AC071",
+      "packages/core/src/ai-p8.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "AI-03",
+    "section": "16",
+    "title": "additional model adapters",
+    "classification": "RESEARCH-EXTENSION",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/ai/safetensors.ts"
+    ],
+    "testIds": [
+      "AC072",
+      "packages/core/src/ai-p8.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "AI-04",
+    "section": "16",
+    "title": "tensor address/bounds",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/ai/tensors.ts"
+    ],
+    "testIds": [
+      "AC069",
+      "AC070",
+      "packages/core/src/ai-p8.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "AI-05",
+    "section": "16",
+    "title": "numeric representations",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/ai/tensors.ts"
+    ],
+    "testIds": [
+      "AC074",
+      "packages/core/src/ai-p8.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "AI-06",
+    "section": "16",
+    "title": "GPU diagnostic correlation",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/ai/gpu-sanitizer.ts"
+    ],
+    "testIds": [
+      "AC073",
+      "packages/core/src/ai-p8.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "AI-07",
+    "section": "16",
+    "title": "runtime experiment adapter",
+    "classification": "INTEGRATION-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/ai/gpu-sanitizer.ts"
+    ],
+    "testIds": [
+      "AC075",
+      "packages/core/src/ai-p8.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "DISC-01",
+    "section": "17",
+    "title": "hypothesis engine/holdout",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/discovery.ts"
+    ],
+    "testIds": [
+      "AC076",
+      "packages/core/src/structures-p4.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "DISC-02",
+    "section": "17",
+    "title": "experiment proposals/schema candidates",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/discovery.ts"
+    ],
+    "testIds": [
+      "AC077",
+      "packages/core/src/structures-p4.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "UI-01",
+    "section": "18",
+    "title": "paged hex/selection",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "src/components/"
+    ],
+    "testIds": [
+      "AC017",
+      "src/lib/bytes.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "UI-02",
+    "section": "18",
+    "title": "domain panels/provenance navigation",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "src/components/"
+    ],
+    "testIds": [
+      "AC018",
+      "AC020",
+      "packages/core/src/provenance.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "UI-03",
+    "section": "18",
+    "title": "jobs/findings/accessibility",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "src/components/"
+    ],
+    "testIds": [
+      "AC020",
+      "src/lib/storage.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "CLI-01",
+    "section": "19",
+    "title": "commands/contracts",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/cli/src/cli.ts"
+    ],
+    "testIds": [
+      "AC085",
+      "packages/cli/src/cli.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "CLI-02",
+    "section": "19",
+    "title": "packaging/launchers/doctor",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/cli/src/cli.ts",
+      "bitpeek.cmd",
+      "bitpeek-mcp.cmd"
+    ],
+    "testIds": [
+      "AC085",
+      "packages/cli/src/cli.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "MCP-01",
+    "section": "20",
+    "title": "tools/pagination/parity",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/mcp/src/server.ts"
+    ],
+    "testIds": [
+      "AC078",
+      "AC079",
+      "AC086",
+      "packages/mcp/src/server.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "MCP-02",
+    "section": "20",
+    "title": "containment/sessions/resource cleanup",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/mcp/src/security.ts"
+    ],
+    "testIds": [
+      "AC079",
+      "AC080",
+      "packages/mcp/src/server.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "EVID-01",
+    "section": "21",
+    "title": "patch dialect migration",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/patch.ts"
+    ],
+    "testIds": [
+      "AC037",
+      "AC038",
+      "AC039",
+      "packages/core/src/patch-v2.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "EVID-02",
+    "section": "21",
+    "title": "recipe versioning/replay",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/recipe-v2.ts"
+    ],
+    "testIds": [
+      "AC040",
+      "AC083",
+      "packages/core/src/recipe.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "EVID-03",
+    "section": "21",
+    "title": "bundle/verification",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/evidence-bundle.ts"
+    ],
+    "testIds": [
+      "AC082",
+      "packages/core/src/demos-p10.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "EVID-04",
+    "section": "21",
+    "title": "recursive redaction/reports",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/evidence-bundle.ts"
+    ],
+    "testIds": [
+      "AC081",
+      "packages/core/src/demos-p10.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "SDK-01",
+    "section": "22",
+    "title": "manifests/trust/lifecycle",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/sdk/"
+    ],
+    "testIds": [
+      "AC084",
+      "packages/core/src/operations-sdk-p9.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "SDK-02",
+    "section": "22",
+    "title": "example plugins/conformance",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/sdk/examples.ts"
+    ],
+    "testIds": [
+      "AC084",
+      "packages/core/src/operations-sdk-p9.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "QA-01",
+    "section": "23",
+    "title": "corpus/property/fuzz tests",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/"
+    ],
+    "testIds": [
+      "AC001",
+      "AC011",
+      "AC088",
+      "packages/core/src/structures-p4.test.ts",
+      "packages/core/src/native-trace-runner-p6.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "QA-02",
+    "section": "23",
+    "title": "real CLI/MCP/browser integration",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/cli/src/cli.ts",
+      "packages/mcp/src/server.ts"
+    ],
+    "testIds": [
+      "AC085",
+      "AC086",
+      "packages/cli/src/cli.test.ts",
+      "packages/mcp/src/server.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "QA-03",
+    "section": "28",
+    "title": "demos A-F",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/demos-p10.test.ts"
+    ],
+    "testIds": [
+      "DEMO-A",
+      "DEMO-B",
+      "DEMO-C",
+      "DEMO-D",
+      "DEMO-E",
+      "DEMO-F",
+      "packages/core/src/demos-p10.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "QA-04",
+    "section": "24",
+    "title": "measured benchmarks",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/large-source.test.ts"
+    ],
+    "testIds": [
+      "AC089",
+      "packages/core/src/large-source.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "DOC-01",
+    "section": "25",
+    "title": "ADRs/guides/support matrix",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "docs/adr/"
+    ],
+    "testIds": [
+      "AC090",
+      "packages/core/src/demos-p10.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "DOC-02",
+    "section": "25",
+    "title": "generated schemas/capabilities",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "packages/core/src/operations/registry.ts"
+    ],
+    "testIds": [
+      "AC039",
+      "AC084",
+      "packages/core/src/operations-sdk-p9.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  },
+  {
+    "id": "REL-01",
+    "section": "25",
+    "title": "build/CI/licenses/final audit",
+    "classification": "SOFTWARE-MUST",
+    "dependencies": [],
+    "implementationState": "implemented",
+    "verificationState": "verified",
+    "availability": "ready",
+    "maturity": "experimental",
+    "codePaths": [
+      "package.json"
+    ],
+    "testIds": [
+      "AC087",
+      "AC088",
+      "AC090",
+      "packages/core/src/demos-p10.test.ts"
+    ],
+    "evidencePaths": [],
+    "supportedSubset": {},
+    "limitations": "",
+    "remainingWork": "",
+    "lastUpdated": "2026-09-29T04:58:46.622Z",
+    "applicableSourceRevision": "5ba4c328ccc41a0799213dd19c35efdc78a27621"
+  }
+]

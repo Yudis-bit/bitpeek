@@ -476,8 +476,27 @@ export function createBitpeekMcpServer(security = new McpSecurityManager()) {
   return server
 }
 
-export async function runMcpServer() {
-  const server = createBitpeekMcpServer()
+export async function runMcpServer(customSecurity?: McpSecurityManager) {
+  let security = customSecurity
+  if (!security) {
+    const allowedRoots: string[] = []
+    for (let i = 2; i < process.argv.length; i++) {
+      if (process.argv[i] === '--allowed-roots' && process.argv[i + 1]) {
+        allowedRoots.push(...process.argv[i + 1]!.split(',').map((s: string) => s.trim()).filter(Boolean))
+        i++
+      }
+    }
+    if (process.env['BITPEEK_ALLOWED_ROOTS']) {
+      allowedRoots.push(...process.env['BITPEEK_ALLOWED_ROOTS'].split(',').map((s: string) => s.trim()).filter(Boolean))
+    }
+    if (allowedRoots.length > 0) {
+      security = new McpSecurityManager({
+        allowedInputRoots: allowedRoots,
+        allowedOutputRoots: allowedRoots,
+      })
+    }
+  }
+  const server = createBitpeekMcpServer(security)
   const transport = new StdioServerTransport()
   await server.connect(transport)
   process.stderr.write('Bitpeek MCP server running on stdio.\n')

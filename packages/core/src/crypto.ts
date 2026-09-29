@@ -216,6 +216,10 @@ export class Sha256 {
   }
 }
 
+export function sha256(bytes: Uint8Array): Uint8Array {
+  return new Sha256().update(bytes).digest()
+}
+
 export function sha256Hex(bytes: Uint8Array): string {
   return new Sha256().update(bytes).digestHex()
 }
