@@ -9,6 +9,7 @@ export interface ExtractedString {
 }
 
 export interface StringScanResult {
+  nextCursor?: number
   items: ExtractedString[]
   truncated: boolean
   totalKnown?: number
@@ -32,10 +33,7 @@ function codeUnitsToString(values: ArrayLike<number>): string {
   return result
 }
 
-function scanAscii(
-  bytes: Uint8Array,
-  minimumLength: number,
-): ExtractedString[] {
+function scanAscii(bytes: Uint8Array, minimumLength: number): ExtractedString[] {
   const result: ExtractedString[] = []
   let start = -1
 

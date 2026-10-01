@@ -7,21 +7,20 @@ export const docsPages = [
     eyebrow: 'Technical Manual',
     title: 'Bitpeek Technical Documentation & Architecture Manual',
     description:
-      'Comprehensive manual for the Bitpeek local-first binary workbench. Covers byte semantics, structure parsing, offset patches, CLI automation, and local MCP.',
+      'Documentation for the Bitpeek local-first binary workbench. Covers byte semantics, structure parsing, offset patches, CLI automation, and local MCP.',
     h1: 'Bitpeek Technical Documentation & Manual',
-    lead:
-      'A complete engineering reference for inspecting raw bytes, analyzing binary structures, generating verifiable evidence, and integrating with CLI or MCP.',
+    lead: 'Read bytes, inspect file structures, compare changes, and export evidence. Includes browser, CLI, and MCP workflows.',
     ctaHref: '/?intent=open#workspace',
     ctaLabel: 'Open the workbench',
     ctaHeading: 'Start inspecting bytes in Bitpeek',
     ctaText:
-      'Load any local binary file up to 256 KiB in browser memory, or explore the documentation guides below.',
+      'Open local files up to 512 MiB. Use the guides below for editing, analysis, and automation.',
     sections: [
       {
         id: 'architecture-overview',
         title: 'Architecture & Engine Design',
         html: `
-          <p>Bitpeek is engineered as a client-side, local-first binary workbench. The architecture is strictly decoupled into an algorithmic core and target-specific delivery adapters:</p>
+          <p>Bitpeek processes files locally. The shared engine is separate from its browser, CLI, and MCP interfaces:</p>
           <ul>
             <li><strong>packages/core</strong>: A pure TypeScript engine containing parsers (ELF, PNG, declarative schemas), byte streaming abstractions (<code>ByteSource</code>), hashing algorithms (FIPS 180-4 SHA-256, CRC-32, CRC-16), offset diffing, and declarative recipe execution. It has zero dependencies on React, the DOM, or Node.js.</li>
             <li><strong>src/ (Web Workbench)</strong>: React 19 interface with virtualized hex and ASCII grid rendering, real-time structure tree navigation, bit toggling, and in-memory transactional history.</li>
@@ -32,13 +31,13 @@ export const docsPages = [
       },
       {
         id: 'core-differentiators',
-        title: 'Core Differentiators',
+        title: 'Workspace features',
         html: `
-          <p>Bitpeek was built to solve precision problems found in general-purpose hex editors:</p>
+          <p>The workspace connects parsed fields, raw bytes, and reproducible operations:</p>
           <ul>
             <li><strong>Field-to-Byte Semantic Mapping</strong>: High-level structural fields (such as ELF section headers or PNG chunk lengths) are mapped directly to exact byte coordinates in the raw binary view.</li>
             <li><strong>Zero Server Uploads</strong>: All byte analysis and manipulation execute entirely within the user's local execution environment. No bytes ever leave your device.</li>
-            <li><strong>Cross-Platform Parity</strong>: The exact same TypeScript core powers the web interface, the CLI binary, and the MCP agent server, guaranteeing identical semantic results.</li>
+            <li><strong>Cross-Platform Parity</strong>: The exact same TypeScript core powers the web interface, the CLI binary, and the MCP agent server, using the same parsers and byte operations.</li>
             <li><strong>Verifiable Evidence & Replay</strong>: Export reproducible markdown summaries, JSON evidence reports, and declarative replay recipes suitable for pull requests and bug bounty submissions.</li>
           </ul>
         `,
@@ -65,21 +64,32 @@ export const docsPages = [
     faqs: [
       {
         question: 'Is Bitpeek free and open source?',
-        answer: 'Yes. Bitpeek is licensed under the permissive MIT license and hosted openly on GitHub.',
+        answer:
+          'Yes. Bitpeek is licensed under the permissive MIT license and hosted openly on GitHub.',
       },
       {
         question: 'Does Bitpeek require an account or API key?',
-        answer: 'No. Bitpeek requires no login, no accounts, and no paid API keys. All features are fully functional offline once loaded.',
+        answer:
+          'No. Bitpeek requires no login, no accounts, and no paid API keys. The app processes files locally. Tools loaded on demand need a connection on first use.',
       },
       {
         question: 'Can Bitpeek be used in CI/CD pipelines?',
-        answer: 'Yes. The bitpeek CLI provides exit code 0 on success, exit code 4 on verification failure, and JSON output for automated scripting.',
+        answer:
+          'Yes. The bitpeek CLI provides exit code 0 on success, exit code 4 on verification failure, and JSON output for automated scripting.',
       },
     ],
     related: [
       { slug: '/docs/quickstart', label: 'Quickstart guide', note: 'Start with 3 practical tasks' },
-      { slug: '/docs/byte-semantics', label: 'Byte semantics', note: 'Coordinate and numeric rules' },
-      { slug: '/docs/structures', label: 'Structure inspector', note: 'ELF, PNG, and custom schemas' },
+      {
+        slug: '/docs/byte-semantics',
+        label: 'Byte semantics',
+        note: 'Coordinate and numeric rules',
+      },
+      {
+        slug: '/docs/structures',
+        label: 'Structure inspector',
+        note: 'ELF, PNG, and custom schemas',
+      },
     ],
   },
   {
@@ -92,12 +102,12 @@ export const docsPages = [
     description:
       'Learn three essential binary inspection workflows in Bitpeek: inspecting header fields, detecting byte patterns, and generating atomic offset diff patches.',
     h1: 'Quickstart Guide for Binary Inspection',
-    lead:
-      'Three realistic inspection tasks demonstrating byte navigation, field highlight inspection, and reproducible patch creation in under five minutes.',
+    lead: 'Three realistic inspection tasks demonstrating byte navigation, field highlight inspection, and reproducible patch creation in under five minutes.',
     ctaHref: '/?intent=open#workspace',
     ctaLabel: 'Try the quickstart in Bitpeek',
     ctaHeading: 'Open the interactive workbench',
-    ctaText: 'Follow along with these three tasks by opening the Bitpeek workbench in your browser.',
+    ctaText:
+      'Follow along with these three tasks by opening the Bitpeek workbench in your browser.',
     sections: [
       {
         id: 'task-1-header-inspection',
@@ -142,17 +152,23 @@ export const docsPages = [
     faqs: [
       {
         question: 'Can I undo my edits if I make a mistake?',
-        answer: 'Yes. Press Ctrl+Z or Cmd+Z (or click Undo in the toolbar) to revert any byte edit, bit toggle, or transform transaction.',
+        answer:
+          'Yes. Press Ctrl+Z or Cmd+Z (or click Undo in the toolbar) to revert any byte edit, bit toggle, or transform transaction.',
       },
       {
         question: 'Does Bitpeek modify my original file on disk?',
-        answer: 'No. Bitpeek operates entirely in browser memory. Clicking Save triggers a new file download without touching the source file.',
+        answer:
+          'No. Bitpeek operates entirely in browser memory. Clicking Save triggers a new file download without touching the source file.',
       },
     ],
     related: [
       { slug: '/docs', label: 'Documentation index', note: 'Complete architecture manual' },
       { slug: '/docs/byte-semantics', label: 'Byte semantics', note: 'Data representation rules' },
-      { slug: '/docs/structures', label: 'Structure inspector', note: 'Deep dive into ELF and PNG' },
+      {
+        slug: '/docs/structures',
+        label: 'Structure inspector',
+        note: 'Deep dive into ELF and PNG',
+      },
     ],
   },
   {
@@ -165,12 +181,12 @@ export const docsPages = [
     description:
       'Understand how Bitpeek encodes half-open byte ranges, little and big endian integers, IEEE-754 floating-point numbers, and text encodings with zero loss.',
     h1: 'Byte Semantics and Numeric Representations',
-    lead:
-      'Mathematical and algorithmic rules governing half-open intervals, 64-bit integer strings, raw float bits, and character encoding transformations.',
+    lead: 'Mathematical and algorithmic rules governing half-open intervals, 64-bit integer strings, raw float bits, and character encoding transformations.',
     ctaHref: '/?mode=hex#workspace',
     ctaLabel: 'Test byte conversions',
     ctaHeading: 'Explore numeric representations',
-    ctaText: 'Enter byte values in the Bitpeek workspace to observe real-time interpretations across formats.',
+    ctaText:
+      'Enter byte values in the Bitpeek workspace to observe real-time interpretations across formats.',
     sections: [
       {
         id: 'half-open-intervals',
@@ -214,11 +230,13 @@ export const docsPages = [
     faqs: [
       {
         question: 'Why are 64-bit numbers returned as strings in JSON?',
-        answer: 'To prevent silent precision loss caused by standard JSON parsers converting integers above 2^53 - 1 into double-precision approximations.',
+        answer:
+          'To prevent silent precision loss caused by standard JSON parsers converting integers above 2^53 - 1 into double-precision approximations.',
       },
       {
         question: 'How does Bitpeek handle invalid UTF-8 sequences?',
-        answer: 'Invalid UTF-8 byte sequences are highlighted with error flags, and non-printable bytes in ASCII columns are displayed as safe dots (.) rather than broken replacement characters.',
+        answer:
+          'Invalid UTF-8 byte sequences are highlighted with error flags, and non-printable bytes in ASCII columns are displayed as safe dots (.) rather than broken replacement characters.',
       },
     ],
     related: [
@@ -237,12 +255,12 @@ export const docsPages = [
     description:
       'Inspect ELF binaries, PNG chunks with CRC verification, and custom declarative JSON schemas. Map high-level structural fields directly to raw source bytes.',
     h1: 'Structured Binary Inspection: ELF, PNG, & Schemas',
-    lead:
-      'Real-time parsing of ELF32/ELF64 headers, PNG chunk hierarchies with CRC verification, and declarative custom schemas with direct field-to-byte highlighting.',
+    lead: 'Real-time parsing of ELF32/ELF64 headers, PNG chunk hierarchies with CRC verification, and declarative custom schemas with direct field-to-byte highlighting.',
     ctaHref: '/file-formats/elf',
     ctaLabel: 'View ELF format reference',
     ctaHeading: 'Explore binary file structures',
-    ctaText: 'Open an ELF or PNG file in Bitpeek to see real-time structure tree parsing and byte mapping.',
+    ctaText:
+      'Open an ELF or PNG file in Bitpeek to see real-time structure tree parsing and byte mapping.',
     sections: [
       {
         id: 'elf-parser',
@@ -288,15 +306,21 @@ export const docsPages = [
     faqs: [
       {
         question: 'Does Bitpeek execute or decompile ELF binaries?',
-        answer: 'No. Bitpeek is strictly a passive structural parser and hex inspector. It never executes code or runs dynamic analysis.',
+        answer:
+          'No. Bitpeek is strictly a passive structural parser and hex inspector. It never executes code or runs dynamic analysis.',
       },
       {
         question: 'Can I load my own custom schema in the browser?',
-        answer: 'Yes. Click Load Custom Schema in the Structure panel and paste your JSON schema definition to inspect any custom format.',
+        answer:
+          'Yes. Click Load Custom Schema in the Structure panel and paste your JSON schema definition to inspect any custom format.',
       },
     ],
     related: [
-      { slug: '/docs/byte-semantics', label: 'Byte semantics', note: 'Endianness and scalar rules' },
+      {
+        slug: '/docs/byte-semantics',
+        label: 'Byte semantics',
+        note: 'Endianness and scalar rules',
+      },
       { slug: '/docs/patches', label: 'Patches & diff', note: 'Verifying structure mutations' },
       { slug: '/docs/recipes', label: 'Recipes & replay', note: 'Automating structure checks' },
     ],
@@ -311,12 +335,12 @@ export const docsPages = [
     description:
       'Specification for bitpeek-offset-patch formats v1 and v2. Learn how precondition checks and cryptographic SHA-256 hashes guarantee atomic patch application.',
     h1: 'Offset-Aligned Binary Patches and Verification',
-    lead:
-      'Deterministic binary difference recording using absolute byte offsets, strict preconditions, and cryptographic SHA-256 verification.',
+    lead: 'Deterministic binary difference recording using absolute byte offsets, strict preconditions, and cryptographic SHA-256 verification.',
     ctaHref: '/tools/binary-diff',
     ctaLabel: 'Try binary diff tool',
     ctaHeading: 'Compare binary files online',
-    ctaText: 'Load two binaries in Bitpeek to generate reproducible offset patches with precondition checks.',
+    ctaText:
+      'Load two binaries in Bitpeek to generate reproducible offset patches with precondition checks.',
     sections: [
       {
         id: 'offset-patch-concept',
@@ -362,11 +386,13 @@ export const docsPages = [
     faqs: [
       {
         question: 'What happens if a patch is applied to the wrong source file?',
-        answer: 'The patch fails immediately during source hash or precondition checks, leaving the original file completely untouched.',
+        answer:
+          'The patch fails immediately during source hash or precondition checks, leaving the original file completely untouched.',
       },
       {
         question: 'Can offset patches change the length of a file?',
-        answer: 'Yes. Target length can truncate or extend a binary; extensions append data, while mutations modify bytes at specified offsets.',
+        answer:
+          'Yes. Target length can truncate or extend a binary; extensions append data, while mutations modify bytes at specified offsets.',
       },
     ],
     related: [
@@ -385,8 +411,7 @@ export const docsPages = [
     description:
       'Execute automated binary operation sequences using declarative recipe JSON. Reproduce transforms, checks, and evidence across Web, CLI, and MCP engines.',
     h1: 'Deterministic Binary Replay Recipes',
-    lead:
-      'A declarative, versioned execution model for chaining binary inspections, transforms, searches, and validations with deterministic expected outputs.',
+    lead: 'A declarative, versioned execution model for chaining binary inspections, transforms, searches, and validations with deterministic expected outputs.',
     ctaHref: '/examples',
     ctaLabel: 'View runnable recipe examples',
     ctaHeading: 'Explore verified replay recipes',
@@ -433,11 +458,13 @@ export const docsPages = [
     faqs: [
       {
         question: 'Does a recipe embed the binary file inside the JSON?',
-        answer: 'No. Recipes separate code from data; inputs specify file IDs, expected byte lengths, and SHA-256 fingerprints to ensure correct input binding.',
+        answer:
+          'No. Recipes separate code from data; inputs specify file IDs, expected byte lengths, and SHA-256 fingerprints to ensure correct input binding.',
       },
       {
         question: 'Can recipes run arbitrary JavaScript or shell scripts?',
-        answer: 'No. Recipes are strictly declarative JSON specifications executed by the sandboxed Bitpeek core. No arbitrary code execution is permitted.',
+        answer:
+          'No. Recipes are strictly declarative JSON specifications executed by the sandboxed Bitpeek core. No arbitrary code execution is permitted.',
       },
     ],
     related: [
@@ -456,8 +483,7 @@ export const docsPages = [
     description:
       'Complete command-line manual for bitpeek. Inspect, find, hash, diff, and patch binary files from your terminal with scriptable JSON output and POSIX exits.',
     h1: 'Bitpeek Command-Line Interface Manual',
-    lead:
-      'Automate binary inspection, searches, hashing, structure parsing, and atomic patch application in CI/CD pipelines and shell environments.',
+    lead: 'Automate binary inspection, searches, hashing, structure parsing, and atomic patch application in CI/CD pipelines and shell environments.',
     ctaHref: '/docs/quickstart',
     ctaLabel: 'Read quickstart guide',
     ctaHeading: 'Automate binary inspection',
@@ -510,11 +536,13 @@ bitpeek --help</code></pre>
     faqs: [
       {
         question: 'Can I pipe the JSON output into jq?',
-        answer: 'Yes. When --json is specified, all diagnostics and progress stream to stderr, keeping stdout clean for piping directly into jq.',
+        answer:
+          'Yes. When --json is specified, all diagnostics and progress stream to stderr, keeping stdout clean for piping directly into jq.',
       },
       {
         question: 'Does bitpeek patch apply overwrite files by default?',
-        answer: 'No. The CLI defaults to fail-if-exists for all output files. Overwriting an existing destination requires the explicit --force flag.',
+        answer:
+          'No. The CLI defaults to fail-if-exists for all output files. Overwriting an existing destination requires the explicit --force flag.',
       },
     ],
     related: [
@@ -533,8 +561,7 @@ bitpeek --help</code></pre>
     description:
       'Equip AI developer tools with local binary inspection tools using the Model Context Protocol. Stdio transport, opaque sessions, and sandboxed root boundaries.',
     h1: 'Local Model Context Protocol (MCP) Server',
-    lead:
-      'A secure stdio MCP tool server providing 12 specialized binary inspection and diff tools for AI developer agents like Claude, Cursor, and Antigravity.',
+    lead: 'A secure stdio MCP tool server providing 12 specialized binary inspection and diff tools for AI developer agents like Claude, Cursor, and Antigravity.',
     ctaHref: '/docs/cli',
     ctaLabel: 'View CLI reference',
     ctaHeading: 'Equip AI agents with binary tools',
@@ -585,11 +612,13 @@ bitpeek --help</code></pre>
     faqs: [
       {
         question: 'Does the MCP server connect to external cloud APIs?',
-        answer: 'No. The Bitpeek MCP server runs completely locally via standard input/output (stdio). It makes no outbound network connections.',
+        answer:
+          'No. The Bitpeek MCP server runs completely locally via standard input/output (stdio). It makes no outbound network connections.',
       },
       {
         question: 'Can the MCP server read sensitive system files?',
-        answer: 'No. Access is restricted strictly to directories explicitly specified in the --allowed-roots configuration.',
+        answer:
+          'No. Access is restricted strictly to directories explicitly specified in the --allowed-roots configuration.',
       },
     ],
     related: [
@@ -608,21 +637,21 @@ bitpeek --help</code></pre>
     description:
       'Transparent operational limits and memory budgets for Bitpeek. Details workspace caps, bounded streaming, chunk sizes, and browser compatibility limits.',
     h1: 'Operational Limits and Performance Budgets',
-    lead:
-      'Detailed technical limits, bounded memory allocations, streaming chunk sizes, and platform guarantees for local-first binary processing.',
+    lead: 'Detailed technical limits, bounded memory allocations, streaming chunk sizes, and platform guarantees for local-first binary processing.',
     ctaHref: '/benchmarks',
     ctaLabel: 'View benchmark metrics',
     ctaHeading: 'Measured performance data',
-    ctaText: 'Review real-world latency, memory retention, and throughput metrics across file sizes.',
+    ctaText:
+      'Review real-world latency, memory retention, and throughput metrics across file sizes.',
     sections: [
       {
         id: 'file-size-limits',
         title: 'File Size Limits & Operating Modes',
         html: `
-          <p>To guarantee responsive interactive editing and eliminate browser out-of-memory crashes, Bitpeek defines clear operational bounds:</p>
+          <p>Different operations have different limits:</p>
           <ul>
-            <li><strong>Browser Interactive Edit Limit</strong>: 256 KiB maximum per document. This ensures instantaneous keystroke feedback, synchronous bit manipulation, and full transactional undo/redo history.</li>
-            <li><strong>Browser Read-Only Target</strong>: 64 MiB for viewing, streaming search, string scanning, structure header inspection, and progressive hashing.</li>
+            <li><strong>Source input</strong>: 256 KiB for typed or pasted bytes.</li><li><strong>File editing</strong>: Files up to 512 MiB use a piece table and 64 KiB viewing windows. Byte edits, insertion, deletion, and undo/redo do not copy the entire file.</li>
+            <li><strong>Analysis</strong>: Search, ASCII string extraction, entropy maps, and SHA-256 run in background workers for files up to 512 MiB. Structure parsing supports 64 MiB.</li><li><strong>Recipes</strong>: Preview inputs up to 16 MiB, with at most 100 steps and a 128 MiB cumulative processing budget.</li>
             <li><strong>CLI & MCP Streaming</strong>: Files up to 512 MiB are processed using bounded 1 MiB chunk streams, keeping heap consumption below 128 MiB.</li>
           </ul>
         `,
@@ -646,22 +675,24 @@ bitpeek --help</code></pre>
         html: `
           <p>Bitpeek strictly monitors bundle size on every build:</p>
           <ul>
-            <li>Homepage HTML: ≤ 6 KiB gzip (measured: ~3.2 KiB).</li>
-            <li>Initial Application JavaScript: ≤ 110 KiB gzip (measured: ~83.2 KiB).</li>
-            <li>Application CSS: ≤ 7 KiB gzip (measured: ~5.9 KiB).</li>
-            <li>Total Initial Transfer: ≤ 150 KiB gzip (measured: ~95.3 KiB).</li>
+            <li>Homepage HTML: ≤ 6 KiB gzip.</li>
+            <li>Initial Application JavaScript: ≤ 110 KiB gzip.</li>
+            <li>Application CSS: ≤ 7 KiB gzip.</li>
+            <li>Total Initial Transfer: ≤ 150 KiB gzip.</li>
           </ul>
         `,
       },
     ],
     faqs: [
       {
-        question: 'Why does Bitpeek cap interactive web editing at 256 KiB?',
-        answer: 'DOM rendering and multi-level transaction history for large files create significant memory pressure; capping interactive editing maintains instantaneous responsiveness.',
+        question: 'Can I edit files larger than 256 KiB?',
+        answer:
+          'Yes. Open a file to use the large-document editor. The 256 KiB limit applies to typed source input; file editing supports up to 512 MiB.',
       },
       {
         question: 'Can I inspect larger files without browser memory issues?',
-        answer: 'Yes. Use the bitpeek CLI or MCP tools, which stream files in 1 MiB chunks with constant memory overhead.',
+        answer:
+          'The browser reads large files in windows and runs analysis in workers. CLI and MCP also support chunked processing. Edit history and browser storage still consume space.',
       },
     ],
     related: [
@@ -680,18 +711,18 @@ bitpeek --help</code></pre>
     description:
       'Learn about the strict client-only security architecture of Bitpeek. Zero server uploads, local storage isolation, CSP headers, and offline capability.',
     h1: 'Privacy Architecture & Zero-Upload Guarantee',
-    lead:
-      'Why Bitpeek processes all bytes locally in browser memory or local process without external telemetry, tracking, or remote server file uploads.',
+    lead: 'Why Bitpeek processes all bytes locally in browser memory or local process without external telemetry, tracking, or remote server file uploads.',
     ctaHref: '/?intent=open#workspace',
     ctaLabel: 'Test local workbench',
     ctaHeading: 'Verify privacy in your browser',
-    ctaText: 'Open your browser Network tab to verify that zero byte data is sent over the network during file inspection.',
+    ctaText:
+      'Open your browser Network tab to verify that zero byte data is sent over the network during file inspection.',
     sections: [
       {
         id: 'zero-upload-invariant',
         title: 'The Zero-Upload Invariant',
         html: `
-          <p>Bitpeek guarantees that <strong>no user bytes, filenames, patterns, hashes, or inspection outputs are ever uploaded to any server</strong>.</p>
+          <p>Files, names, searches, hashes, and analysis results stay on your device. Nothing is sent to a Bitpeek server.</p>
           <p>When you open a file in Bitpeek:</p>
           <ul>
             <li>The browser reads the file directly from your local filesystem into client-side JavaScript memory using the standard HTML5 File and Blob APIs.</li>
@@ -709,7 +740,7 @@ bitpeek --help</code></pre>
             <li>No Google Analytics, Mixpanel, Segment, or tracking pixels.</li>
             <li>No remote web fonts (system monospace and sans-serif fonts are used exclusively).</li>
             <li>No external CDN scripts or third-party cookies.</li>
-            <li>No artificial AI chat widgets or server-side LLM API dependencies.</li>
+            <li>No account, API key, or remote processing service is needed.</li>
           </ul>
         `,
       },
@@ -717,7 +748,7 @@ bitpeek --help</code></pre>
         id: 'storage-and-headers',
         title: 'Storage Isolation & Security Headers',
         html: `
-          <p>User files and byte data are never written to <code>localStorage</code> or <code>IndexedDB</code>. The only persisted value is the user's preferred input format (e.g. hex or text), handled via a safe storage adapter that falls back to memory in private browsing mode.</p>
+          <p>Session recovery stores files, comparison references, selections, recipes, and notes in this browser’s <code>IndexedDB</code>. Input format and theme preferences use <code>localStorage</code>. Use <strong>Save project</strong> to download a separate copy. If browser storage is blocked or full, file editing still works but session recovery may be unavailable.</p>
           <p>Strict security headers protect the application:</p>
           <ul>
             <li><code>X-Content-Type-Options: nosniff</code></li>
@@ -731,11 +762,13 @@ bitpeek --help</code></pre>
     faqs: [
       {
         question: 'Can I use Bitpeek completely offline?',
-        answer: 'Yes. Once the static assets are loaded by your browser, you can disconnect your network connection and inspect files fully offline.',
+        answer:
+          'Editing uses local bytes after the app loads. Tools loaded on demand need a connection on first use; keep the page open when working offline.',
       },
       {
         question: 'Are file contents logged in Vercel server logs?',
-        answer: 'No. Because files are never sent via HTTP requests, hosting server logs only record requests for static web assets (.js, .css, .html).',
+        answer:
+          'No. Because files are never sent via HTTP requests, hosting server logs only record requests for static web assets (.js, .css, .html).',
       },
     ],
     related: [
@@ -754,12 +787,12 @@ bitpeek --help</code></pre>
     description:
       'Explore four reproducible technical demonstrations: ELF header analysis, PNG CRC editing, synthetic packet schema diffing, and AI agent evidence generation.',
     h1: 'Verifiable Binary Inspection Demonstrations',
-    lead:
-      'Four realistic technical demonstrations with verifiable input vectors, expected semantic outputs, and replayable execution recipes.',
+    lead: 'Four realistic technical demonstrations with verifiable input vectors, expected semantic outputs, and replayable execution recipes.',
     ctaHref: '/?intent=open#workspace',
     ctaLabel: 'Open sample in workbench',
     ctaHeading: 'Try these examples live',
-    ctaText: 'Load sample bytes in the Bitpeek workbench to verify these demonstrations interactively.',
+    ctaText:
+      'Load sample bytes in the Bitpeek workbench to verify these demonstrations interactively.',
     sections: [
       {
         id: 'demo-1-elf',
@@ -826,11 +859,13 @@ bitpeek --help</code></pre>
     faqs: [
       {
         question: 'Can I download the test files used in these demonstrations?',
-        answer: 'Yes. All test fixtures and synthetic byte sequences are included in the open source test corpus under packages/core/fixtures.',
+        answer:
+          'Yes. All test fixtures and synthetic byte sequences are included in the open source test corpus under packages/core/fixtures.',
       },
       {
         question: 'Are the recipes for these demos deterministic?',
-        answer: 'Yes. Running the associated recipe JSON produces identical checksums and output reports across Web, CLI, and MCP.',
+        answer:
+          'Yes. Running the associated recipe JSON produces identical checksums and output reports across Web, CLI, and MCP.',
       },
     ],
     related: [
@@ -844,104 +879,65 @@ bitpeek --help</code></pre>
     slug: '/benchmarks',
     lastModified: '2026-09-27',
     label: 'Benchmarks',
-    eyebrow: 'Empirical Measurements',
-    title: 'Performance Benchmarks & Memory Profiling | Bitpeek',
+    eyebrow: 'Performance',
+    title: 'File Limits and Performance Checks | Bitpeek',
     description:
-      'Empirical performance benchmarks for the Bitpeek engine across file sizes from 0 bytes to 512 MiB. Detailed latency, memory usage, and throughput metrics.',
-    h1: 'Engine Performance Benchmarks & Methodology',
-    lead:
-      'Reproducible benchmarks measuring viewport load latency, streaming search throughput, memory retention, and bundle budgets on reference desktop hardware.',
+      'Check Bitpeek performance on your own files. Covers file limits up to 512 MiB, memory use, background operations, and production bundle budgets.',
+    h1: 'Performance Checks and File Limits',
+    lead: 'How to check responsiveness, memory use, and production bundle size on your own files.',
     ctaHref: '/docs/limits',
     ctaLabel: 'View limits and budgets',
-    ctaHeading: 'Engineered for responsiveness',
-    ctaText: 'Review the technical limits and design tradeoffs behind these benchmark figures.',
+    ctaHeading: 'File and operation limits',
+    ctaText: 'View the limits for editing, structure parsing, and recipe previews.',
     sections: [
       {
         id: 'benchmark-methodology',
-        title: 'Benchmarking Methodology & Reference Hardware',
+        title: 'Checking performance',
         html: `
-          <p>All benchmark measurements were conducted using a repeatable protocol with seeded deterministic inputs:</p>
-          <ul>
-            <li><strong>Hardware</strong>: 4 logical cores, 8 GiB RAM, NVMe SSD storage.</li>
-            <li><strong>Environment</strong>: Node.js v24 LTS and Chromium modern engine.</li>
-            <li><strong>Input Datasets</strong>: Standard synthetic vectors (0 B, 1 B, 256 KiB, 1 MiB, 8 MiB, 64 MiB, 256 MiB, 512 MiB) comprising zeros, periodic cycles, pseudo-random sequences, and ASCII strings.</li>
-            <li><strong>Repetitions</strong>: Minimum 5 warmup runs followed by 10 measured runs; medians and p95 percentiles reported.</li>
-          </ul>
+          <p>File size, file contents, browser version, available memory, and edit history all affect performance. A single number does not describe every workload.</p>
+          <ol>
+            <li>Open a local file and measure the time until the first bytes appear.</li>
+            <li>Navigate to the final byte, edit it, undo, and check that the interface responds.</li>
+            <li>Run search or Analyze file and measure completion time. Cancel a long operation to check responsiveness.</li>
+            <li>Use browser performance tools to measure memory. Separate JavaScript heap, Blob storage, and browser process memory.</li>
+            <li>Record the browser version, machine, input hash, and operation. Repeat runs before comparing results.</li>
+          </ol>
         `,
       },
       {
         id: 'latency-and-memory',
-        title: 'Measured Latency & Memory Retention',
+        title: 'Operation limits',
         html: `
-          <div class="benchmark-table-wrapper">
-            <table class="benchmark-table">
-              <thead>
-                <tr>
-                  <th>Input Size</th>
-                  <th>Operation Mode</th>
-                  <th>First Viewport (Median)</th>
-                  <th>Throughput / Rate</th>
-                  <th>Retained Heap Peak</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>256 KiB</td>
-                  <td>Web Interactive Edit</td>
-                  <td>&lt; 8 ms</td>
-                  <td>Realtime interactive</td>
-                  <td>&lt; 4 MiB</td>
-                </tr>
-                <tr>
-                  <td>8 MiB</td>
-                  <td>Web Read-Only Scan</td>
-                  <td>42 ms</td>
-                  <td>~140 MiB/s</td>
-                  <td>&lt; 14 MiB</td>
-                </tr>
-                <tr>
-                  <td>64 MiB</td>
-                  <td>CLI / Streaming Scan</td>
-                  <td>185 ms</td>
-                  <td>~180 MiB/s</td>
-                  <td>&lt; 28 MiB</td>
-                </tr>
-                <tr>
-                  <td>512 MiB</td>
-                  <td>CLI Bounded Stream</td>
-                  <td>310 ms</td>
-                  <td>~195 MiB/s</td>
-                  <td>&lt; 45 MiB</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p class="notice">Note: In 512 MiB streaming read mode, retained memory remains bounded under 50 MiB because chunks are processed incrementally without holding the full file in memory.</p>
+          <table class="benchmark-table"><thead><tr><th>Operation</th><th>File limit</th><th>Processing</th></tr></thead><tbody>
+            <tr><td>Typed source input</td><td>256 KiB</td><td>In-memory buffer</td></tr>
+            <tr><td>File viewing and editing</td><td>512 MiB</td><td>64 KiB windows and a piece table</td></tr>
+            <tr><td>Search, ASCII strings, entropy, SHA-256</td><td>512 MiB</td><td>Background workers and chunks</td></tr>
+            <tr><td>Structure inspection</td><td>64 MiB</td><td>Background parser for large files</td></tr>
+            <tr><td>Recipe preview</td><td>16 MiB</td><td>Worker preview; one undo step when applied</td></tr>
+          </tbody></table>
+          <p>Opening a large file does not read all its bytes into a JavaScript array. Added bytes and undo history still consume memory; session recovery also needs browser storage.</p>
         `,
       },
       {
         id: 'bundle-budgets',
-        title: 'Production Build Asset Budgets',
+        title: 'Build checks',
         html: `
-          <p>Monitored on every build via <code>scripts/verify-build.mjs</code>:</p>
-          <ul>
-            <li><strong>Homepage HTML</strong>: 3.2 KiB gzip (Budget: 6.0 KiB).</li>
-            <li><strong>Initial Application JS</strong>: 83.2 KiB gzip (Budget: 110.0 KiB).</li>
-            <li><strong>Application CSS</strong>: 5.9 KiB gzip (Budget: 7.0 KiB).</li>
-            <li><strong>Shared SEO CSS</strong>: 3.1 KiB gzip (Budget: 7.0 KiB).</li>
-            <li><strong>Total Initial Transfer</strong>: 95.3 KiB gzip (Budget: 150.0 KiB).</li>
-          </ul>
+          <p><code>npm run build</code> checks the production assets with <code>scripts/verify-build.mjs</code>:</p>
+          <ul><li>Homepage HTML: at most 6 KiB gzip.</li><li>Initial JavaScript: at most 110 KiB gzip.</li><li>Application and shared CSS: at most 7 KiB gzip each.</li><li>Total initial transfer: at most 150 KiB gzip.</li></ul>
+          <p>Workers and optional tools load separately. Run the build to see the current measured sizes.</p>
         `,
       },
     ],
     faqs: [
       {
-        question: 'How does Bitpeek keep memory usage low on 512 MiB files?',
-        answer: 'By utilizing the ByteSource streaming abstraction, files are read in 1 MiB sliding windows so the garbage collector can reclaim unneeded chunks immediately.',
+        question: 'Does the editor load a 512 MiB file into one array?',
+        answer:
+          'No. The editor reads 64 KiB windows. The piece table keeps references to original ranges and stores added bytes separately.',
       },
       {
-        question: 'Are these benchmarks synthetic or field data?',
-        answer: 'These are reproducible lab benchmarks measured on reference hardware using deterministic test vectors.',
+        question: 'Where are the current bundle measurements?',
+        answer:
+          'Run npm run build. Its output reports the actual compressed sizes and checks them against the budgets above.',
       },
     ],
     related: [
@@ -960,19 +956,18 @@ bitpeek --help</code></pre>
     description:
       'Learn about the origins of Bitpeek and creator Yudistira Putra (Yudis-bit), with verified upstream contributions across LLVM, Vulkan, secp256k1, and OpenSBI.',
     h1: 'About Bitpeek and Yudistira Putra',
-    lead:
-      'Engineered by Yudistira Putra (Yudis-bit) as a precision binary workbench built on rigorous systems engineering, boundary checks, and reproducible evidence.',
+    lead: 'Built by Yudistira Putra (Yudis-bit). Bitpeek connects raw bytes, file structures, and reproducible analysis.',
     ctaHref: '/?intent=open#workspace',
     ctaLabel: 'Try Bitpeek workbench',
-    ctaHeading: 'Built with engineering rigor',
-    ctaText: 'Experience a binary workbench crafted with the precision expected in low-level systems engineering.',
+    ctaHeading: 'About the project',
+    ctaText: 'Open a file to inspect bytes, select parsed fields, or compare it with a reference.',
     sections: [
       {
         id: 'creator-background',
         title: 'About the Creator: Yudistira Putra',
         html: `
           <p>Bitpeek was created and is actively maintained by <strong>Yudistira Putra</strong> (<a href="https://github.com/Yudis-bit">@Yudis-bit</a> on GitHub). His work focuses on low-level systems programming, compiler semantics, formal verification, memory safety, and protocol correctness.</p>
-          <p>The design of Bitpeek reflects this engineering background: strict boundary checks on every read, checked integer arithmetic, unambiguous coordinate systems, and zero tolerance for silent data corruption.</p>
+          <p>Bitpeek uses bounded byte reads and explicit offset ranges. Parsed fields link back to the bytes they describe.</p>
         `,
       },
       {
@@ -992,22 +987,19 @@ bitpeek --help</code></pre>
         `,
       },
       {
-        id: 'ethical-claims',
-        title: 'Commitment to Truth in Engineering',
+        id: 'contributing',
+        title: 'Report a problem or contribute',
         html: `
-          <p>In accordance with the Bitpeek development charter:</p>
-          <ul>
-            <li>No exaggerated accolades: We do not claim to be "world-renowned" or "top 1%". Quality is proven through clean code, passing regression tests, and verifiable output.</li>
-            <li>Accurate attribution: Upstream PRs in secp256k1 or Kafel do not imply endorsement by Bitcoin Core or Google. Tested-by credits are acknowledged truthfully without claiming authorship.</li>
-            <li>No fabricated metrics: Bitpeek does not display artificial follower counters, fake user numbers, or sponsored enterprise badges.</li>
-          </ul>
+          <p>Use <a href="https://github.com/Yudis-bit/bitpeek/issues">GitHub issues</a> to report a bug. Include your browser version, the steps to reproduce it, and the affected offset or field when relevant.</p>
+          <p>A small test file helps reproduce parsing and editing problems. Remove private data before sharing a sample. Code changes can be submitted through a pull request.</p>
         `,
       },
     ],
     faqs: [
       {
         question: 'How can I get in touch with the author?',
-        answer: 'You can reach Yudistira Putra via GitHub at github.com/Yudis-bit or via email at pyudistira519@gmail.com.',
+        answer:
+          'You can reach Yudistira Putra via GitHub at github.com/Yudis-bit or via email at pyudistira519@gmail.com.',
       },
       {
         question: 'Is Bitpeek affiliated with Google or Microsoft?',
@@ -1023,25 +1015,40 @@ bitpeek --help</code></pre>
   {
     type: 'doc',
     slug: '/changelog',
-    lastModified: '2026-09-27',
+    lastModified: '2026-10-01',
     label: 'Changelog',
     eyebrow: 'Release History',
-    title: 'Bitpeek Changelog & Release Capability Matrix',
+    title: 'Bitpeek Changelog and Workspace Release Notes',
     description:
       'Complete version history and capability evolution for Bitpeek. Detailed release notes covering core parsers, CLI commands, MCP tools, and bug fixes.',
     h1: 'Bitpeek Version History & Release Notes',
-    lead:
-      'Chronological record of releases, architectural decisions, format additions, performance improvements, and breaking changes.',
+    lead: 'Changes to the browser workspace, shared engine, and automation tools.',
     ctaHref: '/?intent=open#workspace',
     ctaLabel: 'Open Bitpeek v1.0.0',
-    ctaHeading: 'Experience the latest release',
-    ctaText: 'Launch Bitpeek v1.0.0 in your browser to inspect binary files with the updated engine.',
+    ctaHeading: 'Open the current workspace',
+    ctaText:
+      'Launch Bitpeek v1.0.0 in your browser to inspect binary files with the updated engine.',
     sections: [
+      {
+        id: 'workspace-2026-10-01',
+        title: 'Workspace upgrade (October 1, 2026)',
+        html: `
+          <ul>
+            <li>Kept the paper palette, navy chrome, monospace tables, and desktop controls.</li>
+            <li>Added 16 document tabs, resizable panels, a command palette, focus view, and optional dark theme.</li>
+            <li>Added file editing up to 512 MiB with 64 KiB windows, insertion, deletion, undo/redo, and background search and analysis.</li>
+            <li>Added structure filtering, entropy and frequency maps, structure regions, and annotation bookmarks.</li>
+            <li>Added insertion-aware comparison, byte previews, and structure-field comparison.</li>
+            <li>Added annotations, local session recovery, and portable projects with reference files.</li>
+            <li>Added visual recipes, byte previews, and JSON/Markdown investigation reports. Recipe previews support 16 MiB inputs; structure parsing supports 64 MiB.</li>
+          </ul>
+        `,
+      },
       {
         id: 'v1-0-0',
         title: 'Version 1.0.0 (September 2026) — Initial Production Release',
         html: `
-          <p>The complete realization of the Bitpeek Masterplan specification:</p>
+          <p>The first release introduced these tools:</p>
           <ul>
             <li><strong>Structure Inspector</strong>: Added ELF32/ELF64 and PNG interactive parsers with bi-directional field-to-byte coordinate selection. Added support for custom declarative JSON structure schemas.</li>
             <li><strong>Pure TypeScript Core</strong>: Established <code>packages/core</code> with zero external dependencies, streaming <code>ByteSource</code> abstractions, and NIST-verified SHA-256 (FIPS 180-4).</li>
@@ -1049,7 +1056,7 @@ bitpeek --help</code></pre>
             <li><strong>Model Context Protocol (MCP) Server</strong>: Implemented official stdio MCP server in <code>packages/mcp</code> exposing 12 tools for AI agents within a secure allowed-roots sandbox.</li>
             <li><strong>Deterministic Replay Recipes</strong>: Added declarative recipe runner (<code>recipe-v1.json</code>) and verifiable evidence report generator (<code>evidence-report-v1.json</code>).</li>
             <li><strong>Integrity Fixes</strong>: Integrated <code>SafeStorage</code> in-memory fallback for private browsing, fixed 0-byte document export bug, eliminated draft state ambiguity, and unified transactional history across patch and replacement operations.</li>
-            <li><strong>Documentation Suite</strong>: Launched 14 comprehensive technical documentation pages, machine-readable manifests (<code>/capabilities.json</code>, <code>/version.json</code>, <code>/llms.txt</code>), and versioned schemas.</li>
+            <li><strong>Documentation Suite</strong>: Launched 14 technical documentation pages, machine-readable manifests (<code>/capabilities.json</code>, <code>/version.json</code>, <code>/llms.txt</code>), and versioned schemas.</li>
           </ul>
         `,
       },
@@ -1057,11 +1064,13 @@ bitpeek --help</code></pre>
     faqs: [
       {
         question: 'How is Bitpeek versioned?',
-        answer: 'Bitpeek strictly follows Semantic Versioning (SemVer 2.0.0). Schema specifications (such as recipe-v1.json) maintain independent version numbers.',
+        answer:
+          'Bitpeek strictly follows Semantic Versioning (SemVer 2.0.0). Schema specifications (such as recipe-v1.json) maintain independent version numbers.',
       },
       {
         question: 'Where can I see the commit history?',
-        answer: 'The complete, unedited commit history is publicly available on GitHub at github.com/Yudis-bit/bitpeek.',
+        answer:
+          'The complete, unedited commit history is publicly available on GitHub at github.com/Yudis-bit/bitpeek.',
       },
     ],
     related: [

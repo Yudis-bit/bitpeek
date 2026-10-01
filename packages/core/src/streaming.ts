@@ -174,6 +174,7 @@ export async function findBytePatternStream(
 // ==========================================
 
 export interface StreamingStringsOptions {
+  startOffset?: number
   minimumLength?: number
   limit?: number
   chunkSize?: number
@@ -197,9 +198,13 @@ export async function extractPrintableStringsStream(
   const items: ExtractedString[] = []
   let currentChars: number[] = []
   let currentStart = -1
-  let globalOffset = 0
+  let globalOffset = options.startOffset ?? 0
 
-  for await (const chunk of source.chunks(undefined, options.chunkSize ?? 64 * 1024, signal)) {
+  for await (const chunk of source.chunks(
+    { start: globalOffset },
+    options.chunkSize ?? 64 * 1024,
+    signal,
+  )) {
     if (signal?.aborted) throw new BitpeekError('CANCELLED', 'String extraction was aborted.')
 
     for (let i = 0; i < chunk.length; i++) {
@@ -226,7 +231,7 @@ export async function extractPrintableStringsStream(
               value: charLen > maxStrLen ? `${rawStr}… [truncated]` : rawStr,
             })
             if (items.length >= limit) {
-              return { items, truncated: true }
+              return { items, truncated: true, nextCursor: bytePos + 1 }
             }
           }
           currentStart = -1

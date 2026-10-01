@@ -1,4 +1,4 @@
-import { useState, type DragEvent } from 'react'
+import { useId, useState, type DragEvent } from 'react'
 import { INPUT_MODES, type InputMode } from '../lib/bytes'
 
 interface InputEditorProps {
@@ -58,6 +58,7 @@ export function InputEditor({
   onCopy,
   onCopyBytes,
 }: InputEditorProps) {
+  const scopeId = useId()
   const [dragging, setDragging] = useState(false)
 
   const openDroppedFile = (event: DragEvent<HTMLElement>) => {
@@ -70,7 +71,7 @@ export function InputEditor({
   return (
     <section
       className={dragging ? 'input-panel is-dragging' : 'input-panel'}
-      aria-labelledby="input-heading"
+      aria-labelledby={scopeId + '-input-heading'}
       onDragEnter={(event) => {
         event.preventDefault()
         setDragging(true)
@@ -85,7 +86,7 @@ export function InputEditor({
     >
       <div className="section-title-row">
         <div className="input-heading-group">
-          <h2 id="input-heading" className="section-title">
+          <h2 id={scopeId + '-input-heading'} className="section-title">
             Source input
           </h2>
           {documentName ? (
@@ -95,7 +96,9 @@ export function InputEditor({
             </span>
           ) : null}
         </div>
-        <span className="mode-hint">{dragging ? 'Drop your file here' : 'Paste data or drop a local file'}</span>
+        <span className="mode-hint">
+          {dragging ? 'Drop your file here' : 'Paste data or drop a local file'}
+        </span>
       </div>
 
       <div className="mode-tabs" role="group" aria-label="Input format">
@@ -112,19 +115,24 @@ export function InputEditor({
         ))}
       </div>
 
-      <label className="sr-only" htmlFor="byte-source">
+      <label className="sr-only" htmlFor={scopeId + '-byte-source'}>
         {labels[mode]} byte input
       </label>
       <textarea
         rows={2}
-        id="byte-source"
+        id={scopeId + '-byte-source'}
+        data-byte-source
         className={error ? 'source-editor has-error' : 'source-editor'}
         value={source}
         placeholder={placeholders[mode]}
         onChange={(event) => onSourceChange(event.target.value)}
         aria-invalid={error !== null}
         aria-describedby={
-          error ? 'input-error' : warning ? 'input-warning' : 'input-summary'
+          error
+            ? scopeId + '-input-error'
+            : warning
+              ? scopeId + '-input-warning'
+              : scopeId + '-input-summary'
         }
         spellCheck={false}
         autoCapitalize="off"
@@ -134,7 +142,7 @@ export function InputEditor({
       <div className="input-status-row">
         <div className="input-message">
           {error ? (
-            <span id="input-error" className="input-error" role="alert">
+            <span id={scopeId + '-input-error'} className="input-error" role="alert">
               {error}
               {byteCount > 0 ? (
                 <span className="last-valid-note">
@@ -145,12 +153,11 @@ export function InputEditor({
             </span>
           ) : (
             <>
-              <span id="input-summary" className="input-summary">
-                {byteCount} {byteCount === 1 ? 'byte' : 'bytes'} ·{' '}
-                {byteCount * 8} bits
+              <span id={scopeId + '-input-summary'} className="input-summary">
+                {byteCount} {byteCount === 1 ? 'byte' : 'bytes'} · {byteCount * 8} bits
               </span>
               {warning ? (
-                <span id="input-warning" className="input-warning">
+                <span id={scopeId + '-input-warning'} className="input-warning">
                   {warning}
                 </span>
               ) : null}
@@ -158,13 +165,7 @@ export function InputEditor({
           )}
         </div>
         <div className="compact-actions">
-          <label
-            className={
-              primaryAction === 'open'
-                ? 'file-action is-emphasized'
-                : 'file-action'
-            }
-          >
+          <label className={primaryAction === 'open' ? 'file-action is-emphasized' : 'file-action'}>
             Open file
             <input
               type="file"
@@ -177,11 +178,7 @@ export function InputEditor({
             />
           </label>
           <label
-            className={
-              primaryAction === 'compare'
-                ? 'file-action is-emphasized'
-                : 'file-action'
-            }
+            className={primaryAction === 'compare' ? 'file-action is-emphasized' : 'file-action'}
             title="Compare a local file by offset"
           >
             Compare
@@ -204,8 +201,8 @@ export function InputEditor({
               isDraftInvalid
                 ? `Draft has syntax errors. Export will save last valid bytes (${byteCount} B).`
                 : byteCount === 0
-                ? 'Save empty binary file (0 bytes)'
-                : `Save ${byteCount} bytes as binary file`
+                  ? 'Save empty binary file (0 bytes)'
+                  : `Save ${byteCount} bytes as binary file`
             }
           >
             {isDraftInvalid ? 'Save valid bytes' : 'Save file'}

@@ -13,29 +13,20 @@
       name="robots"
       content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
     />
-    <meta
-      name="google-site-verification"
-      content="Jn0K5vK7EtJ9tpYr_JzwqkUNXm-OeVXELznWLvX7lns"
-    />
+    <meta name="google-site-verification" content="Jn0K5vK7EtJ9tpYr_JzwqkUNXm-OeVXELznWLvX7lns" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <link rel="canonical" href="https://bitpeek-seven.vercel.app/" />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Bitpeek" />
     <meta property="og:locale" content="en_US" />
-    <meta
-      property="og:title"
-      content="Bitpeek Online Hex Editor &amp; Binary Inspector"
-    />
+    <meta property="og:title" content="Bitpeek Online Hex Editor &amp; Binary Inspector" />
     <meta
       property="og:description"
       content="Inspect, edit, search, and compare binary files locally in your browser. No uploads and no account required."
     />
     <meta property="og:url" content="https://bitpeek-seven.vercel.app/" />
-    <meta
-      property="og:image"
-      content="https://bitpeek-seven.vercel.app/social/bitpeek-og.png"
-    />
+    <meta property="og:image" content="https://bitpeek-seven.vercel.app/social/bitpeek-og.png" />
     <meta
       property="og:image:alt"
       content="Bitpeek local-first binary workbench showing hexadecimal bytes"
@@ -44,18 +35,12 @@
     <meta property="og:image:height" content="630" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta
-      name="twitter:title"
-      content="Bitpeek Online Hex Editor &amp; Binary Inspector"
-    />
+    <meta name="twitter:title" content="Bitpeek Online Hex Editor &amp; Binary Inspector" />
     <meta
       name="twitter:description"
       content="Inspect, edit, search, and compare binary files locally in your browser."
     />
-    <meta
-      name="twitter:image"
-      content="https://bitpeek-seven.vercel.app/social/bitpeek-og.png"
-    />
+    <meta name="twitter:image" content="https://bitpeek-seven.vercel.app/social/bitpeek-og.png" />
     <meta
       name="twitter:image:alt"
       content="Bitpeek local-first binary workbench showing hexadecimal bytes"
@@ -161,7 +146,7 @@
             </li>
             <li>
               <a href="/tools/binary-diff">Binary diff</a>
-              <span>Compare two buffers by byte offset.</span>
+              <span>Compare offsets or align inserted and deleted byte ranges.</span>
             </li>
             <li>
               <a href="/tools/file-signature-checker">File signatures</a>
@@ -235,17 +220,23 @@
               <h3>Basic use</h3>
               <ol>
                 <li>Enter hex, binary, decimal, Base64, or UTF-8 text, or open a file.</li>
-                <li>Select bytes to inspect integer, floating-point, text, checksum, hash, entropy, and signature values.</li>
-                <li>Edit a byte or bit, search for a pattern, reverse or invert a selection, then save the result.</li>
+                <li>
+                  Select bytes to inspect integer, floating-point, text, checksum, hash, entropy,
+                  and signature values.
+                </li>
+                <li>
+                  Edit a byte or bit, search for a pattern, reverse or invert a selection, then save
+                  the result.
+                </li>
               </ol>
             </div>
             <div>
               <h3>Comparison</h3>
               <p>
-                Open a reference file with <strong>Compare</strong>. Bitpeek marks
-                modified bytes and length differences at matching offsets. The
-                exported JSON patch records the reference-to-current changes.
-                It does not perform sequence alignment or format-aware comparison.
+                Open a reference file with <strong>Compare</strong>. Bitpeek marks modified bytes
+                and length differences at matching offsets. The exported JSON patch records the
+                reference-to-current changes. For insertion-aware comparison and structure-field
+                changes, open Investigate and choose Changes.
               </p>
             </div>
           </div>
@@ -260,18 +251,19 @@
             <div>
               <h3>Data handling</h3>
               <p>
-                File contents, names, pasted input, searches, edits, hashes,
-                extracted strings, comparisons, and patches remain in browser
-                memory. Bitpeek has no file-upload endpoint and requires no account.
+                File contents, names, pasted input, searches, edits, hashes, extracted strings,
+                comparisons, and patches are processed locally. Session recovery saves files and
+                notes in this browser’s IndexedDB. Save project exports the workspace to a local
+                file. Bitpeek has no file-upload endpoint and requires no account.
               </p>
             </div>
             <div>
               <h3>Workspace limit</h3>
               <p>
-                Each opened file or comparison file is limited to 256 KiB. For
-                larger files, extract the relevant range with a trusted local tool.
-                Keep a backup and validate saved bytes with software that understands
-                the file format.
+                Files up to 512 MiB open in the workspace. Large documents use 64 KiB windows and
+                background analysis. Pasted source input is limited to 256 KiB; structure parsing
+                supports 64 MiB and recipe previews support 16 MiB. Validate saved bytes with
+                software that understands the file format.
               </p>
             </div>
           </div>
@@ -293,8 +285,8 @@
 
     <noscript>
       <div class="noscript-note">
-        Bitpeek needs JavaScript for interactive binary processing. The tool and
-        format guides remain readable without it.
+        Bitpeek needs JavaScript for interactive binary processing. The tool and format guides
+        remain readable without it.
       </div>
     </noscript>
     <script type="module" src="/src/main.tsx"></script>

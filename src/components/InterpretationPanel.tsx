@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useId, useEffect, useMemo, useState } from 'react'
 import { ReferenceDisassembler } from '../../packages/core/src/native/disassembler'
 import {
   crc16CcittFalse,
@@ -30,6 +30,7 @@ import { digestHex } from '../lib/crypto'
 
 interface InterpretationPanelProps {
   bytes: Uint8Array
+  documentOffset?: number
   documentBytes: Uint8Array
   range: SelectionRange | null
   onCopy: (value: string, label: string) => void
@@ -42,15 +43,9 @@ interface ValueWithCopyProps {
   onCopy: (value: string, label: string) => void
 }
 
-function ValueWithCopy({
-  value,
-  copyValue,
-  label,
-  onCopy,
-}: ValueWithCopyProps) {
+function ValueWithCopy({ value, copyValue, label, onCopy }: ValueWithCopyProps) {
   const copyCurrentValue = () => {
-    const resolved =
-      typeof copyValue === 'function' ? copyValue() : (copyValue ?? value)
+    const resolved = typeof copyValue === 'function' ? copyValue() : (copyValue ?? value)
     onCopy(resolved, label)
   }
 
@@ -64,25 +59,27 @@ function ValueWithCopy({
         title={'Copy ' + label}
         onClick={copyCurrentValue}
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="1" /><path d="M16 8V4H4v12h4" /></svg>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          aria-hidden="true"
+        >
+          <rect x="8" y="8" width="12" height="12" rx="1" />
+          <path d="M16 8V4H4v12h4" />
+        </svg>
       </button>
     </span>
   )
 }
 
-function preview(
-  bytes: Uint8Array,
-  formatter: (value: Uint8Array) => string,
-  limit = 128,
-): string {
+function preview(bytes: Uint8Array, formatter: (value: Uint8Array) => string, limit = 128): string {
   if (bytes.length <= limit) return formatter(bytes)
   return (
-    formatter(bytes.subarray(0, limit)) +
-    ' … (first ' +
-    limit +
-    ' of ' +
-    bytes.length +
-    ' bytes)'
+    formatter(bytes.subarray(0, limit)) + ' … (first ' + limit + ' of ' + bytes.length + ' bytes)'
   )
 }
 
@@ -93,9 +90,11 @@ function paddedHex(value: number, width: number): string {
 export function InterpretationPanel({
   bytes,
   documentBytes,
+  documentOffset = 0,
   range,
   onCopy,
 }: InterpretationPanelProps) {
+  const scopeId = useId()
   const [view, setView] = useState<'values' | 'disasm' | 'analysis' | 'text'>('values')
   const [disasmArch, setDisasmArch] = useState<'x86_64' | 'aarch64'>('x86_64')
   const [digests, setDigests] = useState<{
@@ -124,10 +123,7 @@ export function InterpretationPanel({
     let active = true
     if (bytes.length === 0) return
 
-    void Promise.all([
-      digestHex(bytes, 'SHA-256'),
-      digestHex(bytes, 'SHA-512'),
-    ])
+    void Promise.all([digestHex(bytes, 'SHA-256'), digestHex(bytes, 'SHA-512')])
       .then(([sha256, sha512]) => {
         if (active) setDigests({ source: bytes, sha256, sha512, error: false })
       })
@@ -143,9 +139,7 @@ export function InterpretationPanel({
   }, [bytes])
 
   const currentDigests =
-    digests.source === bytes
-      ? digests
-      : { source: null, sha256: null, sha512: null, error: false }
+    digests.source === bytes ? digests : { source: null, sha256: null, sha512: null, error: false }
 
   const unsignedBe = hasInteger ? unsignedBigEndian(bytes).toString() : ''
   const signedBe = hasInteger ? signedBigEndian(bytes).toString() : ''
@@ -170,48 +164,50 @@ export function InterpretationPanel({
   }
 
   return (
-    <aside
-      className="interpretation-panel"
-      aria-labelledby="interpretation-heading"
-    >
+    <aside className="interpretation-panel" aria-labelledby={scopeId + '-interpretation-heading'}>
       <div className="panel-heading">
-        <h2 id="interpretation-heading" className="section-title">
+        <h2 id={scopeId + '-interpretation-heading'} className="section-title">
           Inspector
         </h2>
         <span>{signature ? signature.name : 'Selected bytes'}</span>
       </div>
 
       <div className="inspector-tabs" role="group" aria-label="Inspector view">
-        <button type="button" aria-pressed={view === 'values'} onClick={() => setView('values')}>Values</button>
-        <button type="button" aria-pressed={view === 'disasm'} onClick={() => setView('disasm')}>Disasm</button>
-        <button type="button" aria-pressed={view === 'analysis'} onClick={() => setView('analysis')}>Analysis</button>
-        <button type="button" aria-pressed={view === 'text'} onClick={() => setView('text')}>Text & encoding</button>
+        <button type="button" aria-pressed={view === 'values'} onClick={() => setView('values')}>
+          Values
+        </button>
+        <button type="button" aria-pressed={view === 'disasm'} onClick={() => setView('disasm')}>
+          Disasm
+        </button>
+        <button
+          type="button"
+          aria-pressed={view === 'analysis'}
+          onClick={() => setView('analysis')}
+        >
+          Analysis
+        </button>
+        <button type="button" aria-pressed={view === 'text'} onClick={() => setView('text')}>
+          Text & encoding
+        </button>
       </div>
 
       {range === null ? (
         <div className="workspace-placeholder">Select one or more bytes.</div>
       ) : (
         <div className="inspector-content">
-          <section
-            className="inspector-section"
-            aria-labelledby="selection-heading"
-          >
-            <h3 id="selection-heading">Selection</h3>
+          <section className="inspector-section" aria-labelledby={scopeId + '-selection-heading'}>
+            <h3 id={scopeId + '-selection-heading'}>Selection</h3>
             <dl className="property-list">
               <div>
                 <dt>Start</dt>
                 <dd>
-                  <code>
-                    0x{range.start.toString(16).toUpperCase().padStart(4, '0')}
-                  </code>
+                  <code>0x{range.start.toString(16).toUpperCase().padStart(4, '0')}</code>
                 </dd>
               </div>
               <div>
                 <dt>End</dt>
                 <dd>
-                  <code>
-                    0x{range.end.toString(16).toUpperCase().padStart(4, '0')}
-                  </code>
+                  <code>0x{range.end.toString(16).toUpperCase().padStart(4, '0')}</code>
                 </dd>
               </div>
               <div>
@@ -225,30 +221,22 @@ export function InterpretationPanel({
 
           <section
             className="inspector-section"
-            aria-labelledby="integer-heading"
+            aria-labelledby={scopeId + '-integer-heading'}
             hidden={view !== 'values'}
           >
-            <h3 id="integer-heading">Integer · {bitWidth}-bit</h3>
+            <h3 id={scopeId + '-integer-heading'}>Integer · {bitWidth}-bit</h3>
             {length === 1 ? (
               <dl className="property-list numeric-list">
                 <div>
                   <dt>uint8</dt>
                   <dd>
-                    <ValueWithCopy
-                      value={unsignedBe}
-                      label="uint8"
-                      onCopy={onCopy}
-                    />
+                    <ValueWithCopy value={unsignedBe} label="uint8" onCopy={onCopy} />
                   </dd>
                 </div>
                 <div>
                   <dt>int8</dt>
                   <dd>
-                    <ValueWithCopy
-                      value={signedBe}
-                      label="int8"
-                      onCopy={onCopy}
-                    />
+                    <ValueWithCopy value={signedBe} label="int8" onCopy={onCopy} />
                   </dd>
                 </div>
               </dl>
@@ -283,11 +271,7 @@ export function InterpretationPanel({
                     <tr>
                       <th scope="row">Signed</th>
                       <td>
-                        <ValueWithCopy
-                          value={signedBe}
-                          label="signed big endian"
-                          onCopy={onCopy}
-                        />
+                        <ValueWithCopy value={signedBe} label="signed big endian" onCopy={onCopy} />
                       </td>
                       <td>
                         <ValueWithCopy
@@ -301,19 +285,17 @@ export function InterpretationPanel({
                 </table>
               </div>
             ) : (
-              <p className="inspector-note">
-                Integer view supports selections up to 8 bytes.
-              </p>
+              <p className="inspector-note">Integer view supports selections up to 8 bytes.</p>
             )}
           </section>
 
           {floatLabel && floatBe !== null && floatLe !== null ? (
             <section
               className="inspector-section"
-              aria-labelledby="float-heading"
+              aria-labelledby={scopeId + '-float-heading'}
               hidden={view !== 'values'}
             >
-              <h3 id="float-heading">Floating point</h3>
+              <h3 id={scopeId + '-float-heading'}>Floating point</h3>
               <div className="integer-table-wrap">
                 <table className="integer-table float-table">
                   <thead>
@@ -349,11 +331,20 @@ export function InterpretationPanel({
 
           <section
             className="inspector-section"
-            aria-labelledby="disasm-heading"
+            aria-labelledby={scopeId + '-disasm-heading'}
             hidden={view !== 'disasm'}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <h3 id="disasm-heading" style={{ margin: 0 }}>Disassembly</h3>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '8px',
+              }}
+            >
+              <h3 id={scopeId + '-disasm-heading'} style={{ margin: 0 }}>
+                Disassembly
+              </h3>
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 <select
                   value={disasmArch}
@@ -377,7 +368,10 @@ export function InterpretationPanel({
                   style={{ minHeight: '26px', padding: '2px 8px', fontSize: '12px' }}
                   onClick={() => {
                     const fullText = disasmInstructions
-                      .map((i) => `0x${i.address.toString(16).toUpperCase().padStart(8, '0')}:  ${i.mnemonic.padEnd(8)} ${i.operands}`)
+                      .map(
+                        (i) =>
+                          `0x${i.address.toString(16).toUpperCase().padStart(8, '0')}:  ${i.mnemonic.padEnd(8)} ${i.operands}`,
+                      )
                       .join('\n')
                     onCopy(fullText, 'disassembly')
                   }}
@@ -390,17 +384,44 @@ export function InterpretationPanel({
               <p className="inspector-note">No code bytes to disassemble.</p>
             ) : (
               <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--mono)', fontSize: '12px' }}>
+                <table
+                  style={{
+                    width: '100%',
+                    borderCollapse: 'collapse',
+                    fontFamily: 'var(--mono)',
+                    fontSize: '12px',
+                  }}
+                >
                   <tbody>
                     {disasmInstructions.map((inst, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)', lineHeight: '1.6' }}>
+                      <tr
+                        key={idx}
+                        style={{
+                          borderBottom: '1px solid var(--border-subtle)',
+                          lineHeight: '1.6',
+                        }}
+                      >
                         <td style={{ color: 'var(--muted)', width: '75px', padding: '2px 4px' }}>
                           +0x{inst.address.toString(16).toUpperCase().padStart(4, '0')}
                         </td>
-                        <td style={{ color: 'var(--muted)', width: '90px', padding: '2px 4px', whiteSpace: 'nowrap' }}>
-                          {Array.from(inst.bytes).map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ')}
+                        <td
+                          style={{
+                            color: 'var(--muted)',
+                            width: '90px',
+                            padding: '2px 4px',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {Array.from(inst.bytes)
+                            .map((b) => b.toString(16).toUpperCase().padStart(2, '0'))
+                            .join(' ')}
                         </td>
-                        <td style={{ padding: '2px 4px', color: inst.isValid ? 'var(--ink)' : 'var(--error)' }}>
+                        <td
+                          style={{
+                            padding: '2px 4px',
+                            color: inst.isValid ? 'var(--ink)' : 'var(--error)',
+                          }}
+                        >
                           <strong>{inst.mnemonic}</strong> {inst.operands}
                         </td>
                       </tr>
@@ -413,18 +434,14 @@ export function InterpretationPanel({
 
           <section
             className="inspector-section"
-            aria-labelledby="analysis-heading"
+            aria-labelledby={scopeId + '-analysis-heading'}
             hidden={view !== 'analysis'}
           >
-            <h3 id="analysis-heading">Analysis</h3>
+            <h3 id={scopeId + '-analysis-heading'}>Analysis</h3>
             <dl className="property-list numeric-list">
               <div>
-                <dt>Magic</dt>
-                <dd>
-                  {signature
-                    ? signature.name + ' · ' + signature.mime
-                    : 'Unknown'}
-                </dd>
+                <dt>{documentOffset ? 'Window magic' : 'Magic'}</dt>
+                <dd>{signature ? signature.name + ' · ' + signature.mime : 'Unknown'}</dd>
               </div>
               <div>
                 <dt>CRC-32</dt>
@@ -449,21 +466,13 @@ export function InterpretationPanel({
               <div>
                 <dt>Sum-8</dt>
                 <dd>
-                  <ValueWithCopy
-                    value={paddedHex(sum8(bytes), 2)}
-                    label="Sum-8"
-                    onCopy={onCopy}
-                  />
+                  <ValueWithCopy value={paddedHex(sum8(bytes), 2)} label="Sum-8" onCopy={onCopy} />
                 </dd>
               </div>
               <div>
                 <dt>XOR-8</dt>
                 <dd>
-                  <ValueWithCopy
-                    value={paddedHex(xor8(bytes), 2)}
-                    label="XOR-8"
-                    onCopy={onCopy}
-                  />
+                  <ValueWithCopy value={paddedHex(xor8(bytes), 2)} label="XOR-8" onCopy={onCopy} />
                 </dd>
               </div>
               <div>
@@ -474,15 +483,9 @@ export function InterpretationPanel({
                 <dt>SHA-256</dt>
                 <dd>
                   {currentDigests.sha256 ? (
-                    <ValueWithCopy
-                      value={currentDigests.sha256}
-                      label="SHA-256"
-                      onCopy={onCopy}
-                    />
+                    <ValueWithCopy value={currentDigests.sha256} label="SHA-256" onCopy={onCopy} />
                   ) : (
-                    <code>
-                      {currentDigests.error ? 'Unavailable' : 'Computing…'}
-                    </code>
+                    <code>{currentDigests.error ? 'Unavailable' : 'Computing…'}</code>
                   )}
                 </dd>
               </div>
@@ -490,15 +493,9 @@ export function InterpretationPanel({
                 <dt>SHA-512</dt>
                 <dd>
                   {currentDigests.sha512 ? (
-                    <ValueWithCopy
-                      value={currentDigests.sha512}
-                      label="SHA-512"
-                      onCopy={onCopy}
-                    />
+                    <ValueWithCopy value={currentDigests.sha512} label="SHA-512" onCopy={onCopy} />
                   ) : (
-                    <code>
-                      {currentDigests.error ? 'Unavailable' : 'Computing…'}
-                    </code>
+                    <code>{currentDigests.error ? 'Unavailable' : 'Computing…'}</code>
                   )}
                 </dd>
               </div>
@@ -507,10 +504,10 @@ export function InterpretationPanel({
 
           <section
             className="inspector-section"
-            aria-labelledby="representations-heading"
+            aria-labelledby={scopeId + '-representations-heading'}
             hidden={view !== 'text'}
           >
-            <h3 id="representations-heading">Representations</h3>
+            <h3 id={scopeId + '-representations-heading'}>Representations</h3>
             <dl className="representation-list">
               <div>
                 <dt>Hex</dt>

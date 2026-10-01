@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from 'react'
+import { useId, useState, type KeyboardEvent } from 'react'
 import type { SearchMode } from '../lib/analysis'
 import type { RangeOperation } from '../lib/edits'
 
@@ -49,6 +49,7 @@ export function ByteTools({
   onUndo,
   onRedo,
 }: ByteToolsProps) {
+  const scopeId = useId()
   const [offset, setOffset] = useState('')
   const [offsetError, setOffsetError] = useState<string | null>(null)
 
@@ -87,42 +88,38 @@ export function ByteTools({
         : matchCount === 0
           ? 'No matches'
           : activeMatch >= 0
-            ? String(activeMatch + 1) +
-              ' / ' +
-              String(matchCount) +
-              (matchesTruncated ? '+' : '')
+            ? String(activeMatch + 1) + ' / ' + String(matchCount) + (matchesTruncated ? '+' : '')
             : String(matchCount) + (matchesTruncated ? '+' : '') + ' matches'
 
   return (
-    <section className="byte-tools" aria-labelledby="byte-tools-heading">
-      <h2 id="byte-tools-heading" className="sr-only">
+    <section className="byte-tools" aria-labelledby={scopeId + '-byte-tools-heading'}>
+      <h2 id={scopeId + '-byte-tools-heading'} className="sr-only">
         Tools
       </h2>
 
       <div className="tool-group search-tools">
-        <label htmlFor="byte-search">Find</label>
+        <label htmlFor={scopeId + '-byte-search'}>Find</label>
         <select
           aria-label="Search format"
           value={searchMode}
-          onChange={(event) =>
-            onSearchModeChange(event.target.value as SearchMode)
-          }
+          onChange={(event) => onSearchModeChange(event.target.value as SearchMode)}
         >
           <option value="hex">Hex</option>
           <option value="text">Text</option>
         </select>
         <input
-          id="byte-search"
+          id={scopeId + '-byte-search'}
+          data-byte-search
           value={searchQuery}
           onChange={(event) => onSearchQueryChange(event.target.value)}
           onKeyDown={handleSearchKeyDown}
           placeholder={searchMode === 'hex' ? 'DE AD ?? EF' : 'UTF-8 text'}
           spellCheck={false}
           aria-invalid={searchError !== null}
-          aria-describedby="search-status"
+          aria-describedby={scopeId + '-search-status'}
         />
         <span
-          id="search-status"
+          id={scopeId + '-search-status'}
           className={searchError ? 'tool-status is-error' : 'tool-status'}
         >
           {searchStatus}
@@ -148,9 +145,10 @@ export function ByteTools({
       <div className="tool-divider" aria-hidden="true" />
 
       <div className="tool-group offset-tools">
-        <label htmlFor="byte-offset">Go to</label>
+        <label htmlFor={scopeId + '-byte-offset'}>Go to</label>
         <input
-          id="byte-offset"
+          id={scopeId + '-byte-offset'}
+          data-byte-offset
           value={offset}
           onChange={(event) => {
             setOffset(event.target.value)
@@ -176,11 +174,7 @@ export function ByteTools({
         <button type="button" onClick={onSelectAll} disabled={byteCount === 0}>
           Select all
         </button>
-        <button
-          type="button"
-          onClick={() => onTransform('reverse')}
-          disabled={selectionLength < 2}
-        >
+        <button type="button" onClick={() => onTransform('reverse')} disabled={selectionLength < 2}>
           Reverse
         </button>
         <button
@@ -225,7 +219,11 @@ export function ByteTools({
           Redo
         </button>
       </div>
-      {offsetError ? <p className="offset-error" role="alert">{offsetError}</p> : null}
+      {offsetError ? (
+        <p className="offset-error" role="alert">
+          {offsetError}
+        </p>
+      ) : null}
     </section>
   )
 }

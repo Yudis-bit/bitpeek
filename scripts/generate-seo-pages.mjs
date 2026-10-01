@@ -1,11 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import {
-  allSeoPages,
-  HOMEPAGE_LAST_MODIFIED,
-  SITE_URL,
-} from './seo-pages.mjs'
+import { allSeoPages, HOMEPAGE_LAST_MODIFIED, SITE_URL } from './seo-pages.mjs'
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const publicRoot = join(projectRoot, 'public')
@@ -160,10 +156,7 @@ function renderAside(page) {
       <h2>On this page</h2>
       <nav>
         ${links
-          .map(
-            (link) =>
-              `<a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a>`,
-          )
+          .map((link) => `<a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a>`)
           .join('')}
       </nav>
     </aside>`
@@ -244,7 +237,7 @@ ${jsonLd(page)}
 
             <section class="article-section" id="privacy" aria-labelledby="local-processing-heading">
               <h2 id="local-processing-heading">Local processing and privacy</h2>
-              <p>The ${escapeHtml(page.label)} workflow opens the same Bitpeek browser workspace. Selected file bytes, file names, pasted input, searches, edits, hashes, and comparison data are processed in local browser memory and are not sent to a Bitpeek server.</p>
+              <p>The ${escapeHtml(page.label)} workflow opens the same Bitpeek browser workspace. Selected file bytes, file names, pasted input, searches, edits, hashes, and comparison data are processed locally and are not sent to a Bitpeek server. Session recovery stores files and workspace notes in this browser’s IndexedDB; Save project downloads a separate local copy.</p>
               <p>The static guide itself can be read without opening a file or creating an account.</p>
             </section>
 
@@ -263,10 +256,7 @@ ${jsonLd(page)}
 }
 
 function renderSitemap() {
-  const pages = [
-    { slug: '/', lastModified: HOMEPAGE_LAST_MODIFIED },
-    ...allSeoPages,
-  ]
+  const pages = [{ slug: '/', lastModified: HOMEPAGE_LAST_MODIFIED }, ...allSeoPages]
   return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${pages

@@ -2,7 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://bitpeek-seven.vercel.app/</loc>
-    <lastmod>2026-08-29</lastmod>
+    <lastmod>2026-10-01</lastmod>
   </url>
   <url>
     <loc>https://bitpeek-seven.vercel.app/tools/hex-editor</loc>
@@ -98,6 +98,6 @@
   </url>
   <url>
     <loc>https://bitpeek-seven.vercel.app/changelog</loc>
-    <lastmod>2026-09-27</lastmod>
+    <lastmod>2026-10-01</lastmod>
   </url>
 </urlset>

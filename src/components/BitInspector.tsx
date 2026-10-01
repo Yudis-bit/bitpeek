@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import type { SelectionRange } from '../lib/bytes'
 
 interface BitInspectorProps {
@@ -9,12 +10,13 @@ interface BitInspectorProps {
 const BITS = [7, 6, 5, 4, 3, 2, 1, 0]
 
 export function BitInspector({ bytes, range, onToggle }: BitInspectorProps) {
+  const scopeId = useId()
   const singleByte = bytes.length === 1 ? bytes[0] : undefined
 
   return (
-    <section className="bits-panel" aria-labelledby="bits-heading">
+    <section className="bits-panel" aria-labelledby={scopeId + '-bits-heading'}>
       <div className="panel-heading bits-heading-row">
-        <h2 id="bits-heading" className="section-title">
+        <h2 id={scopeId + '-bits-heading'} className="section-title">
           Bits
         </h2>
         {singleByte !== undefined && range ? (
@@ -38,7 +40,11 @@ export function BitInspector({ bytes, range, onToggle }: BitInspectorProps) {
       ) : (
         <div className="bit-grid" role="group" aria-label="Selected byte bits">
           <span className="bit-row-label">bit</span>
-          {BITS.map((bit) => <span className="bit-index" key={`label-${bit}`}>{bit}</span>)}
+          {BITS.map((bit) => (
+            <span className="bit-index" key={`label-${bit}`}>
+              {bit}
+            </span>
+          ))}
           <span className="bit-row-label">value</span>
           {BITS.map((bit) => {
             const active = (singleByte & (1 << bit)) !== 0

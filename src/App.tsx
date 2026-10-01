@@ -1,12 +1,4 @@
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BitInspector } from './components/BitInspector'
 import { ByteTable } from './components/ByteTable'
 import { ByteTools } from './components/ByteTools'
@@ -15,12 +7,7 @@ import { InputEditor } from './components/InputEditor'
 import { InterpretationPanel } from './components/InterpretationPanel'
 import { StructureInspector } from './components/StructureInspector'
 import { useClipboard } from './hooks/useClipboard'
-import {
-  findBytePattern,
-  parseOffset,
-  parseSearchPattern,
-  type SearchMode,
-} from './lib/analysis'
+import { findBytePattern, parseOffset, parseSearchPattern, type SearchMode } from './lib/analysis'
 import {
   formatInput,
   getSelectionRange,
@@ -33,11 +20,7 @@ import {
   type InputMode,
 } from './lib/bytes'
 import { digestHex } from './lib/crypto'
-import {
-  createOffsetPatch,
-  diffBytes,
-  serializeOffsetPatch,
-} from './lib/diff'
+import { createOffsetPatch, diffBytes, serializeOffsetPatch } from './lib/diff'
 import {
   createPatch,
   transformRange,
@@ -49,16 +32,16 @@ import {
   applyRedo,
 } from './lib/edits'
 import { generateEvidenceReport } from './lib/evidence'
-import {
-  createSafeStorage,
-  resolveInitialMode,
-  MODE_STORAGE_KEY,
-} from './lib/storage'
-import {
-  parseStructureByFormat,
-  type CustomStructureSchema,
-} from './lib/structures'
+import { createSafeStorage, resolveInitialMode, MODE_STORAGE_KEY } from './lib/storage'
+import { parseStructureByFormat, type CustomStructureSchema } from './lib/structures'
 import { ETHEREUM_ADDRESS } from './lib/support'
+import { ResizableSplit } from './components/ResizableSplit'
+import { MAX_FILE_BYTES, type DocumentSnapshot } from './lib/workspace'
+import { SelectionEditor } from './components/SelectionEditor'
+
+const InvestigationPanel = lazy(() =>
+  import('./components/InvestigationPanel').then((m) => ({ default: m.InvestigationPanel })),
+)
 
 const HelpDialog = lazy(() =>
   import('./components/HelpDialog').then((module) => ({
@@ -76,9 +59,7 @@ const SupportDialog = lazy(() =>
   })),
 )
 
-const DEFAULT_BYTES = Uint8Array.from([
-  0xde, 0xad, 0xbe, 0xef, 0x00, 0x01, 0x7f, 0x80,
-])
+const DEFAULT_BYTES = Uint8Array.from([0xde, 0xad, 0xbe, 0xef, 0x00, 0x01, 0x7f, 0x80])
 const MAX_DOCUMENT_BYTES = 256 * 1024
 const storage = createSafeStorage()
 
@@ -117,7 +98,23 @@ function downloadName(documentName: string | null, byteCount: number): string {
   return stem + '.bitpeek.bin'
 }
 
-export default function App() {
+export default function App({
+  initial,
+  onSnapshot,
+  onOpenDocument,
+}: {
+  initial: DocumentSnapshot
+  onSnapshot: (snapshot: DocumentSnapshot) => void
+  onOpenDocument: (file: File) => void
+}) {
+  const rootRef = useRef<HTMLDivElement>(null)
+  const [loaded, setLoaded] = useState(false)
+  const [notes, setNotes] = useState(initial.notes)
+  const notesUndo = useRef<(typeof notes)[]>([])
+  const notesRedo = useRef<(typeof notes)[]>([])
+  const [recipe, setRecipe] = useState(initial.recipe)
+  const [investigationOpen, setInvestigationOpen] = useState(false)
+  const [extraReference, setExtraReference] = useState<Blob | undefined>(initial.reference)
   const [mode, setMode] = useState<InputMode>(() => resolveInitialMode(storage))
   const [primaryAction] = useState(requestedAction)
   const [bytes, setBytes] = useState<Uint8Array>(() => DEFAULT_BYTES.slice())
@@ -132,8 +129,10 @@ export default function App() {
   const [history, setHistory] = useState<UnifiedHistoryState>(() => createEmptyHistory())
   const [structureOpen, setStructureOpen] = useState(false)
   const [mobileView, setMobileView] = useState<'bytes' | 'inspector' | 'structure'>('bytes')
-  const [customSchema, setCustomSchema] = useState<CustomStructureSchema | null>(null)
-  const [structureFormat, setStructureFormat] = useState<string>('auto')
+  const [customSchema, setCustomSchema] = useState<CustomStructureSchema | null>(
+    (initial.schema as CustomStructureSchema) ?? null,
+  )
+  const [structureFormat, setStructureFormat] = useState<string>(initial.format ?? 'auto')
   const [searchMode, setSearchMode] = useState<SearchMode>('hex')
   const [searchQuery, setSearchQuery] = useState('')
   const [activeMatchIndex, setActiveMatchIndex] = useState(-1)
@@ -141,11 +140,71 @@ export default function App() {
   const [activeDifferenceIndex, setActiveDifferenceIndex] = useState(-1)
   const [stringsOpen, setStringsOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
-  const [supportOpen, setSupportOpen] = useState(
-    () => window.location.hash === '#support',
-  )
+  const [supportOpen, setSupportOpen] = useState(() => window.location.hash === '#support')
   const baselineRef = useRef<Uint8Array | null>(null)
   const { notice, copy } = useClipboard()
+  const documentBlob = useMemo(() => new Blob([bytes as BlobPart]), [bytes])
+  const comparisonBlob = useMemo(
+    () => (comparison ? new Blob([comparison.bytes as BlobPart]) : undefined),
+    [comparison],
+  )
+
+  useEffect(() => {
+    let live = true
+    void initial.blob
+      .arrayBuffer()
+      .then((buffer) => {
+        if (!live) return
+        const restored = new Uint8Array(buffer)
+        setBytes(restored)
+        setSource(formatInput(restored, mode))
+        setDocumentName(initial.name)
+        setDocumentDirty(initial.dirty)
+        setSelection(initial.selection)
+        baselineRef.current = restored.slice()
+        setLoaded(true)
+      })
+      .catch(() => {
+        if (live) setError('Could not restore this document.')
+      })
+    return () => {
+      live = false
+    }
+    // The initial snapshot belongs to this tab; later edits are reported through onSnapshot.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initial])
+  useEffect(() => {
+    if (loaded)
+      onSnapshot({
+        id: initial.id,
+        name: documentName ?? 'Untitled buffer',
+        blob: documentBlob,
+        dirty: documentDirty,
+        selection,
+        notes,
+        recipe,
+        reference: extraReference ?? comparisonBlob,
+        referenceName: comparison?.name ?? initial.referenceName,
+        format: structureFormat,
+        schema: customSchema ?? undefined,
+      })
+  }, [
+    loaded,
+    initial.id,
+    documentName,
+    documentBlob,
+    documentDirty,
+    selection,
+    notes,
+    recipe,
+    extraReference,
+    comparisonBlob,
+    comparison,
+    initial.referenceName,
+    structureFormat,
+    customSchema,
+    onSnapshot,
+  ])
 
   const structure = useMemo(
     () => parseStructureByFormat(bytes, structureFormat, customSchema ?? undefined),
@@ -154,10 +213,7 @@ export default function App() {
   const showStructure = structureOpen
 
   const range = getSelectionRange(selection, bytes.length)
-  const selectedBytes = useMemo(
-    () => sliceSelection(bytes, selection),
-    [bytes, selection],
-  )
+  const selectedBytes = useMemo(() => sliceSelection(bytes, selection), [bytes, selection])
 
   const search = useMemo(() => {
     const parsed = parseSearchPattern(searchQuery, searchMode)
@@ -187,37 +243,26 @@ export default function App() {
       ? Math.min(activeDifferenceIndex, comparisonDiff.offsets.length - 1)
       : -1
   const activeDifferenceOffset =
-    activeDifference >= 0
-      ? (comparisonDiff?.offsets[activeDifference] ?? null)
-      : null
+    activeDifference >= 0 ? (comparisonDiff?.offsets[activeDifference] ?? null) : null
   const currentDifferenceOffsets = useMemo(
-    () =>
-      comparisonDiff
-        ? comparisonDiff.offsets.filter((offset) => offset < bytes.length)
-        : [],
+    () => (comparisonDiff ? comparisonDiff.offsets.filter((offset) => offset < bytes.length) : []),
     [bytes.length, comparisonDiff],
   )
 
   const activeMatch =
-    search.offsets.length === 0
-      ? -1
-      : Math.min(activeMatchIndex, search.offsets.length - 1)
-  const activeSearchOffset =
-    activeMatch >= 0 ? (search.offsets[activeMatch] ?? null) : null
+    search.offsets.length === 0 ? -1 : Math.min(activeMatchIndex, search.offsets.length - 1)
+  const activeSearchOffset = activeMatch >= 0 ? (search.offsets[activeMatch] ?? null) : null
   const inputWarning =
     mode === 'text' && bytes.length > 0 && !isValidUtf8(bytes)
       ? 'Invalid UTF-8; editing text will replace undecodable bytes.'
       : null
-  const statusOffset = range
-    ? '0x' + range.start.toString(16).toUpperCase().padStart(8, '0')
-    : '—'
-  const statusSelection = range
-    ? range.length + (range.length === 1 ? ' byte' : ' bytes')
-    : 'none'
+  const statusOffset = range ? '0x' + range.start.toString(16).toUpperCase().padStart(8, '0') : '—'
+  const statusSelection = range ? range.length + (range.length === 1 ? ' byte' : ' bytes') : 'none'
 
   const applyWorkingBytes = useCallback(
     (nextBytes: Uint8Array) => {
       setBytes(nextBytes)
+      setNotes((current) => current.filter((note) => note.end < nextBytes.length))
       setSource(formatInput(nextBytes, mode))
       setError(null)
       setActiveMatchIndex(-1)
@@ -233,33 +278,36 @@ export default function App() {
     if (!res) return
     setHistory(res.history)
     applyWorkingBytes(res.nextBytes)
-  }, [applyWorkingBytes, bytes, history])
+    notesRedo.current.push(notes)
+    const previous = notesUndo.current.pop()
+    if (previous) setNotes(previous)
+  }, [applyWorkingBytes, bytes, history, notes])
 
   const handleRedo = useCallback(() => {
     const res = applyRedo(bytes, history)
     if (!res) return
     setHistory(res.history)
     applyWorkingBytes(res.nextBytes)
-  }, [applyWorkingBytes, bytes, history])
+    notesUndo.current.push(notes)
+    const next = notesRedo.current.pop()
+    if (next) setNotes(next)
+  }, [applyWorkingBytes, bytes, history, notes])
 
   useEffect(() => {
     const handleGlobalKeys = (event: KeyboardEvent) => {
+      if (rootRef.current?.parentElement?.dataset.active !== 'true') return
       const command = event.ctrlKey || event.metaKey
       if (command && event.key.toLowerCase() === 'f') {
         event.preventDefault()
-        document.getElementById('byte-search')?.focus()
+        rootRef.current?.querySelector<HTMLElement>('[data-byte-search]')?.focus()
         return
       }
       if (command && event.key.toLowerCase() === 'g') {
         event.preventDefault()
-        document.getElementById('byte-offset')?.focus()
+        rootRef.current?.querySelector<HTMLElement>('[data-byte-offset]')?.focus()
         return
       }
-      if (
-        command &&
-        event.key.toLowerCase() === 'z' &&
-        !isTextEditingTarget(event.target)
-      ) {
+      if (command && event.key.toLowerCase() === 'z' && !isTextEditingTarget(event.target)) {
         event.preventDefault()
         if (event.shiftKey) handleRedo()
         else handleUndo()
@@ -281,13 +329,10 @@ export default function App() {
     return () => window.removeEventListener('hashchange', syncSupportHash)
   }, [])
 
-  const commitMutation = (
-    nextBytes: Uint8Array,
-    start: number,
-    end: number,
-    label: string,
-  ) => {
+  const commitMutation = (nextBytes: Uint8Array, start: number, end: number, label: string) => {
     if (equalBytes(bytes, nextBytes)) return
+    notesUndo.current.push(notes)
+    notesRedo.current = []
     const patch = createPatch(bytes, nextBytes, start, end, label)
     setHistory((current) =>
       pushTransaction(current, {
@@ -313,6 +358,9 @@ export default function App() {
 
     setError(null)
     if (!equalBytes(bytes, result.bytes)) {
+      notesUndo.current.push(notes)
+      notesRedo.current = []
+      setNotes((current) => current.filter((note) => note.end < result.bytes.length))
       setHistory((current) =>
         pushTransaction(current, {
           type: 'replace',
@@ -347,9 +395,7 @@ export default function App() {
   const handleClear = () => {
     if (
       documentDirty &&
-      !window.confirm(
-        'You have unsaved edits in this buffer. Discard changes?',
-      )
+      !window.confirm('You have unsaved edits in this buffer. Discard changes?')
     ) {
       return
     }
@@ -365,48 +411,24 @@ export default function App() {
     setComparison(null)
     setActiveDifferenceIndex(-1)
     setCustomSchema(null)
-  }
-
-  const handleOpenFile = async (file: File) => {
-    if (
-      documentDirty &&
-      !window.confirm(
-        'You have unsaved edits in this buffer. Discard changes and open file?',
-      )
-    ) {
-      return
-    }
-    if (file.size > MAX_DOCUMENT_BYTES) {
-      setError('File exceeds the 256 KiB workspace limit.')
-      return
-    }
-    try {
-      const nextBytes = new Uint8Array(await file.arrayBuffer())
-      setBytes(nextBytes)
-      setSource(formatInput(nextBytes, mode))
-      setError(null)
-      setDocumentName(file.name)
-      setDocumentDirty(false)
-      baselineRef.current = nextBytes.slice()
-      setHistory(createEmptyHistory())
-      setSelection(
-        nextBytes.length === 0
-          ? null
-          : { anchor: 0, focus: Math.min(7, nextBytes.length - 1) },
-      )
-      setActiveMatchIndex(-1)
-    } catch {
-      setError('The selected file could not be read.')
-    }
+    setNotes([])
+    notesUndo.current = []
+    notesRedo.current = []
   }
 
   const handleOpenComparison = async (file: File) => {
+    if (file.size > MAX_FILE_BYTES) {
+      setError('Reference exceeds 512 MiB.')
+      return
+    }
     if (file.size > MAX_DOCUMENT_BYTES) {
-      setError('Comparison file exceeds the 256 KiB workspace limit.')
+      setExtraReference(file)
+      setInvestigationOpen(true)
       return
     }
     try {
       const referenceBytes = new Uint8Array(await file.arrayBuffer())
+      setExtraReference(undefined)
       const nextDiff = diffBytes(bytes, referenceBytes)
       setComparison({ name: file.name, bytes: referenceBytes })
       setActiveDifferenceIndex(nextDiff.offsets.length > 0 ? 0 : -1)
@@ -420,7 +442,7 @@ export default function App() {
     }
   }
 
-  const handleSaveFile = () => {
+  const handleSaveFile = useCallback(() => {
     const name = downloadName(documentName, bytes.length)
     const blob = new Blob([bytes as unknown as BlobPart], {
       type: 'application/octet-stream',
@@ -436,7 +458,22 @@ export default function App() {
     setDocumentName(name)
     baselineRef.current = bytes.slice()
     setDocumentDirty(false)
-  }
+  }, [bytes, documentName])
+
+  useEffect(() => {
+    const save = (event: KeyboardEvent) => {
+      if (
+        rootRef.current?.parentElement?.dataset.active === 'true' &&
+        (event.ctrlKey || event.metaKey) &&
+        event.key.toLowerCase() === 's'
+      ) {
+        event.preventDefault()
+        handleSaveFile()
+      }
+    }
+    window.addEventListener('keydown', save)
+    return () => window.removeEventListener('keydown', save)
+  }, [handleSaveFile])
 
   const handleExportEvidence = async () => {
     const resultData = structure
@@ -445,9 +482,7 @@ export default function App() {
           status: structure.status,
           fieldCount: structure.fields.length,
           warnings: structure.warnings,
-          selectedRange: range
-            ? { start: range.start, end: range.end }
-            : null,
+          selectedRange: range ? { start: range.start, end: range.end } : null,
         }
       : {
           byteCount: bytes.length,
@@ -455,9 +490,7 @@ export default function App() {
         }
 
     const { humanSummary } = generateEvidenceReport(
-      structure
-        ? `${structure.format.toUpperCase()} structure inspection`
-        : 'Byte inspection',
+      structure ? `${structure.format.toUpperCase()} structure inspection` : 'Byte inspection',
       bytes,
       resultData,
       {
@@ -472,12 +505,7 @@ export default function App() {
 
   const handleToggleBit = (bit: number) => {
     if (range === null || range.length !== 1) return
-    commitMutation(
-      toggleBit(bytes, range.start, bit),
-      range.start,
-      range.end,
-      'Toggle bit ' + bit,
-    )
+    commitMutation(toggleBit(bytes, range.start, bit), range.start, range.end, 'Toggle bit ' + bit)
   }
 
   const handleByteEdit = (index: number, value: number) => {
@@ -501,8 +529,7 @@ export default function App() {
         ? direction === 1
           ? 0
           : search.offsets.length - 1
-        : (activeMatch + direction + search.offsets.length) %
-          search.offsets.length
+        : (activeMatch + direction + search.offsets.length) % search.offsets.length
     const offset = search.offsets[next]
     if (offset === undefined) return
     setActiveMatchIndex(next)
@@ -572,24 +599,31 @@ export default function App() {
 
   const closeSupport = () => {
     if (window.location.hash === '#support') {
-      window.history.replaceState(
-        null,
-        '',
-        window.location.pathname + window.location.search,
-      )
+      window.history.replaceState(null, '', window.location.pathname + window.location.search)
     }
     setSupportOpen(false)
   }
 
   return (
-    <div className="app-shell" data-mobile-view={mobileView}>
+    <div ref={rootRef} className="app-shell" data-mobile-view={mobileView}>
       <div className="workspace-menubar">
         <div className="workspace-document">
-          <span className="window-mark" aria-hidden="true">B</span>
+          <span className="window-mark" aria-hidden="true">
+            B
+          </span>
           <span className="workspace-buffer-name">{documentName ?? 'Untitled buffer'}</span>
-          <span className="document-state">{documentDirty ? 'Modified' : documentName ? 'Local file' : 'Scratchpad'}</span>
+          <span className="document-state">
+            {documentDirty ? 'Modified' : documentName ? 'Local file' : 'Scratchpad'}
+          </span>
         </div>
         <div className="menubar-actions">
+          <button
+            className={investigationOpen ? 'menubar-btn is-active' : 'menubar-btn'}
+            aria-pressed={investigationOpen}
+            onClick={() => setInvestigationOpen((v) => !v)}
+          >
+            Investigate
+          </button>
           <button
             type="button"
             className={showStructure ? 'menubar-btn is-active' : 'menubar-btn'}
@@ -602,11 +636,7 @@ export default function App() {
           >
             Structure {structure ? `(${structure.format.toUpperCase()})` : ''}
           </button>
-          <button
-            type="button"
-            className="menubar-btn"
-            onClick={() => setHelpOpen(true)}
-          >
+          <button type="button" className="menubar-btn" onClick={() => setHelpOpen(true)}>
             Help & shortcuts
           </button>
         </div>
@@ -625,14 +655,12 @@ export default function App() {
           documentLoaded={true}
           onModeChange={handleModeChange}
           onSourceChange={handleSourceChange}
-          onOpenFile={(file) => void handleOpenFile(file)}
+          onOpenFile={onOpenDocument}
           onOpenComparison={(file) => void handleOpenComparison(file)}
           onSaveFile={handleSaveFile}
           onClear={handleClear}
           onCopy={() => void copy(source, mode + ' input')}
-          onCopyBytes={() =>
-            void copy(formatInput(bytes, mode), 'committed ' + mode + ' bytes')
-          }
+          onCopyBytes={() => void copy(formatInput(bytes, mode), 'committed ' + mode + ' bytes')}
         />
 
         <ByteTools
@@ -688,20 +716,36 @@ export default function App() {
         ) : null}
 
         <div className="mobile-workspace-switch" role="group" aria-label="Workspace view">
-          <button type="button" aria-pressed={mobileView === 'bytes'} onClick={() => setMobileView('bytes')}>Bytes</button>
-          <button type="button" aria-pressed={mobileView === 'inspector'} onClick={() => setMobileView('inspector')}>Inspector</button>
-          <button type="button" aria-pressed={mobileView === 'structure'} onClick={() => { setStructureOpen(true); setMobileView('structure') }}>Structure</button>
+          <button
+            type="button"
+            aria-pressed={mobileView === 'bytes'}
+            onClick={() => setMobileView('bytes')}
+          >
+            Bytes
+          </button>
+          <button
+            type="button"
+            aria-pressed={mobileView === 'inspector'}
+            onClick={() => setMobileView('inspector')}
+          >
+            Inspector
+          </button>
+          <button
+            type="button"
+            aria-pressed={mobileView === 'structure'}
+            onClick={() => {
+              setStructureOpen(true)
+              setMobileView('structure')
+            }}
+          >
+            Structure
+          </button>
         </div>
 
-        <div
-          className={
-            showStructure
-              ? 'split-workspace has-structure'
-              : 'split-workspace'
-          }
-        >
+        <ResizableSplit structure={showStructure}>
           {showStructure ? (
             <StructureInspector
+              documentSize={bytes.length}
               structure={structure}
               selectedFormat={structureFormat}
               onSelectFormat={(format) => setStructureFormat(format)}
@@ -730,8 +774,7 @@ export default function App() {
             activeSearchOffset={activeSearchOffset}
             diffOffsets={currentDifferenceOffsets}
             activeDiffOffset={
-              activeDifferenceOffset !== null &&
-              activeDifferenceOffset < bytes.length
+              activeDifferenceOffset !== null && activeDifferenceOffset < bytes.length
                 ? activeDifferenceOffset
                 : null
             }
@@ -744,17 +787,107 @@ export default function App() {
             range={range}
             onCopy={(value, label) => void copy(value, label)}
           />
-        </div>
+        </ResizableSplit>
 
-        <BitInspector
-          bytes={selectedBytes}
+        <BitInspector bytes={selectedBytes} range={range} onToggle={handleToggleBit} />
+        <SelectionEditor
+          size={bytes.length}
           range={range}
-          onToggle={handleToggleBit}
+          onError={setError}
+          onSplice={(start, remove, added, label) => {
+            if (!remove && !added.length) return
+            const length = bytes.length - remove + added.length
+            if (length > MAX_DOCUMENT_BYTES) {
+              setError('Scratchpad input exceeds 256 KiB. Open a file for larger documents.')
+              return
+            }
+            const next = new Uint8Array(length)
+            next.set(bytes.subarray(0, start))
+            next.set(added, start)
+            next.set(bytes.subarray(start + remove), start + added.length)
+            notesUndo.current.push(notes)
+            notesRedo.current = []
+            setHistory((current) =>
+              pushTransaction(current, {
+                type: 'replace',
+                before: bytes.slice(),
+                after: next.slice(),
+                label,
+              }),
+            )
+            applyWorkingBytes(next)
+            const delta = added.length - remove
+            if (delta)
+              setNotes(
+                notes.flatMap((note) =>
+                  note.end < start
+                    ? [note]
+                    : note.start >= start + remove
+                      ? [{ ...note, start: note.start + delta, end: note.end + delta }]
+                      : [],
+                ),
+              )
+            setSelection(
+              length
+                ? {
+                    anchor: Math.min(start, length - 1),
+                    focus: Math.min(start + Math.max(1, added.length) - 1, length - 1),
+                  }
+                : null,
+            )
+          }}
         />
+        {investigationOpen && (
+          <Suspense fallback={<p className="workspace-message">Opening investigation tools…</p>}>
+            <InvestigationPanel
+              blob={documentBlob}
+              name={documentName ?? 'Untitled buffer'}
+              range={range}
+              notes={notes}
+              onNotes={setNotes}
+              recipe={recipe}
+              onRecipe={setRecipe}
+              reference={extraReference ?? comparisonBlob}
+              onReference={setExtraReference}
+              onClose={() => setInvestigationOpen(false)}
+              onSelect={(start, end) => {
+                if (bytes.length) {
+                  setSelection({
+                    anchor: Math.min(start, bytes.length - 1),
+                    focus: Math.min(end, bytes.length - 1),
+                  })
+                  setMobileView('bytes')
+                }
+              }}
+              onApply={(next, label) => {
+                if (next.length > MAX_DOCUMENT_BYTES) {
+                  setError(
+                    'Recipe output exceeds the scratchpad limit. Open the exported output in a large-file tab.',
+                  )
+                  return
+                }
+                notesUndo.current.push(notes)
+                notesRedo.current = []
+                setHistory((current) =>
+                  pushTransaction(current, {
+                    type: 'replace',
+                    before: bytes.slice(),
+                    after: next.slice(),
+                    label,
+                  }),
+                )
+                applyWorkingBytes(next)
+              }}
+            />
+          </Suspense>
+        )}
       </div>
 
       <div className="workspace-status" aria-label="Workspace status">
-        <span className="local-status"><i aria-hidden="true" />Local processing</span>
+        <span className="local-status">
+          <i aria-hidden="true" />
+          Local processing
+        </span>
         <span>{bytes.length.toLocaleString('en-US')} bytes</span>
         <span>Offset {statusOffset}</span>
         <span>Selection {statusSelection}</span>
@@ -762,9 +895,7 @@ export default function App() {
       </div>
 
       <Suspense fallback={null}>
-        {helpOpen ? (
-          <HelpDialog open onClose={() => setHelpOpen(false)} />
-        ) : null}
+        {helpOpen ? <HelpDialog open onClose={() => setHelpOpen(false)} /> : null}
         {stringsOpen ? (
           <StringScannerDialog
             open
@@ -781,9 +912,7 @@ export default function App() {
           <SupportDialog
             open
             onClose={closeSupport}
-            onCopyAddress={() =>
-              void copy(ETHEREUM_ADDRESS, 'Ethereum address')
-            }
+            onCopyAddress={() => void copy(ETHEREUM_ADDRESS, 'Ethereum address')}
           />
         ) : null}
       </Suspense>

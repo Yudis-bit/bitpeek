@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { StructureField, StructureParseResult } from '../lib/structures'
 import type { SelectionRange } from '../lib/bytes'
 
 interface StructureInspectorProps {
+  documentSize?: number
   structure: StructureParseResult | null
   selectedFormat?: string
   onSelectFormat?: (format: string) => void
@@ -13,6 +14,7 @@ interface StructureInspectorProps {
 }
 
 export function StructureInspector({
+  documentSize = Number.MAX_SAFE_INTEGER,
   structure,
   selectedFormat = 'auto',
   onSelectFormat,
@@ -21,9 +23,20 @@ export function StructureInspector({
   onExportEvidence,
   onLoadCustomSchema,
 }: StructureInspectorProps) {
+  const scopeId = useId()
   const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set())
   const [schemaModalOpen, setSchemaModalOpen] = useState(false)
   const [customSchemaText, setCustomSchemaText] = useState('')
+  const [filter, setFilter] = useState('')
+  const [detail, setDetail] = useState<StructureField | null>(null)
+  const allFields = (fields: StructureField[]): StructureField[] =>
+    fields.flatMap((field) => [field, ...allFields(field.children ?? [])])
+  const matchesFilter = (field: StructureField): boolean =>
+    !filter ||
+    (field.label + ' ' + String(field.interpretedValue))
+      .toLowerCase()
+      .includes(filter.toLowerCase()) ||
+    (field.children ?? []).some(matchesFilter)
 
   const formatSelector = onSelectFormat ? (
     <select
@@ -59,17 +72,18 @@ export function StructureInspector({
 
   if (!structure) {
     return (
-      <section className="structure-panel" aria-labelledby="structure-heading">
+      <section className="structure-panel" aria-labelledby={scopeId + '-structure-heading'}>
         <div className="section-title-row">
           <div className="structure-heading-group">
-            <h2 id="structure-heading" className="section-title">
+            <h2 id={scopeId + '-structure-heading'} className="section-title">
               Structure
             </h2>
             {formatSelector}
           </div>
         </div>
         <p className="empty-structure-note">
-          No structured format recognized. Select a parser above (ELF, PE, WASM, PNG, ZIP, GPT, UBI, SquashFS, SafeTensors, Bitcoin, Ethereum), or load a custom schema.
+          No structured format recognized. Select a parser above (ELF, PE, WASM, PNG, ZIP, GPT, UBI,
+          SquashFS, SafeTensors, Bitcoin, Ethereum), or load a custom schema.
         </p>
         <div className="compact-actions" style={{ marginTop: '10px' }}>
           {onLoadCustomSchema && (
@@ -155,6 +169,7 @@ export function StructureInspector({
   }
 
   const renderFieldTree = (field: StructureField, depth = 0): React.ReactNode => {
+    if (!matchesFilter(field)) return null
     const isCollapsed = collapsedNodes.has(field.id)
     const hasChildren = field.children && field.children.length > 0
     const isSelected =
@@ -192,18 +207,25 @@ export function StructureInspector({
           <button
             type="button"
             className="structure-field-btn"
-            onClick={() => onSelectRange(field.range.start, field.range.end - 1)}
+            disabled={
+              field.range.start < 0 ||
+              field.range.start >= documentSize ||
+              field.range.end <= field.range.start
+            }
+            onClick={() => {
+              setDetail(field)
+              onSelectRange(field.range.start, Math.min(documentSize - 1, field.range.end - 1))
+            }}
             title={`Offset 0x${field.range.start.toString(16).toUpperCase()}..0x${field.range.end.toString(16).toUpperCase()} (${field.range.end - field.range.start} bytes)`}
           >
             <span className="field-label">{field.label}</span>
             <span className="field-range">
-              [0x{field.range.start.toString(16).toUpperCase()}..0x{field.range.end.toString(16).toUpperCase()})
+              [0x{field.range.start.toString(16).toUpperCase()}..0x
+              {field.range.end.toString(16).toUpperCase()})
             </span>
             <span className="field-value">{String(field.interpretedValue)}</span>
             {field.status !== 'valid' && (
-              <span className={`status-badge badge-${field.status}`}>
-                {field.status}
-              </span>
+              <span className={`status-badge badge-${field.status}`}>{field.status}</span>
             )}
           </button>
         </div>
@@ -214,7 +236,7 @@ export function StructureInspector({
           </div>
         )}
 
-        {hasChildren && !isCollapsed && (
+        {hasChildren && (!isCollapsed || filter) && (
           <div className="structure-node-children">
             {field.children!.map((child) => renderFieldTree(child, depth + 1))}
           </div>
@@ -224,15 +246,13 @@ export function StructureInspector({
   }
 
   return (
-    <section className="structure-panel" aria-labelledby="structure-heading">
+    <section className="structure-panel" aria-labelledby={scopeId + '-structure-heading'}>
       <div className="section-title-row">
         <div className="structure-heading-group">
-          <h2 id="structure-heading" className="section-title">
+          <h2 id={scopeId + '-structure-heading'} className="section-title">
             Structure ({structure.format.toUpperCase()})
           </h2>
-          <span className={`format-status status-${structure.status}`}>
-            {structure.status}
-          </span>
+          <span className={`format-status status-${structure.status}`}>{structure.status}</span>
           {formatSelector}
         </div>
         <div className="structure-actions">
@@ -247,6 +267,52 @@ export function StructureInspector({
         </div>
       </div>
 
+      <div className="compact-actions structure-filter">
+        <input
+          aria-label="Filter structure fields"
+          placeholder="Find field or value"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+        <button onClick={() => setCollapsedNodes(new Set())}>Expand all</button>
+        <button
+          onClick={() =>
+            setCollapsedNodes(
+              new Set(
+                allFields(structure.fields)
+                  .filter((f) => f.children?.length)
+                  .map((f) => f.id),
+              ),
+            )
+          }
+        >
+          Collapse all
+        </button>
+      </div>
+      {detail && (
+        <div className="field-detail">
+          <strong>{detail.label}</strong>
+          <p>
+            {detail.type}
+            {detail.endian ? ' · ' + detail.endian + ' endian' : ''} ·{' '}
+            {detail.range.end - detail.range.start} bytes
+          </p>
+          {detail.rawHex && <code>{detail.rawHex.slice(0, 256)}</code>}
+          {detail.reason && <p>{detail.reason}</p>}
+          {typeof detail.interpretedValue === 'number' &&
+            Number.isSafeInteger(detail.interpretedValue) &&
+            detail.interpretedValue >= 0 &&
+            detail.interpretedValue < documentSize && (
+              <button
+                onClick={() =>
+                  onSelectRange(Number(detail.interpretedValue), Number(detail.interpretedValue))
+                }
+              >
+                Go to value as file offset
+              </button>
+            )}
+        </div>
+      )}
       {structure.warnings.length > 0 && (
         <div className="structure-warnings" role="alert">
           {structure.warnings.map((w, idx) => (

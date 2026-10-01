@@ -2,9 +2,7 @@ import { BitpeekError } from './errors'
 import { sha256Hex, crc32, crc16 } from './crypto'
 import { transformRange } from './edits'
 import { diffBytes, applyVerifiedPatch } from './diff'
-import { parsePng } from './structures/png'
-import { parseElf } from './structures/elf'
-import { parseCustomStructure, type CustomStructureSchema } from './structures/schema'
+import { parseStructureByFormat, type CustomStructureSchema } from './structures'
 import { findBytePattern, parseSearchPattern } from './analysis'
 import { extractPrintableStrings } from './strings'
 import { formatHexBytes, parseHexBytes } from './patch'
@@ -73,7 +71,9 @@ export interface RecipeRunResult {
   error?: string
 }
 
-export function validateRecipe(obj: unknown): { ok: true; recipe: RecipeFile } | { ok: false; error: string } {
+export function validateRecipe(
+  obj: unknown,
+): { ok: true; recipe: RecipeFile } | { ok: false; error: string } {
   if (typeof obj !== 'object' || obj === null) {
     return { ok: false, error: 'Recipe must be a valid JSON object.' }
   }
@@ -90,13 +90,91 @@ export function validateRecipe(obj: unknown): { ok: true; recipe: RecipeFile } |
   if (!Array.isArray(r['steps'])) {
     return { ok: false, error: 'Recipe steps must be an array.' }
   }
+  if (r['steps'].length > 100 || r['inputs'].length > 16)
+    return { ok: false, error: 'Recipe exceeds the step or input budget.' }
+  const names = new Set([
+    'inspect-scalar',
+    'reverse',
+    'invert',
+    'xor-mask',
+    'fill',
+    'byteswap',
+    'find-pattern',
+    'extract-strings',
+    'hash',
+    'parse-structure',
+    'diff',
+    'apply-patch',
+  ])
+  const ids = new Set<string>()
+  for (const input of r['inputs']) {
+    if (
+      !input ||
+      typeof input.id !== 'string' ||
+      !input.id ||
+      ids.has(input.id) ||
+      (input.byteLength !== undefined &&
+        (!Number.isSafeInteger(input.byteLength) || input.byteLength < 0)) ||
+      (input.sha256 !== undefined &&
+        (typeof input.sha256 !== 'string' || !/^[a-f0-9]{64}$/i.test(input.sha256)))
+    )
+      return { ok: false, error: 'Invalid recipe input.' }
+    ids.add(input.id)
+  }
+  const inputIds = new Set(ids)
+  ids.clear()
+  for (const step of r['steps']) {
+    if (
+      !step ||
+      typeof step.id !== 'string' ||
+      !step.id ||
+      ids.has(step.id) ||
+      !names.has(step.operation)
+    )
+      return { ok: false, error: 'Invalid or duplicate recipe step.' }
+    if (
+      step.range !== undefined &&
+      (!step.range ||
+        typeof step.range !== 'object' ||
+        Array.isArray(step.range) ||
+        !Number.isSafeInteger(step.range.start) ||
+        !Number.isSafeInteger(step.range.end) ||
+        step.range.start < 0 ||
+        step.range.end < step.range.start)
+    )
+      return { ok: false, error: 'Invalid recipe step range.' }
+    if (step.input !== undefined && (typeof step.input !== 'string' || !inputIds.has(step.input)))
+      return { ok: false, error: 'Recipe step refers to an unknown input.' }
+    if (
+      step.parameters !== undefined &&
+      (typeof step.parameters !== 'object' ||
+        step.parameters === null ||
+        Array.isArray(step.parameters))
+    )
+      return { ok: false, error: 'Invalid recipe step parameters.' }
+    ids.add(step.id)
+  }
+  if (r['expectedOutputs'] !== undefined) {
+    if (!Array.isArray(r['expectedOutputs']) || r['expectedOutputs'].length > 100)
+      return { ok: false, error: 'Invalid expected recipe outputs.' }
+    for (const expected of r['expectedOutputs']) {
+      if (
+        !expected ||
+        !ids.has(expected.stepId) ||
+        !expected.checks ||
+        typeof expected.checks !== 'object' ||
+        Array.isArray(expected.checks)
+      )
+        return { ok: false, error: 'Invalid expected recipe output checks.' }
+    }
+  }
   return { ok: true, recipe: obj as RecipeFile }
 }
 
 export function runRecipe(
   recipe: RecipeFile,
   inputBuffers: Record<string, Uint8Array>,
-  options: { dryRun?: boolean } = {},
+  options: { dryRun?: boolean; includeOutputHex?: boolean } = {},
 ): RecipeRunResult {
   const stepResults: RecipeStepResult[] = []
 
@@ -134,7 +212,10 @@ export function runRecipe(
 
   // Work with active document copy
   const firstInputId = recipe.inputs[0]?.id
-  let currentBytes: Uint8Array<ArrayBufferLike> = firstInputId && inputBuffers[firstInputId] ? inputBuffers[firstInputId]!.slice() : new Uint8Array(0)
+  let currentBytes: Uint8Array<ArrayBufferLike> =
+    firstInputId && inputBuffers[firstInputId]
+      ? inputBuffers[firstInputId]!.slice()
+      : new Uint8Array(0)
 
   // 2. Execute steps in order
   for (const step of recipe.steps) {
@@ -147,12 +228,29 @@ export function runRecipe(
     const endInclusive = end - 1
 
     try {
+      const includeHex =
+        options.includeOutputHex !== false ||
+        recipe.expectedOutputs?.some(
+          (expected) => expected.stepId === step.id && expected.checks.outputHex !== undefined,
+        )
+      if (
+        start < 0 ||
+        end < start ||
+        end > currentBytes.length ||
+        !Number.isSafeInteger(start) ||
+        !Number.isSafeInteger(end)
+      )
+        throw new BitpeekError('INVALID_RANGE', 'Recipe range exceeds the active document.')
       switch (step.operation) {
         case 'inspect-scalar': {
           const type = (step.parameters?.['type'] as string) ?? 'u32'
           const endian = (step.parameters?.['endian'] as string) === 'little' ? 'little' : 'big'
           const le = endian === 'little'
-          const view = new DataView(currentBytes.buffer, currentBytes.byteOffset, currentBytes.byteLength)
+          const view = new DataView(
+            currentBytes.buffer,
+            currentBytes.byteOffset,
+            currentBytes.byteLength,
+          )
 
           let value: string | number
           if (type === 'u8') value = currentBytes[start] ?? 0
@@ -180,7 +278,7 @@ export function runRecipe(
             stepId: step.id,
             operation: step.operation,
             status: 'success',
-            outputHex: formatHexBytes(currentBytes),
+            outputHex: includeHex ? formatHexBytes(currentBytes) : undefined,
           })
           break
         }
@@ -191,7 +289,7 @@ export function runRecipe(
             stepId: step.id,
             operation: step.operation,
             status: 'success',
-            outputHex: formatHexBytes(currentBytes),
+            outputHex: includeHex ? formatHexBytes(currentBytes) : undefined,
           })
           break
         }
@@ -204,14 +302,19 @@ export function runRecipe(
           } else if (Array.isArray(rawMask)) {
             mask = Uint8Array.from(rawMask as number[])
           } else {
-            throw new BitpeekError('INVALID_INPUT', 'xor-mask operation requires a "mask" parameter.')
+            throw new BitpeekError(
+              'INVALID_INPUT',
+              'xor-mask operation requires a "mask" parameter.',
+            )
           }
-          currentBytes = transformRange(currentBytes, start, endInclusive, 'xor-mask', { xorMask: mask })
+          currentBytes = transformRange(currentBytes, start, endInclusive, 'xor-mask', {
+            xorMask: mask,
+          })
           stepResults.push({
             stepId: step.id,
             operation: step.operation,
             status: 'success',
-            outputHex: formatHexBytes(currentBytes),
+            outputHex: includeHex ? formatHexBytes(currentBytes) : undefined,
           })
           break
         }
@@ -223,19 +326,21 @@ export function runRecipe(
             stepId: step.id,
             operation: step.operation,
             status: 'success',
-            outputHex: formatHexBytes(currentBytes),
+            outputHex: includeHex ? formatHexBytes(currentBytes) : undefined,
           })
           break
         }
 
         case 'byteswap': {
-          const groupWidth = (Number(step.parameters?.['groupWidth'] ?? 2) as 2 | 4 | 8)
-          currentBytes = transformRange(currentBytes, start, endInclusive, 'byteswap', { groupWidth })
+          const groupWidth = Number(step.parameters?.['groupWidth'] ?? 2) as 2 | 4 | 8
+          currentBytes = transformRange(currentBytes, start, endInclusive, 'byteswap', {
+            groupWidth,
+          })
           stepResults.push({
             stepId: step.id,
             operation: step.operation,
             status: 'success',
-            outputHex: formatHexBytes(currentBytes),
+            outputHex: includeHex ? formatHexBytes(currentBytes) : undefined,
           })
           break
         }
@@ -245,8 +350,10 @@ export function runRecipe(
           const slice = currentBytes.slice(start, end)
           let digest = ''
           if (algo === 'sha256') digest = sha256Hex(slice)
-          else if (algo === 'crc32') digest = crc32(slice).toString(16).toUpperCase().padStart(8, '0')
-          else if (algo === 'crc16') digest = crc16(slice).toString(16).toUpperCase().padStart(4, '0')
+          else if (algo === 'crc32')
+            digest = crc32(slice).toString(16).toUpperCase().padStart(8, '0')
+          else if (algo === 'crc16')
+            digest = crc16(slice).toString(16).toUpperCase().padStart(4, '0')
           else throw new BitpeekError('INVALID_INPUT', `Unsupported hash algorithm: ${algo}`)
 
           stepResults.push({
@@ -287,20 +394,22 @@ export function runRecipe(
 
         case 'parse-structure': {
           const format = (step.parameters?.['format'] as string) ?? 'auto'
-          let res
-          if (format === 'elf') res = parseElf(currentBytes)
-          else if (format === 'png') res = parsePng(currentBytes)
-          else if (format === 'custom-schema') {
-            const schema = step.parameters?.['schema'] as CustomStructureSchema
-            if (!schema) throw new BitpeekError('INVALID_INPUT', 'Missing schema parameter for custom-schema.')
-            res = parseCustomStructure(currentBytes, schema)
-          } else throw new BitpeekError('INVALID_INPUT', `Unsupported structure format: ${format}`)
+          const schema = step.parameters?.['schema'] as CustomStructureSchema | undefined
+          if (format === 'custom-schema' && !schema)
+            throw new BitpeekError('INVALID_INPUT', 'Missing schema parameter for custom-schema.')
+          const res = parseStructureByFormat(currentBytes, format, schema)
+          if (!res)
+            throw new BitpeekError('INVALID_INPUT', 'No recognized structure for this input.')
 
           stepResults.push({
             stepId: step.id,
             operation: step.operation,
             status: 'success',
-            outputValue: { status: res.status, fieldsCount: res.fields.length, warnings: res.warnings },
+            outputValue: {
+              status: res.status,
+              fieldsCount: res.fields.length,
+              warnings: res.warnings,
+            },
           })
           break
         }
@@ -308,7 +417,8 @@ export function runRecipe(
         case 'diff': {
           const refId = step.parameters?.['referenceInput'] as string
           const refBuf = refId ? inputBuffers[refId] : undefined
-          if (!refBuf) throw new BitpeekError('INVALID_INPUT', `Diff reference input "${refId}" not found.`)
+          if (!refBuf)
+            throw new BitpeekError('INVALID_INPUT', `Diff reference input "${refId}" not found.`)
           const diffResult = diffBytes(currentBytes, refBuf)
           stepResults.push({
             stepId: step.id,
@@ -334,7 +444,7 @@ export function runRecipe(
             stepId: step.id,
             operation: step.operation,
             status: 'success',
-            outputHex: formatHexBytes(currentBytes),
+            outputHex: includeHex ? formatHexBytes(currentBytes) : undefined,
           })
           break
         }
@@ -369,7 +479,11 @@ export function runRecipe(
       }
       for (const [key, expVal] of Object.entries(expected.checks)) {
         const actualVal =
-          key === 'outputValue' ? match.outputValue : key === 'outputHex' ? match.outputHex : undefined
+          key === 'outputValue'
+            ? match.outputValue
+            : key === 'outputHex'
+              ? match.outputHex
+              : undefined
         if (actualVal !== expVal) {
           return {
             ok: false,

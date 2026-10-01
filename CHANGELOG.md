@@ -1,6 +1,19 @@
 # Changelog
 
-All notable changes to Bitpeek are documented here in accordance with Semantic Versioning.
+Changes to Bitpeek.
+
+## Workspace upgrade - 2026-10-01
+
+- Kept the paper palette, navy chrome, monospace tables, and desktop controls.
+- Added up to 16 document tabs, resizable panels, a command palette, focus view, and an optional dark theme.
+- Added file editing up to 512 MiB using 64 KiB windows, with insertion, deletion, undo/redo, and background search and analysis.
+- Added structure filtering, field navigation, entropy and byte-frequency maps, structure regions, and annotation bookmarks.
+- Added insertion-aware comparison, byte previews, and structure-field comparison. Alignment searches within 4 KiB; larger moves can appear as modifications.
+- Added annotations, local session recovery, and portable workspace projects including comparison references.
+- Added visual recipes with previewed byte changes, JSON import/export, and one undo step per application. Browser recipe inputs are limited to 16 MiB; structure parsing to 64 MiB.
+- Added JSON and Markdown investigation reports with SHA-256, notes, comparisons, maps, and recipes.
+- Updated help and operating limits; removed invented benchmark numbers and promotional boilerplate.
+- Verified 194 tests, production build budgets, desktop/mobile browser flows, and editing the final byte of a real 512 MiB file.
 
 ## Workbench interface refresh - 2026-09-27
 

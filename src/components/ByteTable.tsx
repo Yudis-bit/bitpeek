@@ -1,13 +1,10 @@
-import {
-  byteToAscii,
-  getSelectionRange,
-  type ByteSelection,
-} from '../lib/bytes'
+import { byteToAscii, getSelectionRange, type ByteSelection } from '../lib/bytes'
 import {
   type KeyboardEvent,
   type MouseEvent,
   type PointerEvent,
   type UIEvent,
+  useId,
   useEffect,
   useMemo,
   useRef,
@@ -22,6 +19,7 @@ const COLUMN_LABELS = Array.from({ length: 16 }, (_, index) =>
 )
 
 interface ByteTableProps {
+  offsetBase?: number
   bytes: Uint8Array
   selection: ByteSelection | null
   searchOffsets: number[]
@@ -44,6 +42,7 @@ function isWithin(index: number, start: number, end: number): boolean {
 }
 
 export function ByteTable({
+  offsetBase = 0,
   bytes,
   selection,
   searchOffsets,
@@ -54,6 +53,7 @@ export function ByteTable({
   onSelectionChange,
   onByteEdit,
 }: ByteTableProps) {
+  const scopeId = useId()
   const dragging = useRef(false)
   const dragAnchor = useRef(0)
   const byteRefs = useRef(new Map<number, HTMLButtonElement>())
@@ -68,12 +68,8 @@ export function ByteTable({
   const diffIndexes = useMemo(() => new Set(diffOffsets), [diffOffsets])
   const totalRows = Math.ceil(bytes.length / bytesPerRow)
   const bodyScrollTop = Math.max(0, scrollTop - HEADER_HEIGHT)
-  const firstRow = Math.max(
-    0,
-    Math.floor(bodyScrollTop / ROW_HEIGHT) - OVERSCAN_ROWS,
-  )
-  const visibleRowCount =
-    Math.ceil(viewportHeight / ROW_HEIGHT) + OVERSCAN_ROWS * 2
+  const firstRow = Math.max(0, Math.floor(bodyScrollTop / ROW_HEIGHT) - OVERSCAN_ROWS)
+  const visibleRowCount = Math.ceil(viewportHeight / ROW_HEIGHT) + OVERSCAN_ROWS * 2
   const finalRow = Math.min(totalRows, firstRow + visibleRowCount)
 
   const rows = useMemo(() => {
@@ -92,10 +88,7 @@ export function ByteTable({
     const result = new Set<number>()
     if (searchLength === 0) return result
     const visibleStart = firstRow * bytesPerRow
-    const visibleEnd = Math.min(
-      bytes.length - 1,
-      finalRow * bytesPerRow - 1,
-    )
+    const visibleEnd = Math.min(bytes.length - 1, finalRow * bytesPerRow - 1)
     for (const offset of searchOffsets) {
       const matchEnd = offset + searchLength - 1
       if (matchEnd < visibleStart || offset > visibleEnd) continue
@@ -146,10 +139,7 @@ export function ByteTable({
     const visibleTop = viewport.scrollTop + HEADER_HEIGHT
     const visibleBottom = viewport.scrollTop + viewport.clientHeight
     if (targetTop < visibleTop || targetBottom > visibleBottom) {
-      viewport.scrollTop = Math.max(
-        0,
-        targetTop - Math.floor(viewport.clientHeight / 2),
-      )
+      viewport.scrollTop = Math.max(0, targetTop - Math.floor(viewport.clientHeight / 2))
     }
   }, [selection, bytesPerRow])
 
@@ -163,10 +153,7 @@ export function ByteTable({
     }
   }, [firstRow, finalRow, selection])
 
-  const selectFromPointer = (
-    index: number,
-    event: PointerEvent<HTMLButtonElement>,
-  ) => {
+  const selectFromPointer = (index: number, event: PointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return
     event.currentTarget.focus()
     const anchor = event.shiftKey && selection ? selection.anchor : index
@@ -176,10 +163,7 @@ export function ByteTable({
     event.preventDefault()
   }
 
-  const selectFromKeyboardClick = (
-    index: number,
-    event: MouseEvent<HTMLButtonElement>,
-  ) => {
+  const selectFromKeyboardClick = (index: number, event: MouseEvent<HTMLButtonElement>) => {
     if (event.detail !== 0) return
     const anchor = event.shiftKey && selection ? selection.anchor : index
     onSelectionChange({ anchor, focus: index })
@@ -211,11 +195,7 @@ export function ByteTable({
     }
   }
 
-  const handleKeyDown = (
-    index: number,
-    byte: number,
-    event: KeyboardEvent<HTMLButtonElement>,
-  ) => {
+  const handleKeyDown = (index: number, byte: number, event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.key === 'Enter' || event.key === 'F2') {
       event.preventDefault()
       startEditing(index, byte)
@@ -270,9 +250,9 @@ export function ByteTable({
   }
 
   return (
-    <section className="bytes-panel" aria-labelledby="bytes-heading">
+    <section className="bytes-panel" aria-labelledby={scopeId + '-bytes-heading'}>
       <div className="panel-heading">
-        <h2 id="bytes-heading" className="section-title">
+        <h2 id={scopeId + '-bytes-heading'} className="section-title">
           Hex view
         </h2>
         <span className="byte-count">
@@ -282,13 +262,12 @@ export function ByteTable({
       </div>
 
       {bytes.length === 0 ? (
-        <div className="workspace-placeholder"><strong>A blank canvas for your bytes.</strong><span>Paste data above or open a local file to begin.</span></div>
+        <div className="workspace-placeholder">
+          <strong>No bytes loaded.</strong>
+          <span>Open a file or paste data above.</span>
+        </div>
       ) : (
-        <div
-          ref={scrollRef}
-          className="byte-table-scroll"
-          onScroll={handleScroll}
-        >
+        <div ref={scrollRef} className="byte-table-scroll" onScroll={handleScroll}>
           <div className="byte-table" data-columns={bytesPerRow} aria-label="Byte data">
             <div className="byte-table-header">
               <span className="offset-heading">Offset</span>
@@ -300,35 +279,23 @@ export function ByteTable({
               <span className="ascii-heading">ASCII</span>
             </div>
 
-            <div
-              className="virtual-byte-body"
-              style={{ height: totalRows * ROW_HEIGHT }}
-            >
-              <div
-                className="virtual-byte-rows"
-                style={{ top: firstRow * ROW_HEIGHT }}
-              >
+            <div className="virtual-byte-body" style={{ height: totalRows * ROW_HEIGHT }}>
+              <div className="virtual-byte-rows" style={{ top: firstRow * ROW_HEIGHT }}>
                 {rows.map((row) => (
                   <div className="byte-row" key={row.offset}>
                     <span className="offset-cell">
-                      {row.offset.toString(16).toUpperCase().padStart(6, '0')}
+                      {(row.offset + offsetBase).toString(16).toUpperCase().padStart(6, '0')}
                     </span>
                     <div className="hex-cells">
                       {row.values.map((byte, column) => {
                         const index = row.offset + column
-                        const selected = range
-                          ? isWithin(index, range.start, range.end)
-                          : false
+                        const selected = range ? isWithin(index, range.start, range.end) : false
                         const searchMatch = visibleMatchIndexes.has(index)
                         const diffMatch = diffIndexes.has(index)
                         const activeDiff = activeDiffOffset === index
                         const activeMatch =
                           activeSearchOffset !== null &&
-                          isWithin(
-                            index,
-                            activeSearchOffset,
-                            activeSearchOffset + searchLength - 1,
-                          )
+                          isWithin(index, activeSearchOffset, activeSearchOffset + searchLength - 1)
                         const classes = [
                           'byte-cell',
                           diffMatch ? 'is-diff' : '',
@@ -344,16 +311,12 @@ export function ByteTable({
                           <input
                             key={index}
                             className={
-                              editing.error
-                                ? 'byte-edit-input has-error'
-                                : 'byte-edit-input'
+                              editing.error ? 'byte-edit-input has-error' : 'byte-edit-input'
                             }
                             value={editing.value}
                             maxLength={2}
                             autoFocus
-                            aria-label={
-                              'Edit byte ' + index + ' as hexadecimal'
-                            }
+                            aria-label={'Edit byte ' + (index + offsetBase) + ' as hexadecimal'}
                             aria-invalid={editing.error}
                             onChange={(event) => {
                               const value = event.target.value.toUpperCase()
@@ -382,50 +345,30 @@ export function ByteTable({
                             type="button"
                             className={classes}
                             tabIndex={
-                              selection?.focus === index ||
-                              (!selection && index === 0)
-                                ? 0
-                                : -1
+                              selection?.focus === index || (!selection && index === 0) ? 0 : -1
                             }
                             aria-pressed={selected}
                             aria-label={
                               'Byte ' +
-                              index +
+                              (index + offsetBase) +
                               ', hexadecimal ' +
-                              byte
-                                .toString(16)
-                                .toUpperCase()
-                                .padStart(2, '0')
+                              byte.toString(16).toUpperCase().padStart(2, '0')
                             }
-                            onPointerDown={(event) =>
-                              selectFromPointer(index, event)
-                            }
+                            onPointerDown={(event) => selectFromPointer(index, event)}
                             onPointerEnter={(event) => extendDrag(index, event)}
-                            onClick={(event) =>
-                              selectFromKeyboardClick(index, event)
-                            }
+                            onClick={(event) => selectFromKeyboardClick(index, event)}
                             onDoubleClick={() => startEditing(index, byte)}
-                            onKeyDown={(event) =>
-                              handleKeyDown(index, byte, event)
-                            }
+                            onKeyDown={(event) => handleKeyDown(index, byte, event)}
                           >
-                            {byte
-                              .toString(16)
-                              .toUpperCase()
-                              .padStart(2, '0')}
+                            {byte.toString(16).toUpperCase().padStart(2, '0')}
                           </button>
                         )
                       })}
                     </div>
-                    <div
-                      className="ascii-cells"
-                      aria-label={'ASCII at offset ' + row.offset}
-                    >
+                    <div className="ascii-cells" aria-label={'ASCII at offset ' + row.offset}>
                       {row.values.map((byte, column) => {
                         const index = row.offset + column
-                        const selected = range
-                          ? isWithin(index, range.start, range.end)
-                          : false
+                        const selected = range ? isWithin(index, range.start, range.end) : false
                         const searchMatch = visibleMatchIndexes.has(index)
                         const diffMatch = diffIndexes.has(index)
                         const activeDiff = activeDiffOffset === index
@@ -454,7 +397,14 @@ export function ByteTable({
           </div>
         </div>
       )}
-      <div className="byte-view-hint"><span><kbd>Click</kbd> select · <kbd>Shift</kbd> extend</span><span><kbd>Double-click</kbd> edit a byte</span></div>
+      <div className="byte-view-hint">
+        <span>
+          <kbd>Click</kbd> select · <kbd>Shift</kbd> extend
+        </span>
+        <span>
+          <kbd>Double-click</kbd> edit a byte
+        </span>
+      </div>
     </section>
   )
 }

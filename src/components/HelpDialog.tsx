@@ -48,34 +48,34 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
       <section>
         <h3>Input</h3>
         <p>
-          Paste Hex, Binary, Decimal, UTF-8 Text, or Base64. Opened files and
-          pasted data up to 256 KiB never leave this browser.
+          Paste Hex, Binary, Decimal, UTF-8 Text, or Base64 up to 256 KiB. Open files up to 512 MiB
+          in separate tabs. All processing stays on your device.
         </p>
       </section>
 
       <section>
         <h3>Search</h3>
         <p>
-          Hex search accepts complete bytes and wildcards. Use <code>??</code>{' '}
-          for any byte or <code>D?</code> for a nibble wildcard.
+          Hex search accepts complete bytes and wildcards. Use <code>??</code> for any byte or{' '}
+          <code>D?</code> for a nibble wildcard.
         </p>
       </section>
 
       <section>
         <h3>Compare and patch</h3>
         <p>
-          Compare loads a second local file and performs an offset-aligned byte
-          diff. Navigate each change or export a reference-to-current JSON patch
-          with SHA-256 source and target fingerprints.
+          Compare loads a second local file and performs an offset-aligned byte diff. Navigate each
+          change or export a reference-to-current JSON patch with SHA-256 source and target
+          fingerprints. For insertions, deletions, and structure-field comparisons, open Investigate
+          → Changes.
         </p>
       </section>
 
       <section>
         <h3>Analysis</h3>
         <p>
-          Selection analysis includes numeric interpretations, CRC, entropy,
-          SHA-256, and SHA-512. Strings scans the document for printable ASCII
-          and ASCII-like UTF-16 data.
+          Selection analysis includes numeric interpretations, CRC, entropy, SHA-256, and SHA-512.
+          Strings scans the document for printable ASCII and ASCII-like UTF-16 data.
         </p>
       </section>
 

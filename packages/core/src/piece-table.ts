@@ -51,6 +51,19 @@ export class PieceTable implements ByteSource {
     return this.currentLength
   }
 
+  /** Immutable export spans; callers can compose original Blob slices without reading them. */
+  exportSegments(): Array<{ start: number; length: number; added?: Uint8Array }> {
+    return this.pieces.map((piece) =>
+      piece.source === 'original'
+        ? { start: piece.start, length: piece.length }
+        : {
+            start: piece.start,
+            length: piece.length,
+            added: this.readFromAdded(piece.start, piece.length),
+          },
+    )
+  }
+
   private snapshot(): PieceTableSnapshot {
     return {
       pieces: [...this.pieces],
@@ -209,6 +222,22 @@ export class PieceTable implements ByteSource {
     // Merge the two edits in the undo stack so undo acts as a single step
     this.undoStack.pop() // remove insert edit
     this.undoStack.pop() // remove delete edit
+    this.commitEdit(description, before)
+  }
+
+  splice(
+    offset: number,
+    removeLength: number,
+    bytes: Uint8Array,
+    description = 'Splice bytes',
+  ): void {
+    checkRange(offset, removeLength, this.currentLength)
+    if (!removeLength && !bytes.length) return
+    const before = this.snapshot()
+    const oldCount = this.undoStack.length
+    if (removeLength) this.delete(offset, removeLength, description)
+    if (bytes.length) this.insert(offset, bytes, description)
+    this.undoStack.length = oldCount
     this.commitEdit(description, before)
   }
 

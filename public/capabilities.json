@@ -6,7 +6,20 @@
   "engine": "Bitpeek TypeScript Core v1.0.0",
   "clientOnly": true,
   "zeroServerProcessing": true,
-  "supportedFormats": ["elf", "png", "custom-schema"],
+  "supportedFormats": [
+    "elf",
+    "pe",
+    "wasm",
+    "png",
+    "zip",
+    "gpt",
+    "ubi",
+    "squashfs",
+    "safetensors",
+    "bitcoin",
+    "ethereum",
+    "custom-schema"
+  ],
   "supportedChecksums": [
     "crc16-ccitt",
     "crc32-ieee",
@@ -32,10 +45,16 @@
     "mcp": "stdio"
   },
   "limits": {
-    "webWorkspaceMaxBytes": 262144,
-    "webReadOnlyTargetBytes": 67108864,
+    "webWorkspaceMaxBytes": 536870912,
+    "webReadOnlyTargetBytes": 536870912,
     "cliStreamingChunkBytes": 1048576,
-    "mcpMaxReadChunkBytes": 65536
+    "mcpMaxReadChunkBytes": 65536,
+    "webSourceInputMaxBytes": 262144,
+    "webWindowBytes": 65536,
+    "webStructureMaxBytes": 67108864,
+    "webRecipeInputMaxBytes": 16777216,
+    "webRecipeSteps": 100,
+    "webMaxTabs": 16
   },
   "schemas": {
     "offsetPatchV1": "https://bitpeek-seven.vercel.app/schemas/offset-patch-v1.json",
@@ -43,5 +62,16 @@
     "recipeV1": "https://bitpeek-seven.vercel.app/schemas/recipe-v1.json",
     "evidenceReportV1": "https://bitpeek-seven.vercel.app/schemas/evidence-report-v1.json",
     "schemaDefinitionV1": "https://bitpeek-seven.vercel.app/schemas/schema-definition-v1.json"
-  }
+  },
+  "workspaceFeatures": [
+    "multiple-documents",
+    "local-projects",
+    "session-recovery",
+    "annotations",
+    "aligned-diff",
+    "structure-comparison",
+    "entropy-map",
+    "recipe-preview",
+    "evidence-export"
+  ]
 }

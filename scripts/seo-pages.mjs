@@ -1,7 +1,7 @@
 import { docsPages } from './docs-pages.mjs'
 
 export const SITE_URL = 'https://bitpeek-seven.vercel.app'
-export const HOMEPAGE_LAST_MODIFIED = '2026-08-29'
+export const HOMEPAGE_LAST_MODIFIED = '2026-10-01'
 
 export const toolPages = [
   {
@@ -14,8 +14,7 @@ export const toolPages = [
     description:
       'Open, inspect, and edit hexadecimal bytes in your browser. Search patterns, toggle bits, undo changes, and export a new file without uploading it.',
     h1: 'Online Hex Editor for Local Binary Files',
-    lead:
-      'Edit raw bytes in a focused hexadecimal workspace. Bitpeek keeps the file in browser memory, shows the matching ASCII view, and lets you export a separate edited copy.',
+    lead: 'Edit raw bytes in a focused hexadecimal workspace. Bitpeek keeps the file in browser memory, shows the matching ASCII view, and lets you export a separate edited copy.',
     ctaHref: '/?mode=hex#workspace',
     ctaLabel: 'Open the hex editor',
     ctaHeading: 'Edit bytes in the Bitpeek workspace',
@@ -38,7 +37,7 @@ export const toolPages = [
         id: 'capabilities',
         title: 'Hex editing capabilities',
         html: `
-          <p>Bitpeek is designed for small, targeted binary inspection rather than unrestricted multi-gigabyte editing. The workspace accepts files up to 256 KiB and keeps an in-memory edit history.</p>
+          <p>Bitpeek supports local files up to 512 MiB. Large documents use a piece table and 64 KiB viewing windows. Typed source input supports up to 256 KiB.</p>
           <ul>
             <li>Hexadecimal, binary, decimal, UTF-8 text, and Base64 input modes.</li>
             <li>Hex and ASCII rows with stable byte offsets.</li>
@@ -80,7 +79,7 @@ export const toolPages = [
       {
         question: 'What is the maximum file size?',
         answer:
-          'The current workspace limit is 256 KiB per opened file. This keeps inspection and editing responsive in the browser.',
+          'Files up to 512 MiB can be opened and edited. Typed input supports 256 KiB; larger files use windows and background analysis.',
       },
       {
         question: 'Can I undo a hex edit?',
@@ -94,8 +93,16 @@ export const toolPages = [
       },
     ],
     related: [
-      { slug: '/tools/binary-viewer', label: 'Binary viewer', note: 'Interpret selected bytes and headers' },
-      { slug: '/tools/binary-diff', label: 'Binary diff', note: 'Compare the edited copy with a reference' },
+      {
+        slug: '/tools/binary-viewer',
+        label: 'Binary viewer',
+        note: 'Interpret selected bytes and headers',
+      },
+      {
+        slug: '/tools/binary-diff',
+        label: 'Binary diff',
+        note: 'Compare the edited copy with a reference',
+      },
       { slug: '/tools/hex-to-text', label: 'Hex to text', note: 'Decode bytes as UTF-8 and ASCII' },
     ],
   },
@@ -109,13 +116,12 @@ export const toolPages = [
     description:
       'View binary files as hex and ASCII with byte offsets, integer and float interpretations, hashes, checksums, entropy, strings, and magic bytes.',
     h1: 'View and Analyze Binary Files Online',
-    lead:
-      'Open a local file and examine its bytes without uploading it. Bitpeek connects the hex table, ASCII view, selected-byte interpretations, checksums, hashes, entropy, and file-signature detection.',
+    lead: 'Open a local file and examine its bytes without uploading it. Bitpeek connects the hex table, ASCII view, selected-byte interpretations, checksums, hashes, entropy, and file-signature detection.',
     ctaHref: '/?intent=open#workspace',
     ctaLabel: 'Open the binary viewer',
     ctaHeading: 'Inspect a local binary file',
     ctaText:
-      'Open a file up to 256 KiB, select a byte range, and Bitpeek will update every interpretation for that selection.',
+      'Open a file up to 512 MiB and select bytes to inspect their values. Large selections show a bounded preview.',
     sections: [
       {
         id: 'what-you-see',
@@ -158,7 +164,7 @@ export const toolPages = [
         title: 'Scope and interpretation limits',
         html: `
           <p class="notice">A generic binary viewer exposes bytes; it does not replace a format-specific parser. A plausible number, string, or file signature is evidence to investigate, not proof that the file is valid or safe.</p>
-          <p>Bitpeek intentionally limits the workspace to 256 KiB. For larger files, extract the relevant range with a trusted local tool before inspecting it.</p>
+          <p>Large files use 64 KiB viewing windows. The inspector previews the first 64 KiB of a large selection; use Investigate for whole-file hashes and entropy maps.</p>
         `,
       },
     ],
@@ -180,9 +186,17 @@ export const toolPages = [
       },
     ],
     related: [
-      { slug: '/tools/file-signature-checker', label: 'File signature checker', note: 'Identify common magic bytes' },
+      {
+        slug: '/tools/file-signature-checker',
+        label: 'File signature checker',
+        note: 'Identify common magic bytes',
+      },
       { slug: '/tools/hex-editor', label: 'Online hex editor', note: 'Change a known byte or bit' },
-      { slug: '/file-formats/elf', label: 'ELF header reference', note: 'Read class and byte-order fields' },
+      {
+        slug: '/file-formats/elf',
+        label: 'ELF header reference',
+        note: 'Read class and byte-order fields',
+      },
     ],
   },
   {
@@ -195,8 +209,7 @@ export const toolPages = [
     description:
       'Compare two local binary files by offset, navigate changed ranges, distinguish modified and extra bytes, and export a reproducible JSON offset patch.',
     h1: 'Compare Two Binary Files by Byte Offset',
-    lead:
-      'Bitpeek compares the current bytes with a local reference file, highlights every different offset, groups adjacent changes, and can export a human-readable offset patch.',
+    lead: 'Bitpeek compares the current bytes with a local reference file, highlights every different offset, groups adjacent changes, and can export a human-readable offset patch.',
     ctaHref: '/?intent=compare#workspace',
     ctaLabel: 'Start a binary comparison',
     ctaHeading: 'Open the Bitpeek binary diff workflow',
@@ -248,8 +261,7 @@ export const toolPages = [
     faqs: [
       {
         question: 'Are both comparison files uploaded?',
-        answer:
-          'No. Both files are read and compared inside the same browser session.',
+        answer: 'No. Both files are read and compared inside the same browser session.',
       },
       {
         question: 'Does Bitpeek align inserted or deleted blocks?',
@@ -263,9 +275,17 @@ export const toolPages = [
       },
     ],
     related: [
-      { slug: '/tools/hex-editor', label: 'Online hex editor', note: 'Make a controlled byte change' },
+      {
+        slug: '/tools/hex-editor',
+        label: 'Online hex editor',
+        note: 'Make a controlled byte change',
+      },
       { slug: '/tools/binary-viewer', label: 'Binary viewer', note: 'Interpret a changed range' },
-      { slug: '/tools/file-signature-checker', label: 'File signature checker', note: 'Confirm both file headers' },
+      {
+        slug: '/tools/file-signature-checker',
+        label: 'File signature checker',
+        note: 'Confirm both file headers',
+      },
     ],
   },
   {
@@ -278,8 +298,7 @@ export const toolPages = [
     description:
       'Check a local file for common magic bytes, inspect its header in hex, and verify PNG, JPEG, PDF, ZIP, ELF, and other recognized signatures in your browser.',
     h1: 'Check File Signatures and Magic Bytes Online',
-    lead:
-      'Open a local file to compare its leading bytes with known signatures. Bitpeek reports recognized formats and keeps the complete inspection workflow in your browser.',
+    lead: 'Open a local file to compare its leading bytes with known signatures. Bitpeek reports recognized formats and keeps the complete inspection workflow in your browser.',
     ctaHref: '/?intent=signature#workspace',
     ctaLabel: 'Check a local file',
     ctaHeading: 'Inspect a file header in Bitpeek',
@@ -358,9 +377,21 @@ export const toolPages = [
       },
     ],
     related: [
-      { slug: '/file-formats/png', label: 'PNG header reference', note: 'Inspect the signature and IHDR chunk' },
-      { slug: '/file-formats/zip', label: 'ZIP header reference', note: 'Read local and central-directory records' },
-      { slug: '/tools/binary-viewer', label: 'Binary viewer', note: 'Inspect an unknown header manually' },
+      {
+        slug: '/file-formats/png',
+        label: 'PNG header reference',
+        note: 'Inspect the signature and IHDR chunk',
+      },
+      {
+        slug: '/file-formats/zip',
+        label: 'ZIP header reference',
+        note: 'Read local and central-directory records',
+      },
+      {
+        slug: '/tools/binary-viewer',
+        label: 'Binary viewer',
+        note: 'Inspect an unknown header manually',
+      },
     ],
   },
   {
@@ -373,8 +404,7 @@ export const toolPages = [
     description:
       'Convert hexadecimal bytes to UTF-8 text or ASCII in your browser, inspect invalid sequences, and compare binary, decimal, and Base64 representations locally.',
     h1: 'Convert Hexadecimal Bytes to Text',
-    lead:
-      'Paste hexadecimal bytes once and inspect their UTF-8 and ASCII representations together. Bitpeek keeps control characters visible as escapes, shows replacement markers for invalid UTF-8, and warns before text-mode editing.',
+    lead: 'Paste hexadecimal bytes once and inspect their UTF-8 and ASCII representations together. Bitpeek keeps control characters visible as escapes, shows replacement markers for invalid UTF-8, and warns before text-mode editing.',
     ctaHref: '/?mode=hex#workspace',
     ctaLabel: 'Open the hex-to-text workspace',
     ctaHeading: 'Decode hexadecimal bytes locally',
@@ -437,9 +467,21 @@ export const toolPages = [
       },
     ],
     related: [
-      { slug: '/tools/hex-editor', label: 'Online hex editor', note: 'Change decoded bytes safely' },
-      { slug: '/tools/binary-viewer', label: 'Binary viewer', note: 'Compare every representation' },
-      { slug: '/file-formats/pdf', label: 'PDF header reference', note: 'Read the ASCII %PDF- prefix' },
+      {
+        slug: '/tools/hex-editor',
+        label: 'Online hex editor',
+        note: 'Change decoded bytes safely',
+      },
+      {
+        slug: '/tools/binary-viewer',
+        label: 'Binary viewer',
+        note: 'Compare every representation',
+      },
+      {
+        slug: '/file-formats/pdf',
+        label: 'PDF header reference',
+        note: 'Read the ASCII %PDF- prefix',
+      },
     ],
   },
 ]
@@ -455,8 +497,7 @@ export const formatPages = [
     description:
       'Inspect the PNG file signature, IHDR chunk fields, byte offsets, chunk layout, and CRC structure with a verified header reference and local hex viewer.',
     h1: 'PNG File Header and Magic Bytes',
-    lead:
-      'A PNG datastream begins with a fixed eight-byte signature followed by length-prefixed chunks. The first chunk is IHDR and the final chunk is IEND.',
+    lead: 'A PNG datastream begins with a fixed eight-byte signature followed by length-prefixed chunks. The first chunk is IHDR and the final chunk is IEND.',
     ctaHref: '/?intent=signature#workspace',
     ctaLabel: 'Inspect a PNG file',
     ctaHeading: 'Open a PNG header in Bitpeek',
@@ -518,15 +559,39 @@ export const formatPages = [
       },
     ],
     faqs: [
-      { question: 'Are PNG integers little-endian?', answer: 'No. PNG multi-byte integers, including chunk lengths, width, and height, use network byte order (big-endian).' },
-      { question: 'Is IHDR always at offset 0x0C?', answer: 'For a valid PNG datastream, yes. The eight-byte signature is followed by the first chunk length at 0x08 and the IHDR type at 0x0C.' },
-      { question: 'Can Bitpeek validate a complete PNG?', answer: 'Bitpeek can expose bytes, interpretations, CRC values for selections, and the leading signature. A dedicated PNG validator is still needed for full conformance.' },
+      {
+        question: 'Are PNG integers little-endian?',
+        answer:
+          'No. PNG multi-byte integers, including chunk lengths, width, and height, use network byte order (big-endian).',
+      },
+      {
+        question: 'Is IHDR always at offset 0x0C?',
+        answer:
+          'For a valid PNG datastream, yes. The eight-byte signature is followed by the first chunk length at 0x08 and the IHDR type at 0x0C.',
+      },
+      {
+        question: 'Can Bitpeek validate a complete PNG?',
+        answer:
+          'Bitpeek can expose bytes, interpretations, CRC values for selections, and the leading signature. A dedicated PNG validator is still needed for full conformance.',
+      },
     ],
     source: { label: 'W3C PNG Specification, Third Edition', url: 'https://www.w3.org/TR/png-3/' },
     related: [
-      { slug: '/tools/file-signature-checker', label: 'File signature checker', note: 'Confirm PNG magic bytes' },
-      { slug: '/tools/binary-viewer', label: 'Binary viewer', note: 'Read IHDR values as big-endian' },
-      { slug: '/file-formats/jpeg', label: 'JPEG header reference', note: 'Compare marker-based image structure' },
+      {
+        slug: '/tools/file-signature-checker',
+        label: 'File signature checker',
+        note: 'Confirm PNG magic bytes',
+      },
+      {
+        slug: '/tools/binary-viewer',
+        label: 'Binary viewer',
+        note: 'Read IHDR values as big-endian',
+      },
+      {
+        slug: '/file-formats/jpeg',
+        label: 'JPEG header reference',
+        note: 'Compare marker-based image structure',
+      },
     ],
   },
   {
@@ -539,8 +604,7 @@ export const formatPages = [
     description:
       'Inspect JPEG SOI and EOI markers, common APP0 and APP1 segments, frame and scan markers, variable segment lengths, and leading magic bytes in a local hex viewer.',
     h1: 'JPEG File Header and Marker Structure',
-    lead:
-      'A JPEG interchange stream begins with the Start of Image marker and ends with End of Image. Between them, marker segments describe tables, frames, scans, and optional metadata.',
+    lead: 'A JPEG interchange stream begins with the Start of Image marker and ends with End of Image. Between them, marker segments describe tables, frames, scans, and optional metadata.',
     ctaHref: '/?intent=signature#workspace',
     ctaLabel: 'Inspect a JPEG file',
     ctaHeading: 'Open a JPEG byte stream in Bitpeek',
@@ -600,15 +664,42 @@ export const formatPages = [
       },
     ],
     faqs: [
-      { question: 'Why is the common JPEG signature three bytes if SOI is two?', answer: 'SOI is FF D8. A valid interchange stream continues with another marker, whose prefix is FF, so file-signature tables commonly use FF D8 FF.' },
-      { question: 'Is Exif always present in a JPEG?', answer: 'No. Exif commonly appears in an APP1 segment, but JPEG files can omit it or use APP1 for other identified payloads such as XMP.' },
-      { question: 'Are JPEG segment offsets fixed?', answer: 'No. Segment lengths and optional metadata determine later offsets. Parse the two-byte length of each applicable marker segment.' },
+      {
+        question: 'Why is the common JPEG signature three bytes if SOI is two?',
+        answer:
+          'SOI is FF D8. A valid interchange stream continues with another marker, whose prefix is FF, so file-signature tables commonly use FF D8 FF.',
+      },
+      {
+        question: 'Is Exif always present in a JPEG?',
+        answer:
+          'No. Exif commonly appears in an APP1 segment, but JPEG files can omit it or use APP1 for other identified payloads such as XMP.',
+      },
+      {
+        question: 'Are JPEG segment offsets fixed?',
+        answer:
+          'No. Segment lengths and optional metadata determine later offsets. Parse the two-byte length of each applicable marker segment.',
+      },
     ],
-    source: { label: 'ITU-T Recommendation T.81 — JPEG interchange format', url: 'https://www.w3.org/Graphics/JPEG/itu-t81.pdf' },
+    source: {
+      label: 'ITU-T Recommendation T.81 — JPEG interchange format',
+      url: 'https://www.w3.org/Graphics/JPEG/itu-t81.pdf',
+    },
     related: [
-      { slug: '/tools/file-signature-checker', label: 'File signature checker', note: 'Confirm the SOI prefix' },
-      { slug: '/tools/binary-viewer', label: 'Binary viewer', note: 'Navigate markers and lengths' },
-      { slug: '/file-formats/png', label: 'PNG header reference', note: 'Compare chunk-based image structure' },
+      {
+        slug: '/tools/file-signature-checker',
+        label: 'File signature checker',
+        note: 'Confirm the SOI prefix',
+      },
+      {
+        slug: '/tools/binary-viewer',
+        label: 'Binary viewer',
+        note: 'Navigate markers and lengths',
+      },
+      {
+        slug: '/file-formats/png',
+        label: 'PNG header reference',
+        note: 'Compare chunk-based image structure',
+      },
     ],
   },
   {
@@ -621,8 +712,7 @@ export const formatPages = [
     description:
       'Inspect the %PDF- header, version bytes, indirect objects, cross-reference data, startxref pointer, and %%EOF marker with a local binary viewer.',
     h1: 'PDF File Header and Byte Structure',
-    lead:
-      'A PDF begins with an ASCII version header, stores a graph of numbered objects, and ends with information that lets a reader locate the latest cross-reference data.',
+    lead: 'A PDF begins with an ASCII version header, stores a graph of numbered objects, and ends with information that lets a reader locate the latest cross-reference data.',
     ctaHref: '/?intent=signature#workspace',
     ctaLabel: 'Inspect a PDF file',
     ctaHeading: 'Open a compact PDF in Bitpeek',
@@ -680,15 +770,38 @@ export const formatPages = [
       },
     ],
     faqs: [
-      { question: 'Is all PDF content readable as text?', answer: 'No. PDF syntax contains readable tokens, but stream data is often compressed, encoded, encrypted, or binary.' },
-      { question: 'Why can a PDF contain more than one %%EOF marker?', answer: 'Incremental updates append a complete new revision trailer and EOF marker while preserving earlier bytes.' },
-      { question: 'Does the header version always control features?', answer: 'Not always. Starting with PDF 1.4, the document catalog may contain a Version entry that supersedes the header value.' },
+      {
+        question: 'Is all PDF content readable as text?',
+        answer:
+          'No. PDF syntax contains readable tokens, but stream data is often compressed, encoded, encrypted, or binary.',
+      },
+      {
+        question: 'Why can a PDF contain more than one %%EOF marker?',
+        answer:
+          'Incremental updates append a complete new revision trailer and EOF marker while preserving earlier bytes.',
+      },
+      {
+        question: 'Does the header version always control features?',
+        answer:
+          'Not always. Starting with PDF 1.4, the document catalog may contain a Version entry that supersedes the header value.',
+      },
     ],
-    source: { label: 'Adobe PDF 32000-1:2008 specification', url: 'https://opensource.adobe.com/dc-acrobat-sdk-docs/standards/pdfstandards/pdf/PDF32000_2008.pdf' },
+    source: {
+      label: 'Adobe PDF 32000-1:2008 specification',
+      url: 'https://opensource.adobe.com/dc-acrobat-sdk-docs/standards/pdfstandards/pdf/PDF32000_2008.pdf',
+    },
     related: [
-      { slug: '/tools/file-signature-checker', label: 'File signature checker', note: 'Confirm the %PDF- prefix' },
+      {
+        slug: '/tools/file-signature-checker',
+        label: 'File signature checker',
+        note: 'Confirm the %PDF- prefix',
+      },
       { slug: '/tools/hex-to-text', label: 'Hex to text', note: 'Decode readable PDF tokens' },
-      { slug: '/file-formats/zip', label: 'ZIP header reference', note: 'Inspect another structured container' },
+      {
+        slug: '/file-formats/zip',
+        label: 'ZIP header reference',
+        note: 'Inspect another structured container',
+      },
     ],
   },
   {
@@ -701,8 +814,7 @@ export const formatPages = [
     description:
       'Inspect ZIP local file headers, central-directory records, end-of-central-directory signatures, field offsets, flags, sizes, and little-endian values.',
     h1: 'ZIP File Header and Magic Bytes',
-    lead:
-      'A typical ZIP archive begins with a local file header and ends with a central directory plus an end record. Multi-byte numeric fields use little-endian byte order.',
+    lead: 'A typical ZIP archive begins with a local file header and ends with a central directory plus an end record. Multi-byte numeric fields use little-endian byte order.',
     ctaHref: '/?intent=signature#workspace',
     ctaLabel: 'Inspect a ZIP file',
     ctaHeading: 'Open a ZIP header in Bitpeek',
@@ -765,15 +877,42 @@ export const formatPages = [
       },
     ],
     faqs: [
-      { question: 'Is every file starting with PK a ZIP archive?', answer: 'No. The bytes are a format clue. Confirm the complete record structure and central directory before treating the file as a valid archive.' },
-      { question: 'Why can local-header sizes be zero?', answer: 'When general-purpose bit 3 is set, CRC and size values can follow the compressed data in a data descriptor instead of being known when the local header is written.' },
-      { question: 'Does ZIP always start at offset 0?', answer: 'Typical archives do, but self-extracting and deliberately prefixed files can place other bytes before the first ZIP record.' },
+      {
+        question: 'Is every file starting with PK a ZIP archive?',
+        answer:
+          'No. The bytes are a format clue. Confirm the complete record structure and central directory before treating the file as a valid archive.',
+      },
+      {
+        question: 'Why can local-header sizes be zero?',
+        answer:
+          'When general-purpose bit 3 is set, CRC and size values can follow the compressed data in a data descriptor instead of being known when the local header is written.',
+      },
+      {
+        question: 'Does ZIP always start at offset 0?',
+        answer:
+          'Typical archives do, but self-extracting and deliberately prefixed files can place other bytes before the first ZIP record.',
+      },
     ],
-    source: { label: 'PKWARE .ZIP Application Note', url: 'https://support.pkware.com/pkzip/appnote' },
+    source: {
+      label: 'PKWARE .ZIP Application Note',
+      url: 'https://support.pkware.com/pkzip/appnote',
+    },
     related: [
-      { slug: '/tools/file-signature-checker', label: 'File signature checker', note: 'Confirm the local-header signature' },
-      { slug: '/tools/binary-viewer', label: 'Binary viewer', note: 'Read little-endian size fields' },
-      { slug: '/file-formats/pdf', label: 'PDF header reference', note: 'Compare document container structures' },
+      {
+        slug: '/tools/file-signature-checker',
+        label: 'File signature checker',
+        note: 'Confirm the local-header signature',
+      },
+      {
+        slug: '/tools/binary-viewer',
+        label: 'Binary viewer',
+        note: 'Read little-endian size fields',
+      },
+      {
+        slug: '/file-formats/pdf',
+        label: 'PDF header reference',
+        note: 'Compare document container structures',
+      },
     ],
   },
   {
@@ -786,8 +925,7 @@ export const formatPages = [
     description:
       'Inspect ELF magic bytes, 32-bit and 64-bit class, byte-order encoding, OS ABI, object type, machine field, and variable header offsets in a local hex viewer.',
     h1: 'ELF Header and Magic Bytes',
-    lead:
-      'Executable and Linkable Format files start with a 16-byte identification array. Its first bytes establish the format, class, byte order, version, and ABI before the remaining header is interpreted.',
+    lead: 'Executable and Linkable Format files start with a 16-byte identification array. Its first bytes establish the format, class, byte order, version, and ABI before the remaining header is interpreted.',
     ctaHref: '/?intent=signature#workspace',
     ctaLabel: 'Inspect an ELF file',
     ctaHeading: 'Open an ELF header in Bitpeek',
@@ -845,14 +983,36 @@ export const formatPages = [
       },
     ],
     faqs: [
-      { question: 'How do I tell ELF32 from ELF64?', answer: 'Read byte 4 (EI_CLASS). A value of 1 means ELF32 and 2 means ELF64.' },
-      { question: 'How do I know the ELF byte order?', answer: 'Read byte 5 (EI_DATA). A value of 1 selects little-endian encoding and 2 selects big-endian encoding for multi-byte fields.' },
-      { question: 'Does an ELF file need an .elf extension?', answer: 'No. Unix executables, shared libraries, object files, core files, and firmware payloads can all use ELF with different names or extensions.' },
+      {
+        question: 'How do I tell ELF32 from ELF64?',
+        answer: 'Read byte 4 (EI_CLASS). A value of 1 means ELF32 and 2 means ELF64.',
+      },
+      {
+        question: 'How do I know the ELF byte order?',
+        answer:
+          'Read byte 5 (EI_DATA). A value of 1 selects little-endian encoding and 2 selects big-endian encoding for multi-byte fields.',
+      },
+      {
+        question: 'Does an ELF file need an .elf extension?',
+        answer:
+          'No. Unix executables, shared libraries, object files, core files, and firmware payloads can all use ELF with different names or extensions.',
+      },
     ],
-    source: { label: 'System V ABI — ELF Header', url: 'https://www.sco.com/developers/gabi/latest/ch4.eheader.html' },
+    source: {
+      label: 'System V ABI — ELF Header',
+      url: 'https://www.sco.com/developers/gabi/latest/ch4.eheader.html',
+    },
     related: [
-      { slug: '/tools/file-signature-checker', label: 'File signature checker', note: 'Confirm the ELF magic bytes' },
-      { slug: '/tools/binary-viewer', label: 'Binary viewer', note: 'Interpret class-dependent fields' },
+      {
+        slug: '/tools/file-signature-checker',
+        label: 'File signature checker',
+        note: 'Confirm the ELF magic bytes',
+      },
+      {
+        slug: '/tools/binary-viewer',
+        label: 'Binary viewer',
+        note: 'Interpret class-dependent fields',
+      },
       { slug: '/tools/binary-diff', label: 'Binary diff', note: 'Compare two compact ELF objects' },
     ],
   },
