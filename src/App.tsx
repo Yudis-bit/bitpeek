@@ -891,7 +891,7 @@ export default function App({
         <span>{bytes.length.toLocaleString('en-US')} bytes</span>
         <span>Offset {statusOffset}</span>
         <span>Selection {statusSelection}</span>
-        <span className="workspace-limit">256 KiB / file</span>
+        <span className="workspace-limit">Typed input ≤ 256 KiB · files ≤ 512 MiB</span>
       </div>
 
       <Suspense fallback={null}>
