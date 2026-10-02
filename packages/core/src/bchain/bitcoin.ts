@@ -92,6 +92,10 @@ export class BitcoinParser {
     const peek0 = bytes[reader.position]
     const peek1 = bytes[reader.position + 1]
 
+    if (peek0 === 0 && peek1 !== undefined && peek1 !== 0 && peek1 !== 1) {
+      throw new Error('Unknown transaction optional data flag')
+    }
+
     if (peek0 === 0x00 && peek1 === 0x01) {
       isSegWit = true
       reader.skip(2) // skip marker and flag
@@ -99,6 +103,7 @@ export class BitcoinParser {
 
     // Parse Inputs
     const inCount = this.readCanonicalCompactSize(reader)
+    if (inCount > Math.floor(reader.remaining / 41)) throw new Error('Input count exceeds remaining transaction bytes')
     const inputs: BitcoinTxInput[] = []
 
     for (let i = 0; i < inCount; i++) {
@@ -124,6 +129,7 @@ export class BitcoinParser {
 
     // Parse Outputs
     const outCount = this.readCanonicalCompactSize(reader)
+    if (outCount > Math.floor(reader.remaining / 9)) throw new Error('Output count exceeds remaining transaction bytes')
     const outputs: BitcoinTxOutput[] = []
 
     for (let i = 0; i < outCount; i++) {
@@ -142,6 +148,7 @@ export class BitcoinParser {
       for (let i = 0; i < inCount; i++) {
         const itemStack: Uint8Array[] = []
         const numItems = this.readCanonicalCompactSize(reader)
+        if (numItems > reader.remaining) throw new Error('Witness count exceeds remaining transaction bytes')
         for (let j = 0; j < numItems; j++) {
           const itemLen = this.readCanonicalCompactSize(reader)
           const itemData = reader.readBytesSync(itemLen)
@@ -149,9 +156,11 @@ export class BitcoinParser {
         }
         inputs[i]!.witness = itemStack
       }
+      if (!inputs.some(input => input.witness!.length > 0)) throw new Error('Superfluous witness record')
     }
 
     const locktime = reader.readU32Sync('le')
+    if (reader.remaining !== 0) throw new Error('Trailing bytes after Bitcoin transaction')
 
     // Double-SHA-256 for TXID:
     // If SegWit, TXID is calculated over the non-witness serialized format

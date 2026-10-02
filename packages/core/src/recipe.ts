@@ -6,6 +6,8 @@ import { parseStructureByFormat, type CustomStructureSchema } from './structures
 import { findBytePattern, parseSearchPattern } from './analysis'
 import { extractPrintableStrings } from './strings'
 import { formatHexBytes, parseHexBytes } from './patch'
+import { auditSecp256k1 } from './operations/secp256k1-audit'
+import type { Secp256k1AuditFormat } from './operations/secp256k1-audit'
 
 export type RecipeOperationName =
   | 'inspect-scalar'
@@ -20,6 +22,7 @@ export type RecipeOperationName =
   | 'parse-structure'
   | 'diff'
   | 'apply-patch'
+  | 'secp256k1.audit'
 
 export interface RecipeInput {
   id: string
@@ -105,6 +108,7 @@ export function validateRecipe(
     'parse-structure',
     'diff',
     'apply-patch',
+    'secp256k1.audit',
   ])
   const ids = new Set<string>()
   for (const input of r['inputs']) {
@@ -242,6 +246,19 @@ export function runRecipe(
       )
         throw new BitpeekError('INVALID_RANGE', 'Recipe range exceeds the active document.')
       switch (step.operation) {
+        case 'secp256k1.audit': {
+          const format = step.parameters?.['format'] ?? 'auto'
+          if (typeof format !== 'string' || !['auto', 'pubkey', 'der', 'compact', 'bitcoin-tx'].includes(format)) {
+            throw new BitpeekError('INVALID_INPUT', 'Unsupported secp256k1 audit format.')
+          }
+          stepResults.push({
+            stepId: step.id,
+            operation: step.operation,
+            status: 'success',
+            outputValue: auditSecp256k1(currentBytes.subarray(start, end), format as Secp256k1AuditFormat),
+          })
+          break
+        }
         case 'inspect-scalar': {
           const type = (step.parameters?.['type'] as string) ?? 'u32'
           const endian = (step.parameters?.['endian'] as string) === 'little' ? 'little' : 'big'

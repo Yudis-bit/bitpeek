@@ -12,6 +12,7 @@ export interface OperationDescriptor<TInput = any, TOutput = any> {
   version: string
   title: string
   description: string
+  category?: string
   environment: OperationEnvironment
   deterministic: boolean
   readOnly: boolean
@@ -37,6 +38,7 @@ export interface BitpeekCapabilityManifest {
   supportedOperations: {
     id: string
     title: string
+    category?: string
     version: string
     deterministic: boolean
     readOnly: boolean

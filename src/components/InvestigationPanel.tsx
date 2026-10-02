@@ -48,6 +48,7 @@ const operations: RecipeOperationName[] = [
   'extract-strings',
   'inspect-scalar',
   'parse-structure',
+  'secp256k1.audit',
 ]
 const hex = (n: number) => '0x' + n.toString(16).toUpperCase()
 const json = (value: unknown) =>
@@ -151,6 +152,7 @@ export function InvestigationPanel({
       parameters.endian = 'little'
     }
     if (operation === 'parse-structure') parameters.format = parameter || 'auto'
+    if (operation === 'secp256k1.audit') parameters.format = parameter || 'auto'
     if (operation === 'hash') parameters.algorithm = 'sha256'
     setRecipe({
       ...recipe,

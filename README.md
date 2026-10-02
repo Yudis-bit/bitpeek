@@ -15,6 +15,7 @@ A local-first binary workbench for inspecting bytes, checking structure, and rep
 ---
 
 ## Workbench Features
+- **secp256k1 Audit**: Check curve points, strict DER/compact ECDSA encoding, low-S policy, and Bitcoin transaction invariants; inspect x86-64/AArch64 snippets for timing hazards. See [API, recipes, and verification limits](docs/secp256k1-audit.md).
 - **Input Modes**: Hexadecimal, binary, decimal, UTF-8 text, and Base64 with instant bidirectional synchronization.
 - **Structure Inspector**: Real-time parser for ELF32/ELF64 (LE/BE), PNG chunk layout with CRC checks, and user-defined JSON schemas.
 - **Byte Inspector**: Scaled integer decoding (8 to 64 bits), IEEE-754 single and double precision floats with raw bit display, ASCII, UTF-8, CRC-16, CRC-32, Sum-8, XOR-8, and streaming SHA-256 (FIPS 180-4).
@@ -53,20 +54,29 @@ bitpeek patch apply changes.json --source baseline.bin --output patched.bin
 ---
 
 ## Model Context Protocol (MCP) Server
-Bitpeek provides a local stdio MCP server for AI developer tools (Claude Desktop, Cursor, Antigravity, etc.) implementing 12 official tools:
+Bitpeek provides a local stdio MCP server for AI developer tools implementing 17 tools, including direct secp256k1 and static timing audits. After `npm install`, launch the server with Node using the absolute path to its launcher:
 
 ```json
 {
   "mcpServers": {
     "bitpeek": {
       "command": "node",
-      "args": ["packages/mcp/dist/index.js", "--allowed-roots", "C:\\workspace"]
+      "args": [
+        "C:/Users/LENOVO/Documents/bugbounty/bitpeek/packages/mcp/bin/bitpeek-mcp.js",
+        "--allowed-roots",
+        "C:/Users/LENOVO/Documents/bugbounty"
+      ]
     }
   }
 }
 ```
 
 The MCP server enforces path canonicalization, opaque session handles, and strictly contained filesystem boundaries.
+
+Use `bitpeek_secp256k1_audit` for keys, ECDSA encodings, and raw Bitcoin transactions;
+use `bitpeek_constant_time_audit` for selected x86-64/AArch64 code regions. Both accept
+inline `rawHex` or a session `handle` with `offset` and `length`. See
+[MCP examples and verification limits](docs/secp256k1-audit.md#mcp-tools).
 
 ---
 

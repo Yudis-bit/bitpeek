@@ -6,6 +6,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js'
 import { writeFile } from 'node:fs/promises'
 import { McpSecurityManager } from './security.js'
+import { callAuditTool, MCP_AUDIT_TOOLS, MCP_TIMING_MAX_BYTES, MCP_TIMING_MAX_INSTRUCTIONS } from './audit-tools.js'
 import {
   FileByteSource,
   parseHexPattern,
@@ -13,13 +14,12 @@ import {
   extractPrintableStrings,
   sha256Hex,
   crc32,
-  parseElf,
-  parsePng,
   diffBytes,
   validateOffsetPatch,
   verifyPatch,
   validateRecipe,
   runRecipe,
+  replayRecipeV2,
   formatHex,
   readFloat16,
   readFloat32,
@@ -27,6 +27,10 @@ import {
   formatFloat,
   calculateEntropy,
   BitpeekError,
+  parseStructureByFormat,
+  ReferenceDisassembler,
+  BitpeekDoctor,
+  SECP256K1_AUDIT_MAX_BYTES,
 } from '../../core/src/index.js'
 
 export function createBitpeekMcpServer(security = new McpSecurityManager()) {
@@ -45,9 +49,10 @@ export function createBitpeekMcpServer(security = new McpSecurityManager()) {
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     return {
       tools: [
+        ...MCP_AUDIT_TOOLS,
         {
           name: 'bitpeek_capabilities',
-          description: 'Get Bitpeek engine capabilities, supported formats, schemas, and resource limits.',
+          description: 'Get Bitpeek engine capabilities, supported formats (ELF, PE, WASM, PNG, ZIP, GPT, UBI, SquashFS, SafeTensors, Bitcoin, Ethereum, Custom Schema), schemas, and resource limits.',
           inputSchema: { type: 'object', properties: {} },
         },
         {
@@ -118,12 +123,31 @@ export function createBitpeekMcpServer(security = new McpSecurityManager()) {
         },
         {
           name: 'bitpeek_structure',
-          description: 'Parse file structure (ELF or PNG) with exact byte-to-field mappings and status validation.',
+          description: 'Parse file structure (ELF, PE, WASM, PNG, ZIP, GPT, UBI, SquashFS, SafeTensors, Bitcoin, Ethereum, or Custom Schema) with exact byte-to-field mappings and status validation.',
           inputSchema: {
             type: 'object',
             properties: {
               handle: { type: 'string', description: 'Session handle.' },
-              format: { type: 'string', enum: ['elf', 'png', 'auto'], description: 'Format parser to use.' },
+              format: {
+                type: 'string',
+                enum: [
+                  'auto',
+                  'elf',
+                  'pe',
+                  'wasm',
+                  'png',
+                  'zip',
+                  'gpt',
+                  'ubi',
+                  'squashfs',
+                  'safetensors',
+                  'bitcoin',
+                  'ethereum',
+                  'custom-schema',
+                ],
+                description: 'Format parser to use (default: auto).',
+              },
+              customSchemaJson: { type: 'string', description: 'Optional JSON string for custom-schema v1 or v2.' },
             },
             required: ['handle'],
           },
@@ -142,7 +166,7 @@ export function createBitpeekMcpServer(security = new McpSecurityManager()) {
         },
         {
           name: 'bitpeek_verify_patch',
-          description: 'Verify a bitpeek-offset-patch against an open session.',
+          description: 'Verify a bitpeek-offset-patch (version 1 or version 2) against an open session.',
           inputSchema: {
             type: 'object',
             properties: {
@@ -154,11 +178,11 @@ export function createBitpeekMcpServer(security = new McpSecurityManager()) {
         },
         {
           name: 'bitpeek_run_recipe',
-          description: 'Run a deterministic recipe against open sessions.',
+          description: 'Run a deterministic recipe (recipe-v1 or recipe-v2) against open sessions.',
           inputSchema: {
             type: 'object',
             properties: {
-              recipeJson: { type: 'string', description: 'JSON string of recipe-v1.' },
+              recipeJson: { type: 'string', description: 'JSON string of recipe-v1 or recipe-v2.' },
               inputs: { type: 'object', description: 'Mapping of inputId to session handle.' },
               dryRun: { type: 'boolean', description: 'Dry run execution (default true).' },
             },
@@ -189,13 +213,51 @@ export function createBitpeekMcpServer(security = new McpSecurityManager()) {
             required: ['handle'],
           },
         },
+        {
+          name: 'bitpeek_disassemble',
+          description: 'Disassemble machine code instructions (x86_64 or aarch64) over a byte range in an open session.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              handle: { type: 'string', description: 'Session handle.' },
+              offset: { type: 'number', description: 'Starting byte offset (default: 0).' },
+              length: { type: 'number', description: 'Number of bytes to disassemble (max 65536, default: 256).' },
+              arch: { type: 'string', enum: ['x86_64', 'aarch64'], description: 'Target architecture (default: x86_64).' },
+              baseAddress: { type: 'string', description: 'Optional base address as hex or decimal string (e.g. "0x401000").' },
+              maxInstructions: { type: 'number', description: 'Maximum instructions to return (default: 1000).' },
+            },
+            required: ['handle'],
+          },
+        },
+        {
+          name: 'bitpeek_doctor',
+          description: 'Run Bitpeek subsystem health checks and runtime diagnostics.',
+          inputSchema: { type: 'object', properties: {} },
+        },
+        {
+          name: 'bitpeek_entropy',
+          description: 'Calculate Shannon entropy (0.0 to 8.0 bits/byte) and chunked entropy distribution over a byte range.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              handle: { type: 'string', description: 'Session handle.' },
+              offset: { type: 'number', description: 'Starting byte offset (default: 0).' },
+              length: { type: 'number', description: 'Number of bytes to analyze (defaults to remaining size).' },
+              blockSize: { type: 'number', description: 'Block size for chunked entropy profile (default: 256).' },
+            },
+            required: ['handle'],
+          },
+        },
       ],
     }
   })
 
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
     const { name, arguments: args } = request.params
     try {
+      if (name === 'bitpeek_secp256k1_audit' || name === 'bitpeek_constant_time_audit') {
+        return await callAuditTool(name, args ?? {}, security, extra?.signal)
+      }
       switch (name) {
         case 'bitpeek_capabilities': {
           return {
@@ -204,20 +266,72 @@ export function createBitpeekMcpServer(security = new McpSecurityManager()) {
                 type: 'text',
                 text: JSON.stringify(
                   {
-                    engine: 'Bitpeek Core v1.0.0',
+                    engine: 'Bitpeek Ultra Core v1.0.0',
+                    version: '1.0.0',
                     protocol: 'MCP stdio 2026-07-28',
-                    supportedFormats: ['elf', 'png', 'custom-schema'],
+                    supportedFormats: [
+                      'elf',
+                      'pe',
+                      'wasm',
+                      'png',
+                      'zip',
+                      'gpt',
+                      'ubi',
+                      'squashfs',
+                      'safetensors',
+                      'bitcoin',
+                      'ethereum',
+                      'custom-schema',
+                    ],
+                    supportedChecksums: [
+                      'crc16-ccitt',
+                      'crc32-ieee',
+                      'sha256',
+                      'sha512',
+                      'sum8',
+                      'xor8',
+                      'entropy-shannon',
+                    ],
+                    supportedEncodings: [
+                      'hex',
+                      'binary',
+                      'decimal',
+                      'base64',
+                      'ascii',
+                      'utf8',
+                      'utf16le',
+                      'utf16be',
+                    ],
                     limits: {
                       maxReadBytes: 65536,
                       maxSearchMatches: 1000,
                       maxStrings: 1000,
                       maxFileSizeDesktop: '512 MiB',
+                      maxSecp256k1AuditBytes: SECP256K1_AUDIT_MAX_BYTES,
+                      maxConstantTimeAuditBytes: MCP_TIMING_MAX_BYTES,
+                      maxConstantTimeAuditInstructions: MCP_TIMING_MAX_INSTRUCTIONS,
                     },
                     schemas: {
-                      patch: 'schemas/offset-patch-v1.json',
-                      recipe: 'schemas/recipe-v1.json',
+                      patchV1: 'schemas/offset-patch-v1.json',
+                      patchV2: 'schemas/offset-patch-v2.json',
+                      recipeV1: 'schemas/recipe-v1.json',
+                      recipeV2: 'schemas/recipe-v2.json',
+                      evidenceReportV1: 'schemas/evidence-report-v1.json',
                       structure: 'schemas/structure-schema-v1.json',
                     },
+                    auditTools: MCP_AUDIT_TOOLS.map(tool => ({ name: tool.name, description: tool.description })),
+                    auditRecipes: ['secp256k1.audit'],
+                    workspaceFeatures: [
+                      'multiple-documents',
+                      'local-projects',
+                      'session-recovery',
+                      'annotations',
+                      'aligned-diff',
+                      'structure-comparison',
+                      'entropy-map',
+                      'recipe-preview',
+                      'evidence-export',
+                    ],
                   },
                   null,
                   2,
@@ -355,21 +469,30 @@ export function createBitpeekMcpServer(security = new McpSecurityManager()) {
           const handle = String(args?.['handle'] ?? '')
           const session = security.getSession(handle)
           const format = String(args?.['format'] ?? 'auto')
+          let customSchema: any = undefined
+          if (args?.['customSchemaJson']) {
+            try {
+              customSchema = JSON.parse(String(args['customSchemaJson']))
+            } catch (err: unknown) {
+              throw new BitpeekError('INVALID_INPUT', `Invalid customSchemaJson: ${String(err)}`)
+            }
+          }
 
           const source = await FileByteSource.open(session.canonicalPath)
           const fullBytes = await source.read(0, session.size)
           await source.close()
 
-          let result
-          if (format === 'elf') result = parseElf(fullBytes)
-          else if (format === 'png') result = parsePng(fullBytes)
-          else {
-            if (fullBytes.length >= 8 && fullBytes[0] === 0x89 && fullBytes[1] === 0x50) result = parsePng(fullBytes)
-            else if (fullBytes.length >= 4 && fullBytes[0] === 0x7f && fullBytes[1] === 0x45) result = parseElf(fullBytes)
-            else throw new BitpeekError('INVALID_INPUT', 'Could not auto-detect format. Specify format="elf" or "png".')
+          const result = parseStructureByFormat(fullBytes, format, customSchema)
+          if (!result) {
+            throw new BitpeekError(
+              'INVALID_INPUT',
+              `Could not detect or parse structure for format "${format}". Ensure the file contains valid headers.`,
+            )
           }
+          const safeJson = (data: unknown) =>
+            JSON.stringify(data, (_, v) => (typeof v === 'bigint' ? v.toString() : v))
           return {
-            content: [{ type: 'text', text: JSON.stringify(result) }],
+            content: [{ type: 'text', text: safeJson(result) }],
           }
         }
 
@@ -422,9 +545,6 @@ export function createBitpeekMcpServer(security = new McpSecurityManager()) {
 
         case 'bitpeek_run_recipe': {
           const rawRecipe = JSON.parse(String(args?.['recipeJson'] ?? '{}'))
-          const valRes = validateRecipe(rawRecipe)
-          if (!valRes.ok) throw new BitpeekError('INVALID_INPUT', valRes.error)
-
           const handles = (args?.['inputs'] as Record<string, string>) ?? {}
           const inputBuffers: Record<string, Uint8Array> = {}
           for (const [id, handle] of Object.entries(handles)) {
@@ -433,6 +553,16 @@ export function createBitpeekMcpServer(security = new McpSecurityManager()) {
             inputBuffers[id] = await src.read(0, sess.size)
             await src.close()
           }
+
+          if (rawRecipe.version === 2) {
+            const result = replayRecipeV2(rawRecipe, inputBuffers)
+            return {
+              content: [{ type: 'text', text: JSON.stringify(result) }],
+            }
+          }
+
+          const valRes = validateRecipe(rawRecipe)
+          if (!valRes.ok) throw new BitpeekError('INVALID_INPUT', valRes.error)
 
           const result = runRecipe(valRes.recipe, inputBuffers, { dryRun: Boolean(args?.['dryRun'] ?? true) })
           return {
@@ -458,6 +588,79 @@ export function createBitpeekMcpServer(security = new McpSecurityManager()) {
           const closed = security.closeSession(handle)
           return {
             content: [{ type: 'text', text: JSON.stringify({ ok: closed, handle }) }],
+          }
+        }
+
+        case 'bitpeek_disassemble': {
+          const handle = String(args?.['handle'] ?? '')
+          const session = security.getSession(handle)
+          const offset = Number(args?.['offset'] ?? 0)
+          const length = Math.min(65536, Number(args?.['length'] ?? 256))
+          const arch = (args?.['arch'] as 'x86_64' | 'aarch64') ?? 'x86_64'
+          const baseAddrStr = String(args?.['baseAddress'] ?? '0')
+          const baseAddress = baseAddrStr.startsWith('0x') || baseAddrStr.startsWith('0X')
+            ? BigInt(baseAddrStr)
+            : BigInt(baseAddrStr || '0')
+          const maxInstructions = Math.min(10000, Number(args?.['maxInstructions'] ?? 1000))
+
+          const source = await FileByteSource.open(session.canonicalPath)
+          const bytes = await source.read(offset, length)
+          await source.close()
+
+          const insts = ReferenceDisassembler.disassemble(bytes, { arch, baseAddress, maxInstructions })
+          const serialized = insts.map((i) => ({
+            address: '0x' + i.address.toString(16),
+            length: i.length,
+            mnemonic: i.mnemonic,
+            operands: i.operands,
+            arch: i.arch,
+            isValid: i.isValid,
+            hex: formatHex(i.bytes),
+          }))
+          return {
+            content: [{ type: 'text', text: JSON.stringify(serialized) }],
+          }
+        }
+
+        case 'bitpeek_doctor': {
+          const report = await BitpeekDoctor.runDiagnostics()
+          return {
+            content: [{ type: 'text', text: JSON.stringify(report) }],
+          }
+        }
+
+        case 'bitpeek_entropy': {
+          const handle = String(args?.['handle'] ?? '')
+          const session = security.getSession(handle)
+          const offset = Number(args?.['offset'] ?? 0)
+          const length = Number(args?.['length'] ?? (session.size - offset))
+          const blockSize = Math.max(1, Number(args?.['blockSize'] ?? 256))
+
+          const source = await FileByteSource.open(session.canonicalPath)
+          const bytes = await source.read(offset, length)
+          await source.close()
+
+          const overallEntropy = calculateEntropy(bytes)
+          const blocks: (number | null)[] = []
+          for (let i = 0; i < bytes.length; i += blockSize) {
+            const chunk = bytes.subarray(i, Math.min(i + blockSize, bytes.length))
+            const ent = calculateEntropy(chunk)
+            blocks.push(ent !== null ? Number(ent.toFixed(4)) : null)
+          }
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  offset,
+                  length: bytes.length,
+                  overallEntropy: overallEntropy !== null ? Number(overallEntropy.toFixed(4)) : null,
+                  blockSize,
+                  blockCount: blocks.length,
+                  blocks,
+                }),
+              },
+            ],
           }
         }
 

@@ -26,6 +26,9 @@
     "description": {
       "type": "string"
     },
+    "category": {
+      "type": "string"
+    },
     "engineCompatibility": {
       "type": "string"
     },
@@ -64,7 +67,8 @@
               "compute-hash",
               "inspect-structure",
               "diff",
-              "apply-patch"
+              "apply-patch",
+              "secp256k1.audit"
             ]
           },
           "input": { "type": "string" },

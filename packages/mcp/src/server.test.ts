@@ -26,7 +26,7 @@ describe('Bitpeek MCP Server (Section 13)', () => {
     >
   }
 
-  it('lists all 12 official Bitpeek tools', async () => {
+  it('lists all 17 official Bitpeek tools', async () => {
     const handler = (server as unknown as ServerInternal)._requestHandlers.get('tools/list')
     expect(handler).toBeDefined()
     const res = await handler!({ method: 'tools/list', params: {} })
@@ -43,10 +43,15 @@ describe('Bitpeek MCP Server (Section 13)', () => {
     expect(toolNames).toContain('bitpeek_run_recipe')
     expect(toolNames).toContain('bitpeek_export')
     expect(toolNames).toContain('bitpeek_close')
-    expect(res.tools).toHaveLength(12)
+    expect(toolNames).toContain('bitpeek_disassemble')
+    expect(toolNames).toContain('bitpeek_doctor')
+    expect(toolNames).toContain('bitpeek_entropy')
+    expect(toolNames).toContain('bitpeek_secp256k1_audit')
+    expect(toolNames).toContain('bitpeek_constant_time_audit')
+    expect(res.tools).toHaveLength(17)
   })
 
-  it('calls bitpeek_capabilities and returns engine details', async () => {
+  it('calls bitpeek_capabilities and returns engine details with Ultra formats', async () => {
     const handler = (server as unknown as ServerInternal)._requestHandlers.get('tools/call')
     const res = await handler!({
       method: 'tools/call',
@@ -57,9 +62,19 @@ describe('Bitpeek MCP Server (Section 13)', () => {
     })
     expect(res.isError).toBeUndefined()
     const payload = JSON.parse(res.content[0]?.text ?? '{}')
-    expect(payload.engine).toContain('Bitpeek')
+    expect(payload.engine).toContain('Bitpeek Ultra Core')
     expect(payload.supportedFormats).toContain('elf')
+    expect(payload.supportedFormats).toContain('pe')
+    expect(payload.supportedFormats).toContain('wasm')
     expect(payload.supportedFormats).toContain('png')
+    expect(payload.supportedFormats).toContain('zip')
+    expect(payload.supportedFormats).toContain('gpt')
+    expect(payload.supportedFormats).toContain('ubi')
+    expect(payload.supportedFormats).toContain('squashfs')
+    expect(payload.supportedFormats).toContain('safetensors')
+    expect(payload.supportedFormats).toContain('bitcoin')
+    expect(payload.supportedFormats).toContain('ethereum')
+    expect(payload.supportedFormats).toContain('custom-schema')
   })
 
   it('opens a file, reads bytes, and inspects scalars securely', async () => {
@@ -115,6 +130,148 @@ describe('Bitpeek MCP Server (Section 13)', () => {
       })
       const closePayload = JSON.parse(closeRes.content[0]?.text ?? '{}')
       expect(closePayload.ok).toBe(true)
+    } finally {
+      await unlink(tempFile).catch(() => {})
+    }
+  })
+
+  it('runs bitpeek_doctor diagnostics through MCP tool', async () => {
+    const callHandler = (server as unknown as ServerInternal)._requestHandlers.get('tools/call')!
+    const res = await callHandler({
+      method: 'tools/call',
+      params: {
+        name: 'bitpeek_doctor',
+        arguments: {},
+      },
+    })
+    expect(res.isError).toBeUndefined()
+    const report = JSON.parse(res.content[0]?.text ?? '{}')
+    expect(report.platform).toBeDefined()
+    expect(report.overallStatus).toBeDefined()
+    expect(Array.isArray(report.checks)).toBe(true)
+    expect(report.checks.length).toBeGreaterThanOrEqual(5)
+  })
+
+  it('disassembles machine code and calculates entropy on an open session', async () => {
+    // x86_64: 90 (NOP), C3 (RET)
+    const codeBytes = Uint8Array.from([0x90, 0xc3, 0x00, 0x00, 0xff, 0xff])
+    await writeFile(tempFile, codeBytes)
+    try {
+      const callHandler = (server as unknown as ServerInternal)._requestHandlers.get('tools/call')!
+
+      // Open
+      const openRes = await callHandler({
+        method: 'tools/call',
+        params: { name: 'bitpeek_open', arguments: { filePath: tempFile } },
+      })
+      const handle = JSON.parse(openRes.content[0]?.text ?? '{}').handle
+
+      // Disassemble
+      const disasmRes = await callHandler({
+        method: 'tools/call',
+        params: {
+          name: 'bitpeek_disassemble',
+          arguments: { handle, offset: 0, length: 2, arch: 'x86_64' },
+        },
+      })
+      expect(disasmRes.isError).toBeUndefined()
+      const insts = JSON.parse(disasmRes.content[0]?.text ?? '[]')
+      expect(insts.length).toBeGreaterThanOrEqual(2)
+      expect(insts[0].mnemonic).toBe('nop')
+      expect(insts[1].mnemonic).toBe('ret')
+
+      // Entropy
+      const entRes = await callHandler({
+        method: 'tools/call',
+        params: {
+          name: 'bitpeek_entropy',
+          arguments: { handle, offset: 0, length: 6, blockSize: 2 },
+        },
+      })
+      expect(entRes.isError).toBeUndefined()
+      const entPayload = JSON.parse(entRes.content[0]?.text ?? '{}')
+      expect(entPayload.overallEntropy).toBeGreaterThan(0)
+      expect(entPayload.blockCount).toBe(3)
+
+      // Close
+      await callHandler({
+        method: 'tools/call',
+        params: { name: 'bitpeek_close', arguments: { handle } },
+      })
+    } finally {
+      await unlink(tempFile).catch(() => {})
+    }
+  })
+
+  it('parses WebAssembly structure using bitpeek_structure', async () => {
+    // Standard WASM binary header: \0asm\1\0\0\0
+    const wasmBytes = Uint8Array.from([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00])
+    await writeFile(tempFile, wasmBytes)
+    try {
+      const callHandler = (server as unknown as ServerInternal)._requestHandlers.get('tools/call')!
+      const openRes = await callHandler({
+        method: 'tools/call',
+        params: { name: 'bitpeek_open', arguments: { filePath: tempFile } },
+      })
+      const handle = JSON.parse(openRes.content[0]?.text ?? '{}').handle
+
+      const structRes = await callHandler({
+        method: 'tools/call',
+        params: {
+          name: 'bitpeek_structure',
+          arguments: { handle, format: 'auto' },
+        },
+      })
+      expect(structRes.isError).toBeUndefined()
+      const struct = JSON.parse(structRes.content[0]?.text ?? '{}')
+      expect(struct.format).toBe('wasm')
+      expect(struct.fields.length).toBeGreaterThanOrEqual(1)
+
+      await callHandler({
+        method: 'tools/call',
+        params: { name: 'bitpeek_close', arguments: { handle } },
+      })
+    } finally {
+      await unlink(tempFile).catch(() => {})
+    }
+  })
+
+  it('verifies a Patch v2 using bitpeek_verify_patch', async () => {
+    const srcBytes = Uint8Array.from([0x01, 0x02, 0x03, 0x04])
+    await writeFile(tempFile, srcBytes)
+    try {
+      const callHandler = (server as unknown as ServerInternal)._requestHandlers.get('tools/call')!
+      const openRes = await callHandler({
+        method: 'tools/call',
+        params: { name: 'bitpeek_open', arguments: { filePath: tempFile } },
+      })
+      const handle = JSON.parse(openRes.content[0]?.text ?? '{}').handle
+
+      const patchV2Json = JSON.stringify({
+        format: 'bitpeek-offset-patch',
+        version: 2,
+        sourceLength: 4,
+        targetLength: 4,
+        sourceSha256: '9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a',
+        targetSha256: '1c2d69135de3ff945156bd8daa9c67c360565b037956aa9b0fa01c3ae04bcbef',
+        operations: [{ offset: 1, bytes: '99 88', precondition: '02 03' }],
+      })
+
+      const verRes = await callHandler({
+        method: 'tools/call',
+        params: {
+          name: 'bitpeek_verify_patch',
+          arguments: { handle, patchJson: patchV2Json },
+        },
+      })
+      expect(verRes.isError).toBeUndefined()
+      const verPayload = JSON.parse(verRes.content[0]?.text ?? '{}')
+      expect(verPayload.ok).toBe(true)
+
+      await callHandler({
+        method: 'tools/call',
+        params: { name: 'bitpeek_close', arguments: { handle } },
+      })
     } finally {
       await unlink(tempFile).catch(() => {})
     }

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { runMcpServer } from '../src/server.js'
+import { tsImport } from 'tsx/esm/api'
 
-runMcpServer().catch((err) => {
+tsImport('../src/server.ts', import.meta.url).then(({ runMcpServer }) => runMcpServer()).catch((err) => {
   process.stderr.write(`Fatal MCP error: ${err.message}\n`)
   process.exit(1)
 })

@@ -22,6 +22,7 @@ import {
 } from '../nand/geometry'
 import { SafeTensorsParser } from '../ai/safetensors'
 import { BitcoinParser } from '../bchain/bitcoin'
+import { secp256k1AuditOperation } from './secp256k1-audit'
 
 export class OperationRegistry {
   private operations = new Map<string, OperationDescriptor>()
@@ -64,6 +65,7 @@ export class OperationRegistry {
       supportedOperations: this.list().map((op) => ({
         id: op.id,
         title: op.title,
+        ...(op.category ? { category: op.category } : {}),
         version: op.version,
         deterministic: op.deterministic,
         readOnly: op.readOnly,
@@ -366,6 +368,8 @@ export function createDefaultOperationRegistry(): OperationRegistry {
       }
     },
   })
+
+  registry.register(secp256k1AuditOperation)
 
   return registry
 }

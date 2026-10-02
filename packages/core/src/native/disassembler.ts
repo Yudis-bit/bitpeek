@@ -34,6 +34,8 @@ export class ReferenceDisassembler {
     const arch = options.arch
     const baseAddr = options.baseAddress ?? 0n
     const maxInst = options.maxInstructions ?? 10_000
+    if (!Number.isSafeInteger(maxInst) || maxInst < 0) throw new RangeError('maxInstructions must be a non-negative safe integer')
+    if (arch !== 'x86_64' && arch !== 'aarch64') throw new Error('Unsupported disassembly architecture')
 
     const instructions: DecodedInstruction[] = []
     let cursor = 0
@@ -68,6 +70,53 @@ export class ReferenceDisassembler {
     }
 
     const b0 = bytes[0]!
+
+    const decoded = (length: number, mnemonic: string, operands: string): DecodedInstruction => ({
+      address: addr, bytes: bytes.subarray(0, length), length,
+      mnemonic, operands, arch: 'x86_64', isValid: true,
+    })
+    const modrmEnd = (offset: number): number | null => {
+      if (offset >= bytes.length) return null
+      const modrm = bytes[offset]!
+      const mod = modrm >> 6
+      const rm = modrm & 7
+      let end = offset + 1
+      if (mod !== 3 && rm === 4) {
+        if (end >= bytes.length) return null
+        const sib = bytes[end++]!
+        if (mod === 0 && (sib & 7) === 5) end += 4
+      }
+      if (mod === 0 && rm === 5) end += 4
+      if (mod === 1) end += 1
+      if (mod === 2) end += 4
+      return end <= bytes.length ? end : null
+    }
+    const conditions = ['jo', 'jno', 'jb', 'jae', 'je', 'jne', 'jbe', 'ja', 'js', 'jns', 'jp', 'jnp', 'jl', 'jge', 'jle', 'jg']
+    if (b0 >= 0x70 && b0 <= 0x7f && bytes.length >= 2) {
+      const rel = (bytes[1]! << 24) >> 24
+      return decoded(2, conditions[b0 - 0x70]!, `0x${(addr + 2n + BigInt(rel)).toString(16)}`)
+    }
+    if (b0 === 0x0f && bytes[1]! >= 0x80 && bytes[1]! <= 0x8f && bytes.length >= 6) {
+      const rel = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getInt32(2, true)
+      return decoded(6, conditions[bytes[1]! - 0x80]!, `0x${(addr + 6n + BigInt(rel)).toString(16)}`)
+    }
+    if (b0 >= 0xe0 && b0 <= 0xe3 && bytes.length >= 2) {
+      const rel = (bytes[1]! << 24) >> 24
+      return decoded(2, ['loopne', 'loope', 'loop', 'jrcxz'][b0 - 0xe0]!, `0x${(addr + 2n + BigInt(rel)).toString(16)}`)
+    }
+
+    // Decode group-3 divisions, including REX, SIB and displacement lengths.
+    const opcodeOffset = b0 >= 0x40 && b0 <= 0x4f ? 1 : 0
+    const opcode = bytes[opcodeOffset]
+    if ((opcode === 0xf6 || opcode === 0xf7) && bytes.length >= opcodeOffset + 2) {
+      const modrm = bytes[opcodeOffset + 1]!
+      const extension = (modrm >> 3) & 7
+      if (extension === 6 || extension === 7) {
+        const length = modrmEnd(opcodeOffset + 1)
+        if (length === null) return { ...decoded(bytes.length, 'db', ''), isValid: false }
+        return decoded(length, extension === 6 ? 'div' : 'idiv', `modrm(0x${modrm.toString(16)})`)
+      }
+    }
 
     // 1-byte opcodes
     if (b0 === 0x90) {
@@ -213,10 +262,12 @@ export class ReferenceDisassembler {
       const b2 = bytes[2]!
       if (b1 === 0x89) {
         // mov r/m64, r64
+        const length = modrmEnd(2)
+        if (length === null) return { ...decoded(bytes.length, 'db', ''), isValid: false }
         return {
           address: addr,
-          bytes: bytes.subarray(0, 3),
-          length: 3,
+          bytes: bytes.subarray(0, length),
+          length,
           mnemonic: 'mov',
           operands: `modrm(0x${b2.toString(16)})`,
           arch: 'x86_64',
@@ -225,14 +276,16 @@ export class ReferenceDisassembler {
       }
       if (b1 === 0x83) {
         // add/sub/cmp r/m64, imm8
+        const operandEnd = modrmEnd(2)
+        const length = operandEnd === null ? bytes.length : Math.min(operandEnd + 1, bytes.length)
         return {
           address: addr,
-          bytes: bytes.subarray(0, Math.min(4, bytes.length)),
-          length: Math.min(4, bytes.length),
+          bytes: bytes.subarray(0, length),
+          length,
           mnemonic: 'alu64',
           operands: `modrm(0x${b2.toString(16)})`,
           arch: 'x86_64',
-          isValid: bytes.length >= 4,
+          isValid: operandEnd !== null && bytes.length > operandEnd,
         }
       }
     }
@@ -264,6 +317,32 @@ export class ReferenceDisassembler {
 
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
     const insn = view.getUint32(0, true) // AArch64 is little-endian 32-bit fixed
+
+    const decoded = (mnemonic: string, operands: string): DecodedInstruction => ({
+      address: addr, bytes: bytes.subarray(0, 4), length: 4,
+      mnemonic, operands, arch: 'aarch64', isValid: true,
+    })
+    const target = (immediate: number, bits: number) => {
+      const signed = (immediate << (32 - bits)) >> (32 - bits)
+      return `0x${(addr + BigInt(signed) * 4n).toString(16)}`
+    }
+    if (((insn & 0xff000000) >>> 0) === 0x54000000 && (insn & 0x10) === 0) {
+      const condition = ['eq', 'ne', 'cs', 'cc', 'mi', 'pl', 'vs', 'vc', 'hi', 'ls', 'ge', 'lt', 'gt', 'le', 'al', 'nv'][insn & 15]!
+      return decoded(`b.${condition}`, target((insn >>> 5) & 0x7ffff, 19))
+    }
+    if (((insn & 0x7e000000) >>> 0) === 0x34000000) {
+      const register = `${(insn >>> 31) === 1 ? 'x' : 'w'}${insn & 31}`
+      return decoded((insn & 0x01000000) === 0 ? 'cbz' : 'cbnz', `${register}, ${target((insn >>> 5) & 0x7ffff, 19)}`)
+    }
+    if (((insn & 0x7e000000) >>> 0) === 0x36000000) {
+      const bit = ((insn >>> 31) << 5) | ((insn >>> 19) & 31)
+      return decoded((insn & 0x01000000) === 0 ? 'tbz' : 'tbnz', `${bit >= 32 ? 'x' : 'w'}${insn & 31}, #${bit}, ${target((insn >>> 5) & 0x3fff, 14)}`)
+    }
+    const divisionOpcode = (insn & 0x7fe0fc00) >>> 0
+    if (divisionOpcode === 0x1ac00800 || divisionOpcode === 0x1ac00c00) {
+      const prefix = (insn >>> 31) === 1 ? 'x' : 'w'
+      return decoded(divisionOpcode === 0x1ac00800 ? 'udiv' : 'sdiv', `${prefix}${insn & 31}, ${prefix}${(insn >>> 5) & 31}, ${prefix}${(insn >>> 16) & 31}`)
+    }
 
     // NOP: 0xd503201f
     if (insn === 0xd503201f) {

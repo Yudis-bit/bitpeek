@@ -7,6 +7,10 @@
     "bitpeek-mcp": "./bin/bitpeek-mcp.js"
   },
   "main": "./src/server.ts",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.1",
+    "tsx": "^4.23.15"
+  },
   "scripts": {
     "build": "tsc -b"
   }
