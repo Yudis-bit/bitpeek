@@ -220,6 +220,14 @@ export function sha256(bytes: Uint8Array): Uint8Array {
   return new Sha256().update(bytes).digest()
 }
 
+export function taggedHash(tag: string, ...messages: (Uint8Array | string)[]): Uint8Array {
+  const encoder = new TextEncoder()
+  const tagHash = sha256(encoder.encode(tag))
+  const hasher = new Sha256().update(tagHash).update(tagHash)
+  for (const message of messages) hasher.update(typeof message === 'string' ? encoder.encode(message) : message)
+  return hasher.digest()
+}
+
 export function sha256Hex(bytes: Uint8Array): string {
   return new Sha256().update(bytes).digestHex()
 }

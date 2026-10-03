@@ -106,15 +106,93 @@ export class ReferenceDisassembler {
     }
 
     // Decode group-3 divisions, including REX, SIB and displacement lengths.
-    const opcodeOffset = b0 >= 0x40 && b0 <= 0x4f ? 1 : 0
+    let opcodeOffset = 0
+    let operand16 = false
+    let repeat = false
+    while (opcodeOffset < 15 && [0x66, 0xf2, 0xf3].includes(bytes[opcodeOffset] ?? -1)) {
+      if (bytes[opcodeOffset] === 0x66) operand16 = true
+      else repeat = true
+      opcodeOffset++
+    }
+    const rex = (bytes[opcodeOffset] ?? 0) >= 0x40 && (bytes[opcodeOffset] ?? 0) <= 0x4f ? bytes[opcodeOffset++]! : 0
     const opcode = bytes[opcodeOffset]
+    const width = (rex & 8) !== 0 ? 64 : operand16 ? 16 : 32
+    const register = (index: number, size = width): string => {
+      if (index >= 8) return `r${index}${size === 64 ? '' : size === 32 ? 'd' : size === 16 ? 'w' : 'b'}`
+      if (size === 8) return (rex ? ['al', 'cl', 'dl', 'bl', 'spl', 'bpl', 'sil', 'dil'] : ['al', 'cl', 'dl', 'bl', 'ah', 'ch', 'dh', 'bh'])[index]!
+      const names = ['ax', 'cx', 'dx', 'bx', 'sp', 'bp', 'si', 'di']
+      return `${size === 64 ? 'r' : size === 32 ? 'e' : ''}${names[index]}`
+    }
+    const memoryOperand = (offset: number, size = width): string => {
+      const modrm = bytes[offset]!
+      const mode = modrm >> 6
+      const rm = modrm & 7
+      if (mode === 3) return register(rm + ((rex & 1) << 3), size)
+      const parts: string[] = []
+      let cursor = offset + 1
+      let displacementSize = mode === 1 ? 1 : mode === 2 ? 4 : 0
+      if (rm === 4) {
+        const sib = bytes[cursor++]!
+        const base = sib & 7
+        const index = (sib >> 3) & 7
+        if (mode === 0 && base === 5) displacementSize = 4
+        else parts.push(register(base + ((rex & 1) << 3), 64))
+        if (index !== 4 || (rex & 2) !== 0) {
+          const scale = 1 << (sib >> 6)
+          const indexRegister = register(index + ((rex & 2) << 2), 64)
+          parts.push(scale === 1 ? indexRegister : `${indexRegister}*${scale}`)
+        }
+      } else if (mode === 0 && rm === 5) {
+        parts.push('rip')
+        displacementSize = 4
+      } else parts.push(register(rm + ((rex & 1) << 3), 64))
+      const displacement = displacementSize === 1 ? (bytes[cursor]! << 24) >> 24
+        : displacementSize === 4 ? new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getInt32(cursor, true) : 0
+      let expression = parts.join(' + ')
+      if (expression === '') expression = displacement.toString()
+      else if (displacement !== 0) expression += displacement < 0 ? ` - ${-displacement}` : ` + ${displacement}`
+      return `[${expression}]`
+    }
+    const complete = (length: number | null, mnemonic: string, operands: () => string): DecodedInstruction => {
+      if (length === null || length > 15 || length > bytes.length) {
+        return { ...decoded(Math.min(bytes.length, 15), 'db', ''), isValid: false }
+      }
+      return decoded(length, mnemonic, operands())
+    }
+    if (repeat && [0xa4, 0xa5, 0xaa, 0xab].includes(opcode ?? -1)) {
+      const suffix = opcode === 0xa4 || opcode === 0xaa ? 'b' : width === 64 ? 'q' : width === 16 ? 'w' : 'd'
+      return complete(opcodeOffset + 1, `rep ${opcode! < 0xaa ? 'movs' : 'stos'}${suffix}`, () => '')
+    }
+    if (opcode === 0x88 || opcode === 0x89 || opcode === 0x8a || opcode === 0x8b) {
+      const size = opcode === 0x88 || opcode === 0x8a ? 8 : width
+      return complete(modrmEnd(opcodeOffset + 1), 'mov', () => {
+        const destination = register(((bytes[opcodeOffset + 1]! >> 3) & 7) + ((rex & 4) << 1), size)
+        const memory = memoryOperand(opcodeOffset + 1, size)
+        return opcode === 0x8a || opcode === 0x8b ? `${destination}, ${memory}` : `${memory}, ${destination}`
+      })
+    }
+    if ([0xd0, 0xd1, 0xd2, 0xd3, 0xc0, 0xc1].includes(opcode ?? -1)) {
+      const operandEnd = modrmEnd(opcodeOffset + 1)
+      if (operandEnd === null) return complete(null, '', () => '')
+      const extension = (bytes[opcodeOffset + 1]! >> 3) & 7
+      const mnemonic = ['rol', 'ror', undefined, undefined, 'shl', 'shr', undefined, 'sar'][extension]
+      if (mnemonic !== undefined) {
+        const immediate = opcode === 0xc0 || opcode === 0xc1
+        return complete(operandEnd + (immediate ? 1 : 0), mnemonic, () =>
+          `${memoryOperand(opcodeOffset + 1, opcode! % 2 === 0 ? 8 : width)}, ${immediate ? bytes[operandEnd] : opcode === 0xd2 || opcode === 0xd3 ? 'cl' : '1'}`)
+      }
+    }
+    if (opcode === 0x0f && (bytes[opcodeOffset + 1] === 0xbc || bytes[opcodeOffset + 1] === 0xbd) && !repeat) {
+      return complete(modrmEnd(opcodeOffset + 2), bytes[opcodeOffset + 1] === 0xbc ? 'bsf' : 'bsr', () =>
+        `${register(((bytes[opcodeOffset + 2]! >> 3) & 7) + ((rex & 4) << 1))}, ${memoryOperand(opcodeOffset + 2)}`)
+    }
     if ((opcode === 0xf6 || opcode === 0xf7) && bytes.length >= opcodeOffset + 2) {
       const modrm = bytes[opcodeOffset + 1]!
       const extension = (modrm >> 3) & 7
       if (extension === 6 || extension === 7) {
         const length = modrmEnd(opcodeOffset + 1)
         if (length === null) return { ...decoded(bytes.length, 'db', ''), isValid: false }
-        return decoded(length, extension === 6 ? 'div' : 'idiv', `modrm(0x${modrm.toString(16)})`)
+        return complete(length, extension === 6 ? 'div' : 'idiv', () => memoryOperand(opcodeOffset + 1, opcode === 0xf6 ? 8 : width))
       }
     }
 
@@ -256,24 +334,10 @@ export class ReferenceDisassembler {
       }
     }
 
-    // REX.W (0x48) common 64-bit prefixes
+    // REX.W (0x48) immediate arithmetic.
     if (b0 === 0x48 && bytes.length >= 3) {
       const b1 = bytes[1]!
       const b2 = bytes[2]!
-      if (b1 === 0x89) {
-        // mov r/m64, r64
-        const length = modrmEnd(2)
-        if (length === null) return { ...decoded(bytes.length, 'db', ''), isValid: false }
-        return {
-          address: addr,
-          bytes: bytes.subarray(0, length),
-          length,
-          mnemonic: 'mov',
-          operands: `modrm(0x${b2.toString(16)})`,
-          arch: 'x86_64',
-          isValid: true,
-        }
-      }
       if (b1 === 0x83) {
         // add/sub/cmp r/m64, imm8
         const operandEnd = modrmEnd(2)
@@ -283,7 +347,7 @@ export class ReferenceDisassembler {
           bytes: bytes.subarray(0, length),
           length,
           mnemonic: 'alu64',
-          operands: `modrm(0x${b2.toString(16)})`,
+          operands: operandEnd === null ? `modrm(0x${b2.toString(16)})` : `${memoryOperand(2)}, ${bytes[operandEnd] ?? '<truncated>'}`,
           arch: 'x86_64',
           isValid: operandEnd !== null && bytes.length > operandEnd,
         }
@@ -342,6 +406,26 @@ export class ReferenceDisassembler {
     if (divisionOpcode === 0x1ac00800 || divisionOpcode === 0x1ac00c00) {
       const prefix = (insn >>> 31) === 1 ? 'x' : 'w'
       return decoded(divisionOpcode === 0x1ac00800 ? 'udiv' : 'sdiv', `${prefix}${insn & 31}, ${prefix}${(insn >>> 5) & 31}, ${prefix}${(insn >>> 16) & 31}`)
+    }
+    if ([0x1ac02000, 0x1ac02400, 0x1ac02800, 0x1ac02c00].includes(divisionOpcode)) {
+      const prefix = (insn >>> 31) === 1 ? 'x' : 'w'
+      const mnemonic = ['lslv', 'lsrv', 'asrv', 'rorv'][(divisionOpcode - 0x1ac02000) >>> 10]!
+      return decoded(mnemonic, `${prefix}${insn & 31}, ${prefix}${(insn >>> 5) & 31}, ${prefix}${(insn >>> 16) & 31}`)
+    }
+    // Integer register-offset loads/stores; reject reserved extend/opcode combinations.
+    if (((insn & 0x3f200c00) >>> 0) === 0x38200800) {
+      const size = insn >>> 30
+      const operation = (insn >>> 22) & 3
+      const option = (insn >>> 13) & 7
+      if ([2, 3, 6, 7].includes(option) && operation <= 1) {
+        const register = (index: number, prefix: string) => index === 31 ? `${prefix}zr` : `${prefix}${index}`
+        const base = (insn >>> 5) & 31
+        const index = register((insn >>> 16) & 31, option === 2 || option === 6 ? 'w' : 'x')
+        const shift = (insn & 0x1000) !== 0 ? size : 0
+        const extension = option === 3 ? (shift ? `, lsl #${shift}` : '') : `, ${option === 2 ? 'uxtw' : option === 6 ? 'sxtw' : 'sxtx'}${shift ? ` #${shift}` : ''}`
+        const mnemonic = `${operation === 1 ? 'ldr' : 'str'}${size === 0 ? 'b' : size === 1 ? 'h' : ''}`
+        return decoded(mnemonic, `${register(insn & 31, size === 3 ? 'x' : 'w')}, [${base === 31 ? 'sp' : `x${base}`}, ${index}${extension}]`)
+      }
     }
 
     // NOP: 0xd503201f

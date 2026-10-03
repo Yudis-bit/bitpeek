@@ -1,0 +1,2176 @@
+BITPEEK DEEP ENGINE - LAPORAN IMPLEMENTASI LENGKAP
+Tanggal laporan: 3 Oktober 2026
+Bahasa: Indonesia
+Repository: C:\Users\LENOVO\Documents\bugbounty\bitpeek
+Directive: BITPEEK_DEEP_ENGINE_DIRECTIVE.txt
+
+Dokumen ini menjelaskan perubahan yang sudah diterapkan, kontrak API, contoh
+pemakaian MCP, cakupan pengujian, dan hasil verifikasi terakhir. Lampiran berisi
+directive asli, diff kode implementasi, serta seluruh sumber tes baru.
+
+Hasil verifikasi di bagian 10 berasal dari eksekusi pada tahap implementasi
+sebelumnya dalam sesi ini. Pembuatan laporan ini hanya menambahkan dokumentasi.
+
+DAFTAR ISI
+01. Status pekerjaan
+02. Daftar file implementasi dan tes
+03. Tagged hash dan aritmetika secp256k1
+04. Verifikasi Schnorr BIP-340
+05. Verifikasi DLEQ BIP-374 dan hubungannya dengan BIP-375
+06. Verifikasi Taproot BIP-341
+07. Audit constant-time dan perluasan disassembler
+08. Kontrak parameter dan hasil MCP
+09. Contoh pemakaian
+10. Cakupan tes dan hasil verifikasi
+11. Batasan dan kompatibilitas
+12. Referensi teknis
+Lampiran A. Directive asli
+Lampiran B. Diff kode implementasi
+Lampiran C. Sumber lengkap ketiga file tes baru
+
+===============================================================================
+01. STATUS PEKERJAAN
+===============================================================================
+
+[SELESAI] Memeriksa struktur, tipe, dan export yang sudah ada.
+[SELESAI] Menambahkan taggedHash memakai Sha256 bawaan Bitpeek.
+[SELESAI] Menambahkan operasi titik secp256k1 berbasis JavaScript BigInt.
+[SELESAI] Menambahkan verifikasi Schnorr, DLEQ, dan Taproot tweak.
+[SELESAI] Menambahkan deteksi indexed memory dan variable-latency instructions.
+[SELESAI] Menambahkan severity, kategori hazard, dan konteks assembly.
+[SELESAI] Memperluas decoder agar temuan tersedia dari byte asli melalui MCP.
+[SELESAI] Mengekspos parameter audit dan format verifikasi baru melalui MCP.
+[SELESAI] Menambahkan tiga suite dengan 130 kasus tes baru.
+[LULUS]   npm test: 566 tes, 39 file; seluruh 436 tes lama tetap lulus.
+[LULUS]   Pemeriksaan SEO: 25 halaman indexable.
+[LULUS]   npm run typecheck.
+[LULUS]   npm run lint: 0 error, 7 warning yang sudah ada.
+[LULUS]   git diff --check.
+
+Tidak ada paket npm baru. package.json dan package-lock.json tidak diubah oleh
+pekerjaan ini. Implementasi memakai TypeScript, BigInt, dan SHA-256 yang sudah
+ada; pengujian pembanding memakai node:crypto bawaan Node.js.
+
+Penyesuaian terhadap rumus Taproot pada directive:
+Tweak t >= n ditolak sebelum scalar multiplication, mengikuti aturan BIP-341.
+Directive menuliskan reduksi modulo n; alasan penyesuaian dijelaskan di bagian 06.
+
+===============================================================================
+02. DAFTAR FILE IMPLEMENTASI DAN TES
+===============================================================================
+
+Lima file implementasi yang diubah:
+
+1. packages/core/src/crypto.ts
+   - Fungsi taggedHash dengan input Uint8Array atau string UTF-8.
+
+2. packages/core/src/bchain/secp256k1.ts
+   - Tipe Point dan operasi pointAdd, pointDouble, scalarMul, liftX.
+   - Wrapper operasi titik pada Secp256k1Engine.
+   - verifySchnorr, verifyDLEQ, verifyTaprootTweak.
+   - Helper modular inverse, pemeriksaan titik, dan serialisasi SEC compressed.
+
+3. packages/core/src/native/constant-time.ts
+   - HazardSeverity, AuditHazard, ConstantTimeAuditOptions.
+   - Field hasil audit baru dan deteksi memory/variable latency.
+   - Kompatibilitas suspiciousInstructions tetap dipertahankan.
+
+4. packages/core/src/native/disassembler.ts
+   - Decoding operand register, ModRM, SIB, dan displacement.
+   - MOV, shift/rotate, bit scan, repeated string operations pada x86.
+   - Register-offset load/store dan variable shifts pada AArch64.
+
+5. packages/mcp/src/audit-tools.ts
+   - Schema dan validasi argument untuk fitur baru.
+   - Hasil audit terstruktur dan PASS/FAIL verifikasi kriptografi.
+   - Alamat dan file offset untuk hazard.
+
+Tiga file tes baru:
+
+6. packages/core/src/native/constant-time-deep.test.ts
+7. packages/core/src/bchain/secp256k1-deep.test.ts
+8. packages/mcp/src/audit-tools-deep.test.ts
+
+Export baru tersedia melalui rantai export yang sudah ada di core/src/index.ts,
+core/src/native/index.ts, dan core/src/bchain/index.ts; file index tidak perlu
+diubah. Metadata public/version.json yang dihasilkan saat npm test dikembalikan
+ke isi awal sehingga tidak menjadi bagian perubahan implementasi.
+
+===============================================================================
+03. TAGGED HASH DAN ARITMETIKA SECP256K1
+===============================================================================
+
+3.1 taggedHash
+
+Signature:
+  taggedHash(tag: string, ...messages: (Uint8Array | string)[]): Uint8Array
+
+Proses:
+  tagHash = SHA256(UTF8(tag))
+  hasil   = SHA256(tagHash || tagHash || message1 || message2 || ...)
+
+Output selalu 32 byte. String message dikonversi ke UTF-8; Uint8Array digunakan
+sebagai byte mentah. Penggabungan dilakukan melalui update() pada Sha256,
+sehingga tidak perlu membuat satu buffer gabungan besar. Tidak ada cache tag
+hash baru; tag hash dihitung langsung setiap pemanggilan.
+
+Pengujian memakai SHA-256 native Node.js sebagai pembanding untuk input kosong,
+string Unicode, input campuran string/byte, dan pesan yang melewati satu blok.
+
+3.2 Representasi dan domain kurva
+
+  type Point = { x: bigint; y: bigint } | null
+
+null merepresentasikan titik infinity. Implementasi memakai koordinat affine.
+Persamaan kurva adalah y^2 = x^3 + 7 (mod p).
+
+  p = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
+  n = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+
+Konstanta generator GX dan GY yang sudah ada tetap digunakan.
+
+3.3 Operasi yang tersedia
+
+  pointAdd(left: Point, right: Point): Point
+  pointDouble(point: Point): Point
+  scalarMul(scalar: bigint, point: Point): Point
+  liftX(bytes: Uint8Array): Point
+
+Keempatnya tersedia sebagai fungsi export dan method static Secp256k1Engine.
+
+pointAdd:
+  - Infinity menjadi elemen identitas.
+  - Titik identik menggunakan pointDouble.
+  - Titik dengan X sama dan Y berlawanan menghasilkan infinity.
+  - Kasus umum memakai slope (y2-y1)/(x2-x1) di field modulo p.
+
+pointDouble:
+  - Infinity atau Y=0 menghasilkan infinity.
+  - Slope adalah 3*x^2/(2*y), dengan operasi field modulo p.
+
+scalarMul:
+  - Scalar dinormalisasi ke [0, n-1], termasuk scalar negatif.
+  - Menggunakan metode double-and-add.
+  - Scalar 0 atau kelipatan n menghasilkan infinity.
+
+liftX:
+  - Input harus tepat 32 byte big-endian.
+  - Menolak X >= p.
+  - Memakai sqrtModP yang sudah ada untuk akar x^3+7.
+  - Menolak X yang tidak menghasilkan titik kurva.
+  - Memilih Y genap, sesuai representasi x-only BIP-340.
+
+Modular inverse menggunakan extended Euclidean algorithm. Fungsi operasi titik
+mengasumsikan koordinat input adalah titik kurva yang valid; verifyDLEQ melakukan
+pemeriksaan titik pada batas API sebelum menggunakan operasi tersebut.
+
+===============================================================================
+04. VERIFIKASI SCHNORR BIP-340
+===============================================================================
+
+Signature:
+  Secp256k1Engine.verifySchnorr(
+    pubkey32: Uint8Array,
+    msg32: Uint8Array,
+    sig64: Uint8Array
+  ): { valid: boolean; reason?: string }
+
+Input:
+  public key : 32 byte x-only
+  message    : tepat 32 byte
+  signature  : tepat 64 byte, r || s
+
+Urutan verifikasi:
+1. Validasi panjang input.
+2. Lift public key menjadi titik P dengan Y genap.
+3. Parse r dan s sebagai unsigned big-endian.
+4. Tolak r >= p dan s >= n; keduanya tidak direduksi agar menjadi valid.
+5. Hitung e = int(taggedHash('BIP0340/challenge', rBytes, pubkey, msg)) mod n.
+6. Hitung R = s*G + (n-e)*P.
+7. Tolak infinity, Y ganjil, atau R.x yang berbeda dengan r.
+8. Kembalikan { valid: true } jika seluruh pemeriksaan lulus.
+
+Alasan penolakan yang dapat dikembalikan:
+  Public key must contain exactly 32 bytes
+  Message must contain exactly 32 bytes
+  Schnorr signature must contain exactly 64 bytes
+  Invalid public key X coordinate
+  r >= p
+  s >= n
+  R is infinity
+  R has odd Y coordinate
+  Signature verification equation failed (Rx != r)
+
+Kontrak API ini sengaja mensyaratkan message 32 byte sesuai directive. Signature
+Bitcoin 65 byte yang membawa sighash byte tidak diterima langsung oleh method
+ini; caller harus menyiapkan signature 64 byte dan message yang sesuai.
+
+===============================================================================
+05. VERIFIKASI DLEQ BIP-374 DAN HUBUNGANNYA DENGAN BIP-375
+===============================================================================
+
+Signature:
+  Secp256k1Engine.verifyDLEQ(
+    G1: Point, P1: Point, G2: Point, P2: Point,
+    proof64: Uint8Array,
+    message?: Uint8Array
+  ): { valid: boolean; reason?: string }
+
+Pernyataan yang diperiksa adalah log_G1(P1) = log_G2(P2).
+
+Pemetaan nama ke BIP-374:
+  G1 = G, generator pertama
+  P1 = A, public point pertama
+  G2 = B, generator kedua
+  P2 = C, public point kedua / ECDH share
+
+proof adalah e || s, masing-masing 32 byte. Optional message, bila diberikan,
+harus tepat 32 byte. Tidak diberikan berarti transcript memakai message kosong.
+
+Urutan verifikasi:
+1. Validasi panjang proof dan optional message.
+2. Pastikan G1, P1, G2, P2 adalah titik finite pada kurva secp256k1.
+   Koordinat harus bigint, non-negatif, kurang dari p, dan memenuhi kurva.
+3. Parse e dan s; tolak e >= n atau s >= n.
+4. Hitung R1 = s*G1 - e*P1 dan R2 = s*G2 - e*P2.
+5. Tolak R1 atau R2 yang infinity.
+6. Serialisasi titik dengan encoding SEC compressed 33 byte, termasuk Y parity.
+7. Hitung challenge dengan urutan transcript berikut:
+
+   expectedE = int(taggedHash('BIP0374/challenge',
+                 cbytes(P1), cbytes(G2), cbytes(P2), cbytes(G1),
+                 cbytes(R1), cbytes(R2), optionalMessageOrEmpty)) mod n
+
+8. Verifikasi expectedE == e.
+
+Alasan penolakan:
+  DLEQ proof must contain exactly 64 bytes
+  DLEQ message must contain exactly 32 bytes
+  G1/P1/G2/P2 must be a finite point on secp256k1
+  e >= n
+  s >= n
+  R1 is infinity
+  R2 is infinity
+  DLEQ challenge verification failed
+
+BIP-375 memakai proof BIP-374 untuk memverifikasi Silent Payment ECDH shares.
+Method ini memverifikasi proof dan titik yang sudah diekstrak oleh caller.
+Cakupan ini tidak mencakup parser PSBT BIP-375, eligibility input, penyusunan
+output Silent Payments, atau validasi keseluruhan transaksi/PSBT.
+
+===============================================================================
+06. VERIFIKASI TAPROOT BIP-341
+===============================================================================
+
+Signature:
+  Secp256k1Engine.verifyTaprootTweak(
+    internalKey32: Uint8Array,
+    outputKey32: Uint8Array,
+    merkleRoot?: Uint8Array
+  ): { valid: boolean; parity: number; reason?: string }
+
+Input internal key dan output key harus tepat 32 byte x-only. Optional Merkle
+root harus tepat 32 byte jika diberikan. Untuk key-only tweak, omit merkleRoot;
+Uint8Array(0) yang diberikan eksplisit ditolak sebagai root dengan panjang salah.
+
+Urutan verifikasi:
+1. Lift internal key menjadi P dengan Y genap.
+2. Tolak output X >= p.
+3. Hitung t = int(taggedHash('TapTweak', internalKey, merkleRootOrEmpty)).
+4. Tolak t >= n.
+5. Hitung Q = P + t*G; tolak Q infinity.
+6. parity = Q.y mod 2.
+7. Verifikasi Q.x sama dengan output key.
+
+Mengapa t >= n ditolak:
+Directive menuliskan t modulo n, tetapi aturan verifikasi BIP-341 mewajibkan
+penolakan overflow. Mengurangi t sebelum memeriksa batas akan menerima tweak
+yang seharusnya ditolak oleh standar. Implementasi mengikuti pemeriksaan batas
+BIP-341 ini, dan terdapat tes khusus untuk overflow.
+
+Nilai parity:
+  0 atau 1 : parity Q berhasil dihitung; tersedia juga saat output X mismatch.
+  -1       : verifikasi gagal sebelum titik Q yang valid tersedia.
+
+Alasan penolakan:
+  Internal and output keys must contain exactly 32 bytes
+  Merkle root must contain exactly 32 bytes when supplied
+  Invalid internal key X coordinate
+  Output key X coordinate >= p
+  Taproot tweak >= n
+  Tweaked point is infinity
+  Taproot output key mismatch
+
+MCP menyediakan expectedParity tambahan untuk memeriksa parity 0/1 terhadap
+hasil method ini. Jika berbeda, reason menjadi Taproot output Y parity mismatch.
+
+===============================================================================
+07. AUDIT CONSTANT-TIME DAN PERLUASAN DISASSEMBLER
+===============================================================================
+
+7.1 API
+
+  ConstantTimeAuditor.auditX86_64(instructions, options = {})
+  ConstantTimeAuditor.auditARM64(instructions, options = {})
+  ConstantTimeAuditor.auditBytes(code, options)
+
+  ConstantTimeAuditOptions:
+    checkMemoryLookups?: boolean      default efektif true
+
+auditBytes menerima DisassemblyOptions yang sudah ada, ditambah opsi memory:
+  arch: 'x86_64' | 'aarch64'
+  baseAddress?: bigint
+  maxInstructions?: number
+  checkMemoryLookups?: boolean
+
+7.2 Bentuk hasil core
+
+  {
+    hasConditionalBranches: boolean,
+    branchCount: number,
+    hasCacheTimingHazards: boolean,
+    hasVariableLatencyHazards: boolean,
+    suspiciousInstructions: Array<{ offset, mnemonic, reason }>,
+    hazards: Array<{ offset, mnemonic, operands?, severity, category, reason }>,
+    isCleanConstantTime: boolean
+  }
+
+offset adalah byte offset relatif terhadap awal region yang diaudit. Pada stream
+instruksi yang diberikan langsung, offset dihitung dari jumlah instruction.length.
+Satu instruksi dapat menghasilkan beberapa hazard dengan offset yang sama.
+branchCount menghitung instruksi conditional branch, bukan total hazard.
+
+7.3 Kategori dan severity
+
+  BRANCH           CRITICAL  Conditional jump/branch yang mungkin terkait secret.
+  CACHE_TIMING     HIGH      Indexed memory operand / potensi table lookup.
+  VARIABLE_LATENCY HIGH      Division atau repeated string operation.
+  VARIABLE_LATENCY WARN      Bit scan, register-controlled shift/rotate, ARM bit op.
+  UNDECODED        WARN      Instruksi unknown/truncated, metadata tidak cocok,
+                             atau byte tersisa akibat batas instruksi.
+
+Klasifikasi menyatakan pola yang perlu diperiksa. Auditor tidak melakukan
+analisis aliran secret atau membuktikan bahwa operand berasal dari secret.
+
+7.4 Indexed memory
+
+x86_64: memeriksa isi [...] untuk beberapa register atau scaled index '*'.
+Contoh ditandai HIGH:
+  mov rax, [rbx + rcx*8]
+  mov rax, [rax + rbx]
+  mov eax, [rsi + rdx]
+  mov rax, [rsp + rax*4]
+
+Contoh tanpa cache hazard dari aturan ini:
+  mov rax, [rbp - 16]
+  mov rax, [rsp + 8]
+  mov rax, [rip + 0x100]
+  mov rax, [rdi]
+  mov rax, [0x1000]
+
+LEA dikecualikan karena menghitung alamat tanpa mengakses memory. Deteksi x86
+memory ini memakai format bracket Intel; ia bukan parser umum memory AT&T.
+
+AArch64: register offset, termasuk scaled/extended register, ditandai HIGH:
+  ldr x0, [x1, x2]
+  ldr x0, [x1, x2, lsl #3]
+  ldr w0, [sp, w2, uxtw #2]
+
+Immediate/fixed offset dan xzr/wzr tidak diperlakukan sebagai variable index.
+checkMemoryLookups=false hanya mematikan kategori CACHE_TIMING; branch,
+variable latency, dan undecoded inspection tetap berjalan.
+
+7.5 Variable latency
+
+x86_64:
+  - DIV/IDIV dan variasi suffix ukuran.
+  - BSF/BSR.
+  - SHL/SAL/SHR/SAR/ROL/ROR dengan count register.
+  - Penulisan count Intel 'rax, cl' dan AT&T '%cl, %rax' dikenali.
+  - Shift immediate seperti 'rax, 3' atau '$3, %rax' tidak ditandai.
+  - REP MOVS dan REP STOS.
+
+AArch64:
+  - UDIV/SDIV.
+  - LSLV/LSRV/ASRV/RORV.
+  - Alias LSL/LSR/ASR/ROR dengan operand count register.
+  - CLZ/CLS/RBIT pada stream mnemonic yang disediakan caller.
+
+Timing aktual bergantung pada instruksi dan prosesor. Temuan WARN pada bit/shift
+merupakan permintaan review timing prosesor, bukan pengukuran latency.
+
+7.6 Mengapa disassembler ikut diubah
+
+Operand placeholder seperti modrm(0x..) tidak cukup untuk mendeteksi memory
+index. Decoder sekarang menghasilkan konteks seperti 'rax, [rbx + rcx*8]'.
+
+Cakupan tambahan x86 byte decoder:
+  - MOV register/memory opcode 88, 89, 8A, 8B.
+  - Operand register 8/16/32/64 bit dan register tambahan melalui REX.
+  - ModRM, SIB, base/index/scale, displacement 8/32 bit, RIP-relative.
+  - Shift/rotate opcode D0-D3 dan C0-C1 untuk bentuk yang didukung.
+  - BSF/BSR opcode 0F BC / 0F BD.
+  - REP MOVS/STOS, termasuk prefix ukuran operand pada subset yang ditambahkan.
+  - Operand nyata untuk division dan bentuk ALU64 immediate yang sudah didukung.
+
+Cakupan tambahan AArch64 byte decoder:
+  - LSLV/LSRV/ASRV/RORV.
+  - Integer register-offset load/store dengan extend/shift yang didukung.
+  - Reserved combinations yang tidak didukung tidak dianggap instruksi valid.
+
+CLZ/CLS/RBIT dikenali oleh auditor pada supplied mnemonic stream; perluasan byte
+decoder ini tidak menambahkan decoding opcode ketiganya. Opcode yang belum
+didukung tetap menghasilkan UNDECODED, sehingga hasil audit tidak clean.
+
+7.7 Kondisi fail-closed
+
+Instruksi unknown/truncated, arsitektur berbeda, byte span berbeda dengan length,
+atau byte yang tidak diperiksa akibat instruction budget menghasilkan hazard.
+isCleanConstantTime hanya true jika ada instruksi dan tidak ada temuan.
+Length nonpositif/pecahan/tidak aman dan akumulasi offset yang melampaui safe
+integer menyebabkan RangeError, agar lokasi temuan tidak diam-diam rusak.
+
+===============================================================================
+08. KONTRAK PARAMETER DAN HASIL MCP
+===============================================================================
+
+8.1 Sumber input bersama
+
+Gunakan tepat salah satu:
+  rawHex : string hex byte yang akan diaudit.
+  handle : session yang dikembalikan bitpeek_open.
+
+offset dan length hanya boleh dipakai bersama handle. offset default 0.
+Path session divalidasi kembali melalui security manager. Ukuran file yang
+berubah sejak session dibuka menyebabkan SOURCE_CHANGED. Range tidak boleh
+melewati file atau melampaui batas ukuran tool.
+
+source pada hasil berisi:
+  kind: 'hex' | 'session'
+  length: jumlah byte input yang dibaca
+  sha256: hash input utama
+  handle dan offset: hanya untuk sumber session
+
+8.2 bitpeek_constant_time_audit
+
+Parameter tambahan:
+  arch                'x86_64' atau 'aarch64'; default 'x86_64'
+  checkMemoryLookups  boolean; default true; null/string/angka ditolak
+  maxInstructions     integer 1..10000; default 10000
+  baseAddress         string unsigned 64-bit, hexadecimal atau decimal
+
+Batas input: 65536 byte. Jika memakai handle tanpa length, tool membaca hingga
+256 byte pertama yang tersedia setelah offset. Untuk inline hex, seluruh input
+yang diberikan diperiksa sampai batas instruksi.
+
+baseAddress default adalah offset file untuk session, atau nol untuk inline hex.
+Alamat yang keluar dari range unsigned 64-bit ditolak.
+
+Field tambahan MCP pada hasil core:
+  arch, baseAddress, source, checkMemoryLookups, summary
+  verificationScope: 'static-instruction-patterns'
+  constantTimeProven: false
+
+Setiap hazard dan suspiciousInstruction diberi:
+  address    = baseAddress + offset, sebagai string hexadecimal
+  fileOffset = source.offset + offset, hanya jika input dari session
+
+Alamat besar tidak dipersempit menjadi Number; perhitungan memakai BigInt.
+
+8.3 bitpeek_secp256k1_audit
+
+Batas input utama: 1 MiB / 1048576 byte. Jika memakai handle tanpa length,
+default membaca seluruh sisa file; caller harus memilih range jika lebih besar.
+
+Format lama tetap tersedia:
+  auto, pubkey, der, compact, bitcoin-tx
+
+Format baru dan arti rawHex atau byte range:
+
+  format              Input utama         Parameter companion
+  ------------------  ------------------  ------------------------------------
+  bip340-schnorr      signature 64 byte   pubkeyHex, messageHex wajib
+  dleq                proof 64 byte       g1Hex, p1Hex, g2Hex, p2Hex wajib;
+                                          messageHex optional
+  taproot-tweak       output key 32 byte  internalKeyHex wajib;
+                                          merkleRootHex, expectedParity optional
+
+pubkeyHex/internalKeyHex adalah x-only 32 byte. messageHex/merkleRootHex juga
+32 byte jika diberikan. expectedParity hanya boleh angka 0 atau 1.
+
+g1Hex/p1Hex/g2Hex/p2Hex menerima public key SEC compressed 33 byte atau
+uncompressed 65 byte. DLEQ menolak x-only karena proof harus mempertahankan
+Y parity. Point yang gagal validasi encoding atau kurva ditolak sebagai input.
+
+Argument tidak dikenal atau companion yang tidak sesuai format ditolak.
+Contoh: messageHex pada format pubkey, atau g1Hex pada bip340-schnorr.
+
+8.4 Hasil verifikasi dan error
+
+Format verifikasi baru mengembalikan:
+  format, valid, status: 'PASS' | 'FAIL', source,
+  verificationScope: 'cryptographic-verification',
+  cryptographicSignaturesVerified, summary,
+  reason jika gagal, parity untuk Taproot.
+
+cryptographicSignaturesVerified true hanya untuk Schnorr yang valid.
+Field tersebut false pada DLEQ dan Taproot, karena keduanya bukan pemeriksaan
+signature Schnorr; keberhasilannya dibaca dari valid dan status.
+
+Signature/proof/tweak yang gagal verifikasi menjadi hasil audit FAIL dengan
+alasan, bukan error pemanggilan MCP. Argument tidak lengkap, encoding companion
+invalid, range salah, atau session tidak diizinkan menjadi error MCP.
+
+Payload JSON yang sama dikirim melalui structuredContent dan content teks.
+Tool tetap memiliki readOnlyHint=true, destructiveHint=false,
+idempotentHint=true, dan openWorldHint=false.
+
+===============================================================================
+09. CONTOH PEMAKAIAN
+===============================================================================
+
+Contoh di bawah adalah nama tool dan JSON arguments untuk pemanggilan MCP.
+Public keys dan signatures adalah data test vector publik, bukan secret key.
+Contoh hasil berupa subset field yang relevan, bukan seluruh payload source/hash.
+
+9.1 Audit indexed memory x86
+
+Tool: bitpeek_constant_time_audit
+Arguments:
+{
+  "rawHex": "90488b04cb",
+  "arch": "x86_64",
+  "checkMemoryLookups": true,
+  "baseAddress": "0x8000000000000000"
+}
+
+Byte pertama adalah NOP; instruksi berikutnya MOV rax, [rbx + rcx*8].
+Subset hasil:
+{
+  "isCleanConstantTime": false,
+  "branchCount": 0,
+  "hasCacheTimingHazards": true,
+  "hasVariableLatencyHazards": false,
+  "constantTimeProven": false,
+  "hazards": [
+    {
+      "offset": 1,
+      "mnemonic": "mov",
+      "operands": "rax, [rbx + rcx*8]",
+      "severity": "HIGH",
+      "category": "CACHE_TIMING",
+      "reason": "Memory operand uses register indexing; potential cache-timing / table-lookup leak",
+      "address": "0x8000000000000001"
+    }
+  ]
+}
+
+9.2 Audit variable shift walaupun memory inspection dimatikan
+
+Tool: bitpeek_constant_time_audit
+Arguments:
+{
+  "rawHex": "488b04cb48d3e07400",
+  "checkMemoryLookups": false
+}
+
+Hasil yang diharapkan:
+  hasCacheTimingHazards=false
+  hasVariableLatencyHazards=true
+  branchCount=1
+  isCleanConstantTime=false
+  VARIABLE_LATENCY WARN pada offset 4: shl rax, cl
+  BRANCH CRITICAL pada offset 7: je
+
+9.3 Verifikasi Schnorr dengan test vector BIP-340
+
+Tool: bitpeek_secp256k1_audit
+Arguments:
+{
+  "format": "bip340-schnorr",
+  "pubkeyHex": "F9308A019258C31049344F85F89D5229B531C845836F99B08601F113BCE036F9",
+  "messageHex": "0000000000000000000000000000000000000000000000000000000000000000",
+  "rawHex": "E907831F80848D1069A5371B402410364BDF1C5F8307B0084C55F1CE2DCA821525F66A4A85EA8B71E482A74F382D2CE5EBEEE8FDB2172F477DF4900D310536C0"
+}
+
+Subset hasil:
+{
+  "format": "bip340-schnorr",
+  "valid": true,
+  "status": "PASS",
+  "verificationScope": "cryptographic-verification",
+  "cryptographicSignaturesVerified": true,
+  "summary": "PASS: bip340-schnorr verification succeeded"
+}
+
+Jika bagian s diganti dengan n, hasil menjadi:
+  valid=false, status='FAIL', reason='s >= n'
+  cryptographicSignaturesVerified=false
+
+9.4 Verifikasi DLEQ dengan test vector BIP-374 tanpa message
+
+Tool: bitpeek_secp256k1_audit
+Arguments:
+{
+  "format": "dleq",
+  "g1Hex": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+  "p1Hex": "02637b2c3ea8ca80b9caecc50f4134c86ae9cf7a269133e7afc71f30e3a3cda60c",
+  "g2Hex": "034bccb1c570ac1f3bc42d61fe35de605b99626501ccb20297e1acbbf2d7152aa1",
+  "p2Hex": "0285b826c8dd175805901906b6c9b4140a30cbcc94c6e7dcf36476038bf90d4718",
+  "rawHex": "503562d36910cd2d61a4d07c8ff680265c713e63dde0dcb88e6ea3c58597bdc05b86db9af95eccc475ce2177f941c118fefed20227d4ce8ce9557cb008758de6"
+}
+
+Hasil yang diharapkan: valid=true, status='PASS'. Mengubah share P2 atau parity
+titik merusak hubungan proof; verifier mengembalikan FAIL.
+
+9.5 Verifikasi Taproot output dan parity
+
+Tool: bitpeek_secp256k1_audit
+Arguments:
+{
+  "format": "taproot-tweak",
+  "internalKeyHex": "187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27",
+  "merkleRootHex": "5b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21",
+  "rawHex": "147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
+  "expectedParity": 1
+}
+
+Hasil yang diharapkan: valid=true, status='PASS', parity=1.
+Jika expectedParity diubah menjadi 0:
+  valid=false, status='FAIL', parity=1,
+  reason='Taproot output Y parity mismatch'.
+
+9.6 Pemakaian file range
+
+1. Panggil bitpeek_open dengan filePath dalam allowed input roots.
+2. Simpan handle session dari hasil.
+3. Pada tool audit, ganti rawHex dengan handle, offset, dan length.
+4. Parameter companion seperti pubkeyHex/messageHex tetap diberikan.
+
+Untuk signature yang ditempatkan mulai byte 1:
+  format='bip340-schnorr', handle=<handle yang valid>, offset=1, length=64,
+  pubkeyHex=<key>, messageHex=<message>.
+
+9.7 Pemakaian core secara langsung
+
+Import dari packages/core/src/index pada kode TypeScript lokal:
+
+  import { taggedHash, Secp256k1Engine, ConstantTimeAuditor,
+           SECP256K1_GX, SECP256K1_GY } from './packages/core/src/index'
+
+  const G = { x: SECP256K1_GX, y: SECP256K1_GY }
+  const twoG = Secp256k1Engine.scalarMul(2n, G)
+  const hash = taggedHash('example/tag', 'hello', Uint8Array.of(1, 2, 3))
+  const audit = ConstantTimeAuditor.auditBytes(
+    Uint8Array.of(0x48, 0xd3, 0xe0),
+    { arch: 'x86_64', checkMemoryLookups: true }
+  )
+
+Import path tersebut mengasumsikan script berada di root repository.
+
+===============================================================================
+10. CAKUPAN TES DAN HASIL VERIFIKASI
+===============================================================================
+
+10.1 Distribusi tes
+
+  Suite lama                                  36 file   436 tes
+  constant-time-deep.test.ts                    1 file    76 tes
+  secp256k1-deep.test.ts                        1 file    29 tes
+  audit-tools-deep.test.ts                      1 file    25 tes
+  TOTAL                                       39 file   566 tes
+
+10.2 Cakupan constant-time-deep
+
+  - Indexed/scaled x86 memory dan lookup dengan beberapa register.
+  - Fixed stack offset, RIP-relative, absolute, dan single-base memory.
+  - Pengecualian LEA dan opsi mematikan memory inspection.
+  - ARM register-offset load/store, extended/scaled index, dan zero register.
+  - Variable shift Intel/AT&T, immediate shift, bit scans, REP string operations.
+  - ARM variable shifts dan bit operation dari supplied mnemonic stream.
+  - Severity, kategori, branch count, multiple hazard per instruction.
+  - Konsistensi field legacy suspiciousInstructions.
+  - Relative byte offsets, REX registers, SIB tanpa base, dan displacement.
+  - Byte encoding nyata, instruksi truncated, serta unexamined tail.
+
+10.3 Cakupan secp256k1-deep
+
+  - Tagged hash dibandingkan dengan node:crypto.
+  - Infinity, identitas, inverse point, doubling, dan scalar reduction.
+  - Scalar multiplication dibandingkan dengan OpenSSL melalui createECDH.
+  - Addition dibandingkan dengan hasil scalar gabungan OpenSSL.
+  - liftX, Y genap, panjang input salah, X overflow, dan non-residue.
+  - BIP-340 valid vectors 0, 1, 3, 4.
+  - r >= p, s >= n, corrupted signature/message/key, R infinity/odd Y/mismatch.
+  - BIP-374 vectors 0 dan 5: custom generator/message serta proof tanpa message.
+  - Proof damage, optional message binding, transcript ordering, dan Y parity.
+  - DLEQ e/s overflow, invalid point pada setiap posisi, R1/R2 infinity.
+  - BIP-341 published wallet vectors dengan parity genap dan ganjil.
+  - Key-only tweak, Merkle root mismatch, output mismatch, invalid input.
+  - Tweak overflow, zero tweak, dan infinity memakai hash mock terkontrol.
+
+10.4 Cakupan audit-tools-deep
+
+  - SDK Client dan server melalui InMemoryTransport; pemanggilan protokol MCP.
+  - Schema mengiklankan format baru dan default memory inspection.
+  - Structured hazard dan kesamaan payload JSON/content.
+  - Alamat lebih besar dari Number.MAX_SAFE_INTEGER.
+  - Memory opt-out tanpa mematikan variable latency atau branch inspection.
+  - File-relative offset pada range yang dipilih.
+  - ARM byte input dengan register-offset load dan truncated tail.
+  - PASS Schnorr, FAIL s overflow dengan alasan persis.
+  - Signature dari file session yang diizinkan.
+  - PASS DLEQ dan FAIL share yang berubah.
+  - PASS Taproot dan FAIL expected parity/output.
+  - Missing/malformed/inapplicable arguments dan non-boolean memory option.
+
+10.5 Hasil eksekusi terakhir pada tahap implementasi
+
+  npm test
+    Test Files: 39 passed (39)
+    Tests:      566 passed (566)
+    Start at:   15:08:07, 3 Oktober 2026 (Asia/Bangkok)
+    Duration:   11.60s
+
+  npm run test:seo (bagian dari npm test)
+    Verified 25 indexable pages, metadata, links, sitemap,
+    robots, manifest, and 404.
+
+  npm run typecheck
+    tsc -b, exit code 0.
+
+  npm run lint
+    ESLint, exit code 0.
+    0 error, 7 warning yang sudah ada pada file lain.
+
+  git diff --check
+    Lulus pada perubahan implementasi.
+
+Pemeriksaan ini menunjukkan seluruh suite yang dijalankan lulus. Angka di atas
+merupakan hasil aktual sesi implementasi, bukan hasil eksekusi baru saat TXT dibuat.
+
+Tujuh warning lint yang tercatat:
+  packages/core/src/captures/protocols.ts:10      DigitalTransition tidak digunakan
+  packages/core/src/discovery.ts:326             expected tidak digunakan
+  packages/core/src/nand-captures-p5.test.ts:15    decodeSpi tidak digunakan
+  packages/core/src/nand-captures-p5.test.ts:16    decodeI2c tidak digunakan
+  packages/core/src/native-trace-runner-p6.test.ts:15  OracleMatcher tidak digunakan
+  packages/core/src/provenance.test.ts:3          ProjectSession tidak digunakan
+  packages/core/src/provenance.ts:161            maxDepth tidak digunakan
+
+===============================================================================
+11. BATASAN DAN KOMPATIBILITAS
+===============================================================================
+
+1. Audit constant-time adalah inspeksi pola statis pada region pilihan caller.
+   Tidak mengukur timing/cache, melakukan secret-taint analysis, atau membuktikan
+   kebebasan side-channel. constantTimeProven tetap false.
+
+2. ReferenceDisassembler adalah subset x86_64/AArch64. Instruksi di luar subset
+   dilaporkan sebagai UNDECODED dan mencegah hasil clean.
+
+3. Memory dengan satu base register dapat tetap bergantung pada secret; aturan
+   cache saat ini khusus indexed/scaled addressing sebagaimana directive.
+
+4. checkMemoryLookups=false mengurangi cakupan inspeksi. Hasil clean pada mode
+   tersebut hanya berlaku terhadap pemeriksaan lain yang masih diaktifkan.
+
+5. JavaScript BigInt tidak memberi jaminan constant-time. Operasi kriptografi
+   ditujukan untuk verifikasi data publik. Implementasi ini tidak menambahkan
+   signing, proof generation, atau penggunaan secret scalar yang constant-time.
+
+6. API Schnorr menerima message 32 byte dan signature 64 byte sesuai directive.
+   Caller menyiapkan message/sighash; tool tidak membangun sighash transaksi.
+
+7. DLEQ menyediakan verifikasi proof yang dapat dipakai untuk share BIP-375;
+   validasi penuh PSBT/consensus/Silent Payments berada di luar API ini.
+
+8. Bentuk affine dipilih untuk implementasi sederhana. Tidak ada implementasi
+   Jacobian, batch verification, atau benchmark throughput baru.
+
+9. Semua API encoding/scalar inspection yang sudah ada dipertahankan. Field
+   suspiciousInstructions tetap memakai offset, mnemonic, reason; field hazard
+   baru ditambahkan untuk konsumen yang memerlukan severity/kategori/operand.
+
+10. Format lama auto/pubkey/der/compact/bitcoin-tx tetap menggunakan jalur audit
+    yang sudah ada. Format verifikasi kriptografi baru dipilih eksplisit.
+
+===============================================================================
+12. REFERENSI TEKNIS
+===============================================================================
+
+Spesifikasi yang digunakan ketika implementasi dikerjakan:
+  BIP-340: https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki
+  BIP-341: https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki
+  BIP-374: https://github.com/bitcoin/bips/blob/master/bip-0374.mediawiki
+  BIP-375: https://github.com/bitcoin/bips/blob/master/bip-0375.mediawiki
+
+Sumber test vector:
+  https://github.com/bitcoin/bips/blob/master/bip-0340/test-vectors.csv
+  https://github.com/bitcoin/bips/blob/master/bip-0341/wallet-test-vectors.json
+  https://github.com/bitcoin/bips/blob/master/bip-0374/test_vectors_verify_proof.csv
+
+Lampiran berikut diambil langsung dari file repository saat laporan dibuat.
+Pada diff: baris '+' adalah tambahan, '-' adalah bagian yang diganti/dihapus,
+dan baris tanpa keduanya adalah konteks. File tes baru ditampilkan utuh pada
+Lampiran C karena belum tercatat sebagai file tracked pada working tree.
+
+===============================================================================
+LAMPIRAN A - DIRECTIVE ASLI
+===============================================================================
+# BITPEEK DEEP ENGINE DIRECTIVE (ULTRA-HARDENING & SURGICAL EXPANSION)
+# Target Model: Frontier Autonomous Coding Agent (GPT-5 / GPT-o1 / Claude 3.5 Sonnet / Opus / Sol 6.1)
+# Workspace Root: C:\Users\LENOVO\Documents\bugbounty\bitpeek
+
+================================================================================
+00. STRICT TOKEN-CONSERVATION & ANTI-HALLUCINATION RULES (NON-NEGOTIABLE)
+================================================================================
+1. ZERO PHILOSOPHICAL YAP & ZERO CHAT FILLER:
+   Do NOT output introductory greetings, conversational fluff, explanations of what
+   you are about to do, or speculative essays. Jump straight into inspecting files,
+   modifying code, and running tests.
+2. SURGICAL MODIFICATIONS ONLY:
+   Do NOT rewrite entire files from scratch if you are only adding methods or exports.
+   Preserve existing imports, function signatures, error handling, and class designs.
+3. ZERO DEPENDENCY HALLUCINATION:
+   Do NOT introduce any external npm packages (no @noble/secp256k1, no elliptic, no bigi).
+   All elliptic curve math, hash functions, and instruction inspections MUST use native
+   TypeScript, JavaScript BigInt, Node.js built-ins (crypto), and existing Bitpeek core code.
+4. ZERO REGRESSION POLICY:
+   All 36 existing test files and 436 tests MUST stay 100% green at all times.
+   Run `npm test` to verify before declaring completion.
+5. DOCUMENTATION TIMING:
+   Produce technical documentation ONLY at the very end of your response, after all tests
+   have passed.
+
+================================================================================
+01. TARGET FILE MAP & ARCHITECTURAL OVERVIEW
+================================================================================
+- `packages/core/src/crypto.ts`
+  Native cryptographic primitives (Sha256, Crc32, Crc16).
+  ADD: `taggedHash(tag: string, ...messages: (Uint8Array | string)[]): Uint8Array`
+  Standard BIP-340 / BIP-374 tagged hash: SHA256(SHA256(tag) || SHA256(tag) || msg).
+
+- `packages/core/src/native/constant-time.ts`
+  Class `ConstantTimeAuditor`, Interface `ConstantTimeAuditResult`.
+  UPGRADE:
+  1. Cache-Timing & Memory-Index Hazard Detection (indirect / scaled memory lookups).
+  2. Variable-Latency Arithmetic Detection (variable shifts by register, bit scans).
+  3. Severity Classification (`CRITICAL`, `HIGH`, `WARN`).
+
+- `packages/core/src/bchain/secp256k1.ts`
+  Class `Secp256k1Engine`, curve constants (`SECP256K1_P`, `SECP256K1_N`, `SECP256K1_GX`, `SECP256K1_GY`).
+  UPGRADE:
+  1. Affine / Jacobian Point Arithmetic (`pointAdd`, `pointDouble`, `scalarMul`, `liftX`).
+  2. BIP-340 Schnorr Signature Verification (`verifySchnorr`).
+  3. BIP-374 / BIP-375 Discrete Log Equality Proof Verification (`verifyDLEQ`).
+  4. BIP-341 Taproot Tweak Verification (`verifyTaprootTweak`).
+
+- `packages/mcp/src/audit-tools.ts`
+  MCP tool declarations `bitpeek_constant_time_audit` and `bitpeek_secp256k1_audit`.
+  UPGRADE:
+  Expose new audit options and return structured reports containing byte offsets,
+  severity levels, and cryptographic verification outcomes.
+
+================================================================================
+02. SPECIFICATION 1: CONSTANT-TIME & CACHE-TIMING AUDIT ENGINE
+================================================================================
+File: `packages/core/src/native/constant-time.ts`
+
+Currently, `ConstantTimeAuditor` only flags simple jump mnemonics and division instructions.
+Upgrade it to detect microarchitectural side-channels:
+
+1. Memory Hazard Detection (Cache-Timing Leaks):
+   In secret-handling code, memory lookups indexed by non-constant registers leak data
+   via L1/L2/L3 cache timing (e.g. S-box lookups, naive scalar table lookups).
+   - Inspect `instruction.operands` for x86_64:
+     Detect indexed addressing modes: patterns containing `*` (scaled index, e.g. `[rax + rbx*8]`)
+     or multiple registers inside `[...]` (e.g. `[rax + rbx]`, `[rsi + rdx]`).
+     Exclude fixed stack offsets (e.g., `[rbp - 0x10]`, `[rsp + 8]`) and RIP-relative offsets (`[rip + ...]`).
+   - For AArch64:
+     Detect register-offset loads (e.g., `ldr x0, [x1, x2]`, `ldr x0, [x1, x2, lsl #3]`).
+   - Flag as: `HIGH: Memory operand uses register indexing; potential cache-timing / table-lookup leak`.
+
+2. Variable-Latency Instructions:
+   - x86_64:
+     - `bsf`, `bsr` (bit scans with data-dependent latency on pre-Zen / Intel CPUs).
+     - Variable shifts by register `%cl`: `shl`, `shr`, `sar`, `rol`, `ror` when second operand is `%cl` or register.
+     - String operations: `rep movs*`, `rep stos*`.
+   - AArch64:
+     - Variable bit operations and divisions (`udiv`, `sdiv`).
+
+3. Hazard Classification:
+   Update `ConstantTimeAuditResult` interface:
+   ```typescript
+   export type HazardSeverity = 'CRITICAL' | 'HIGH' | 'WARN'
+
+   export interface AuditHazard {
+     offset: number
+     mnemonic: string
+     operands?: string
+     severity: HazardSeverity
+     category: 'BRANCH' | 'VARIABLE_LATENCY' | 'CACHE_TIMING' | 'UNDECODED'
+     reason: string
+   }
+
+   export interface ConstantTimeAuditResult {
+     hasConditionalBranches: boolean
+     branchCount: number
+     hasCacheTimingHazards: boolean
+     hasVariableLatencyHazards: boolean
+     suspiciousInstructions: Array<{ offset: number; mnemonic: string; reason: string }> // preserve backwards compatibility
+     hazards: AuditHazard[]
+     isCleanConstantTime: boolean
+   }
+   ```
+
+================================================================================
+03. SPECIFICATION 2: DEEP SECP256K1 & BITCOIN CRYPTOGRAPHIC ENGINE
+================================================================================
+Files: `packages/core/src/crypto.ts` and `packages/core/src/bchain/secp256k1.ts`
+
+1. Tagged Hash in `packages/core/src/crypto.ts`:
+   Implement BIP-340 tagged hash:
+   ```typescript
+   export function taggedHash(tag: string, ...messages: (Uint8Array | string)[]): Uint8Array
+   ```
+   Rule: `SHA256(SHA256(tag) || SHA256(tag) || concatenated_messages)`.
+   Cache the midstate or tag hash for performance if desired, or compute directly.
+
+2. Secp256k1 Point Arithmetic in `packages/core/src/bchain/secp256k1.ts`:
+   Curve: y^2 = x^3 + 7 over F_p.
+   Implement pure BigInt projective or affine point operations (verification only,
+   constant-time is not required in TS verification, but mathematical correctness is mandatory):
+   - `Point = { x: bigint; y: bigint } | null` (null represents infinity).
+   - `pointAdd(P: Point, Q: Point): Point`
+   - `pointDouble(P: Point): Point`
+   - `scalarMul(k: bigint, P: Point): Point` (k modulo n)
+   - `liftX(xBytes: Uint8Array): { x: bigint; y: bigint } | null`:
+     Parse 32-byte big-endian $x$.
+     If $x \ge p$, return null.
+     Compute $y^2 = (x^3 + 7) \pmod p$.
+     Compute $y = \text{sqrtModP}(y^2)$. If null, return null.
+     If $y \pmod 2 \ne 0$, $y = p - y$ (ensure even Y per BIP-340).
+     Return `{ x, y }`.
+
+3. BIP-340 Schnorr Verification:
+   Add method to `Secp256k1Engine`:
+   ```typescript
+   public static verifySchnorr(
+     pubkey32: Uint8Array,
+     msg32: Uint8Array,
+     sig64: Uint8Array
+   ): { valid: boolean; reason?: string }
+   ```
+   Verification Steps:
+   - Check lengths: pubkey32 must be 32 bytes, msg32 must be 32 bytes, sig64 must be 64 bytes.
+   - $P = \text{liftX}(pubkey32)$. If null, return `{ valid: false, reason: 'Invalid public key X coordinate' }`.
+   - $r = \text{unsignedBigEndian}(sig[0..32])$. If $r \ge p$, return `{ valid: false, reason: 'r >= p' }`.
+   - $s = \text{unsignedBigEndian}(sig[32..64])$. If $s \ge n$, return `{ valid: false, reason: 's >= n' }`.
+   - $e = \text{unsignedBigEndian}(\text{taggedHash}('BIP0340/challenge', sig.subarray(0, 32), pubkey32, msg32)) \pmod n$.
+   - Compute $R = s \cdot G - e \cdot P = s \cdot G + (n - e) \cdot P$.
+   - If $R == \text{null}$ (infinity), return `{ valid: false, reason: 'R is infinity' }`.
+   - If $R.y \pmod 2 \ne 0$ (odd Y), return `{ valid: false, reason: 'R has odd Y coordinate' }`.
+   - If $R.x \ne r$, return `{ valid: false, reason: 'Signature verification equation failed (Rx != r)' }`.
+   - Return `{ valid: true }`.
+
+4. BIP-374 DLEQ Proof Verification (Silent Payments Hardware Wallet Support):
+   Add method to `Secp256k1Engine`:
+   ```typescript
+   public static verifyDLEQ(
+     G1: { x: bigint; y: bigint },
+     P1: { x: bigint; y: bigint },
+     G2: { x: bigint; y: bigint },
+     P2: { x: bigint; y: bigint },
+     proof64: Uint8Array
+   ): { valid: boolean; reason?: string }
+   ```
+   Verifies that $\log_{G_1}(P_1) == \log_{G_2}(P_2)$.
+   Proof contains challenge $e$ (32 bytes) and scalar $s$ (32 bytes).
+   Computes $R_1 = s \cdot G_1 - e \cdot P_1$ and $R_2 = s \cdot G_2 - e \cdot P_2$.
+   Verifies challenge equation according to BIP-374 specification.
+
+5. BIP-341 Taproot Tweak Verification:
+   Add method:
+   ```typescript
+   public static verifyTaprootTweak(
+     internalKey32: Uint8Array,
+     outputKey32: Uint8Array,
+     merkleRoot?: Uint8Array
+   ): { valid: boolean; parity: number; reason?: string }
+   ```
+   Computes tweak $t = \text{taggedHash}('TapTweak', internalKey32, merkleRoot ?? new Uint8Array(0)) \pmod n$.
+   Computes $Q = P + t \cdot G$.
+   Verifies that $Q.x == \text{unsignedBigEndian}(outputKey32)$.
+
+================================================================================
+04. SPECIFICATION 3: MCP AUDIT TOOLS EXPOSURE
+================================================================================
+File: `packages/mcp/src/audit-tools.ts`
+
+1. Update `bitpeek_constant_time_audit`:
+   - Add parameter `checkMemoryLookups?: boolean` (defaults to true).
+   - In response content, include structured summary:
+     - `isCleanConstantTime`: boolean
+     - `branchCount`: number
+     - `hazards`: array of classified hazards with exact byte offset and assembly context.
+     - `summary`: concise human/agent-readable diagnostic.
+
+2. Update `bitpeek_secp256k1_audit`:
+   - Support `format: 'bip340-schnorr'`, `format: 'dleq'`, and `format: 'taproot-tweak'`
+     when caller supplies corresponding signature/proof and message/key parameters.
+   - Return clear PASS/FAIL with exact cryptographic failure reasons.
+
+================================================================================
+05. TEST-DRIVEN VERIFICATION SUITES
+================================================================================
+Add comprehensive test suites:
+- `packages/core/src/native/constant-time-deep.test.ts`
+  - Test x86_64 SIB scaled index lookup detection (`mov rax, [rbx + rcx*8]`).
+  - Test fixed stack offset is NOT flagged (`mov rax, [rbp - 16]`).
+  - Test variable shift by `%cl` (`shl rax, cl`).
+  - Test AArch64 register-offset load detection (`ldr x0, [x1, x2]`).
+- `packages/core/src/bchain/secp256k1-deep.test.ts`
+  - Test BIP-340 test vectors (valid signatures, invalid $r \ge p$, invalid $s \ge n$, corrupted challenge).
+  - Test BIP-341 Taproot tweak derivation and parity matching.
+  - Test BIP-374 DLEQ proof verification vector.
+- `packages/mcp/src/audit-tools-deep.test.ts`
+  - Test MCP invocation for `bitpeek_constant_time_audit` with memory lookups enabled.
+  - Test MCP invocation for `bitpeek_secp256k1_audit` with BIP-340 Schnorr signature.
+
+================================================================================
+06. EXECUTION CHECKLIST FOR MODEL
+================================================================================
+[ ] Step 1: Read target files to confirm exact types and exports.
+[ ] Step 2: Implement taggedHash in `packages/core/src/crypto.ts`.
+[ ] Step 3: Implement point arithmetic & verification in `packages/core/src/bchain/secp256k1.ts`.
+[ ] Step 4: Implement memory & variable-latency checks in `packages/core/src/native/constant-time.ts`.
+[ ] Step 5: Wire new capabilities into `packages/mcp/src/audit-tools.ts`.
+[ ] Step 6: Write unit tests in packages/core and packages/mcp.
+[ ] Step 7: Run `npm test` and ensure all tests (existing + new) pass 100%.
+[ ] Step 8: Output ONLY final summary documentation: modified files, new features, and test results.
+
+===============================================================================
+LAMPIRAN B - DIFF KODE IMPLEMENTASI
+===============================================================================
+diff --git a/packages/core/src/bchain/secp256k1.ts b/packages/core/src/bchain/secp256k1.ts
+index 2cff325..d69d203 100644
+--- a/packages/core/src/bchain/secp256k1.ts
++++ b/packages/core/src/bchain/secp256k1.ts
+@@ -1,4 +1,5 @@
+ import { unsignedBigEndian } from '../bytes'
++import { taggedHash } from '../crypto'
+ 
+ export const SECP256K1_P = 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2fn
+ export const SECP256K1_N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n
+@@ -6,6 +7,80 @@ export const SECP256K1_HALF_N = SECP256K1_N / 2n
+ export const SECP256K1_GX = 0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798n
+ export const SECP256K1_GY = 0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8n
+ 
++export type Point = { x: bigint; y: bigint } | null
++const GENERATOR = { x: SECP256K1_GX, y: SECP256K1_GY }
++
++function mod(value: bigint, modulus = SECP256K1_P): bigint {
++  return ((value % modulus) + modulus) % modulus
++}
++
++function inverse(value: bigint): bigint {
++  let a = mod(value)
++  let b = SECP256K1_P
++  let x = 1n
++  let y = 0n
++  while (b !== 0n) {
++    const quotient = a / b
++    ;[a, b] = [b, a - quotient * b]
++    ;[x, y] = [y, x - quotient * y]
++  }
++  if (a !== 1n) throw new RangeError('Field inverse does not exist')
++  return mod(x)
++}
++
++export function pointDouble(point: Point): Point {
++  if (point === null || point.y === 0n) return null
++  const slope = mod(3n * point.x * point.x * inverse(2n * point.y))
++  const x = mod(slope * slope - 2n * point.x)
++  return { x, y: mod(slope * (point.x - x) - point.y) }
++}
++
++export function pointAdd(left: Point, right: Point): Point {
++  if (left === null) return right
++  if (right === null) return left
++  if (left.x === right.x) return left.y === right.y ? pointDouble(left) : null
++  const slope = mod((right.y - left.y) * inverse(right.x - left.x))
++  const x = mod(slope * slope - left.x - right.x)
++  return { x, y: mod(slope * (left.x - x) - left.y) }
++}
++
++export function scalarMul(scalar: bigint, point: Point): Point {
++  let k = mod(scalar, SECP256K1_N)
++  let result: Point = null
++  let addend = point
++  while (k > 0n) {
++    if ((k & 1n) !== 0n) result = pointAdd(result, addend)
++    addend = pointDouble(addend)
++    k >>= 1n
++  }
++  return result
++}
++
++export function liftX(bytes: Uint8Array): Point {
++  if (bytes.length !== 32) return null
++  const x = unsignedBigEndian(bytes)
++  if (x >= SECP256K1_P) return null
++  const y = Secp256k1Engine.sqrtModP(mod(x * x * x + 7n))
++  return y === null ? null : { x, y: (y & 1n) === 0n ? y : SECP256K1_P - y }
++}
++
++function isCurvePoint(point: Point): point is NonNullable<Point> {
++  return point !== null && typeof point.x === 'bigint' && typeof point.y === 'bigint'
++    && point.x >= 0n && point.x < SECP256K1_P && point.y >= 0n && point.y < SECP256K1_P
++    && mod(point.y * point.y) === mod(point.x * point.x * point.x + 7n)
++}
++
++function compressedPoint(point: NonNullable<Point>): Uint8Array {
++  const bytes = new Uint8Array(33)
++  bytes[0] = 2 + Number(point.y & 1n)
++  let x = point.x
++  for (let index = 32; index > 0; index--) {
++    bytes[index] = Number(x & 255n)
++    x >>= 8n
++  }
++  return bytes
++}
++
+ export type Secp256k1PubKeyFormat = 'compressed' | 'uncompressed' | 'x-only-bip340' | 'invalid'
+ 
+ export interface Secp256k1PubKeyInspection {
+@@ -50,8 +125,70 @@ function signatureResult(
+   }
+ }
+ 
+-/** Public-data encoding and curve checks; these methods do not verify a signed message. */
++/** Public-data curve and signature verification; BigInt arithmetic is not constant-time. */
+ export class Secp256k1Engine {
++  public static pointAdd(left: Point, right: Point): Point { return pointAdd(left, right) }
++  public static pointDouble(point: Point): Point { return pointDouble(point) }
++  public static scalarMul(scalar: bigint, point: Point): Point { return scalarMul(scalar, point) }
++  public static liftX(bytes: Uint8Array): Point { return liftX(bytes) }
++
++  public static verifySchnorr(pubkey32: Uint8Array, msg32: Uint8Array, sig64: Uint8Array): { valid: boolean; reason?: string } {
++    if (pubkey32.length !== 32) return { valid: false, reason: 'Public key must contain exactly 32 bytes' }
++    if (msg32.length !== 32) return { valid: false, reason: 'Message must contain exactly 32 bytes' }
++    if (sig64.length !== 64) return { valid: false, reason: 'Schnorr signature must contain exactly 64 bytes' }
++    const point = liftX(pubkey32)
++    if (point === null) return { valid: false, reason: 'Invalid public key X coordinate' }
++    const r = unsignedBigEndian(sig64.subarray(0, 32))
++    const s = unsignedBigEndian(sig64.subarray(32))
++    if (r >= SECP256K1_P) return { valid: false, reason: 'r >= p' }
++    if (s >= SECP256K1_N) return { valid: false, reason: 's >= n' }
++    const e = unsignedBigEndian(taggedHash('BIP0340/challenge', sig64.subarray(0, 32), pubkey32, msg32)) % SECP256K1_N
++    const R = pointAdd(scalarMul(s, GENERATOR), scalarMul(SECP256K1_N - e, point))
++    if (R === null) return { valid: false, reason: 'R is infinity' }
++    if ((R.y & 1n) !== 0n) return { valid: false, reason: 'R has odd Y coordinate' }
++    if (R.x !== r) return { valid: false, reason: 'Signature verification equation failed (Rx != r)' }
++    return { valid: true }
++  }
++
++  public static verifyDLEQ(G1: Point, P1: Point, G2: Point, P2: Point, proof64: Uint8Array, message?: Uint8Array): { valid: boolean; reason?: string } {
++    if (proof64.length !== 64) return { valid: false, reason: 'DLEQ proof must contain exactly 64 bytes' }
++    if (message !== undefined && message.length !== 32) return { valid: false, reason: 'DLEQ message must contain exactly 32 bytes' }
++    for (const [name, point] of [['G1', G1], ['P1', P1], ['G2', G2], ['P2', P2]] as const) {
++      if (!isCurvePoint(point)) return { valid: false, reason: `${name} must be a finite point on secp256k1` }
++    }
++    const e = unsignedBigEndian(proof64.subarray(0, 32))
++    const s = unsignedBigEndian(proof64.subarray(32))
++    if (e >= SECP256K1_N) return { valid: false, reason: 'e >= n' }
++    if (s >= SECP256K1_N) return { valid: false, reason: 's >= n' }
++    const R1 = pointAdd(scalarMul(s, G1), scalarMul(SECP256K1_N - e, P1))
++    if (R1 === null) return { valid: false, reason: 'R1 is infinity' }
++    const R2 = pointAdd(scalarMul(s, G2), scalarMul(SECP256K1_N - e, P2))
++    if (R2 === null) return { valid: false, reason: 'R2 is infinity' }
++    // BIP-374 transcript order: A, B, C, G, R1, R2 (compressed SEC points).
++    const challenge = unsignedBigEndian(taggedHash('BIP0374/challenge',
++      compressedPoint(P1!), compressedPoint(G2!), compressedPoint(P2!), compressedPoint(G1!),
++      compressedPoint(R1), compressedPoint(R2), message ?? new Uint8Array(0))) % SECP256K1_N
++    return challenge === e ? { valid: true } : { valid: false, reason: 'DLEQ challenge verification failed' }
++  }
++
++  public static verifyTaprootTweak(internalKey32: Uint8Array, outputKey32: Uint8Array, merkleRoot?: Uint8Array): { valid: boolean; parity: number; reason?: string } {
++    const fail = (reason: string) => ({ valid: false, parity: -1, reason })
++    if (internalKey32.length !== 32 || outputKey32.length !== 32) return fail('Internal and output keys must contain exactly 32 bytes')
++    if (merkleRoot !== undefined && merkleRoot.length !== 32) return fail('Merkle root must contain exactly 32 bytes when supplied')
++    const point = liftX(internalKey32)
++    if (point === null) return fail('Invalid internal key X coordinate')
++    if (unsignedBigEndian(outputKey32) >= SECP256K1_P) return fail('Output key X coordinate >= p')
++    const tweak = unsignedBigEndian(taggedHash('TapTweak', internalKey32, merkleRoot ?? new Uint8Array(0)))
++    // BIP-341 rejects overflowing tweaks before scalar multiplication.
++    if (tweak >= SECP256K1_N) return fail('Taproot tweak >= n')
++    const output = pointAdd(point, scalarMul(tweak, GENERATOR))
++    if (output === null) return fail('Tweaked point is infinity')
++    const parity = Number(output.y & 1n)
++    return output.x === unsignedBigEndian(outputKey32)
++      ? { valid: true, parity }
++      : { valid: false, parity, reason: 'Taproot output key mismatch' }
++  }
++
+   public static validateScalar(scalar: bigint): { valid: boolean; reason?: string } {
+     if (scalar <= 0n) return { valid: false, reason: 'Scalar must be positive' }
+     if (scalar >= SECP256K1_N) return { valid: false, reason: 'Scalar overflow (k >= n)' }
+diff --git a/packages/core/src/crypto.ts b/packages/core/src/crypto.ts
+index f020c03..b675f59 100644
+--- a/packages/core/src/crypto.ts
++++ b/packages/core/src/crypto.ts
+@@ -220,6 +220,14 @@ export function sha256(bytes: Uint8Array): Uint8Array {
+   return new Sha256().update(bytes).digest()
+ }
+ 
++export function taggedHash(tag: string, ...messages: (Uint8Array | string)[]): Uint8Array {
++  const encoder = new TextEncoder()
++  const tagHash = sha256(encoder.encode(tag))
++  const hasher = new Sha256().update(tagHash).update(tagHash)
++  for (const message of messages) hasher.update(typeof message === 'string' ? encoder.encode(message) : message)
++  return hasher.digest()
++}
++
+ export function sha256Hex(bytes: Uint8Array): string {
+   return new Sha256().update(bytes).digestHex()
+ }
+diff --git a/packages/core/src/native/constant-time.ts b/packages/core/src/native/constant-time.ts
+index 847edcf..9829d72 100644
+--- a/packages/core/src/native/constant-time.ts
++++ b/packages/core/src/native/constant-time.ts
+@@ -3,10 +3,28 @@ import type { DecodedInstruction, DisassemblyOptions } from './disassembler'
+ 
+ export type DisassembledInstruction = DecodedInstruction
+ 
++export type HazardSeverity = 'CRITICAL' | 'HIGH' | 'WARN'
++
++export interface AuditHazard {
++  offset: number
++  mnemonic: string
++  operands?: string
++  severity: HazardSeverity
++  category: 'BRANCH' | 'VARIABLE_LATENCY' | 'CACHE_TIMING' | 'UNDECODED'
++  reason: string
++}
++
++export interface ConstantTimeAuditOptions {
++  checkMemoryLookups?: boolean
++}
++
+ export interface ConstantTimeAuditResult {
+   hasConditionalBranches: boolean
+   branchCount: number
++  hasCacheTimingHazards: boolean
++  hasVariableLatencyHazards: boolean
+   suspiciousInstructions: Array<{ offset: number; mnemonic: string; reason: string }>
++  hazards: AuditHazard[]
+   isCleanConstantTime: boolean
+ }
+ 
+@@ -23,24 +41,38 @@ const ARM_BRANCHES = new Set([
+   'bc.hi', 'bc.ls', 'bc.ge', 'bc.lt', 'bc.gt', 'bc.le',
+ ])
+ 
++function hasIndexedMemory(operands: string, arch: DecodedInstruction['arch']): boolean {
++  for (const match of operands.toLowerCase().matchAll(/\[([^\]]+)\]/g)) {
++    const memory = match[1]!
++    if (arch === 'x86_64') {
++      const registers = memory.match(/\b(?:r(?:1[0-5]|[0-9])[dwb]?|[re]?(?:ax|bx|cx|dx|si|di|bp|sp)|rip|eip)\b/g) ?? []
++      if (registers.length > 1 || (registers.length > 0 && memory.includes('*'))) return true
++    } else if (/\[\s*(?:x\d+|sp)\s*,\s*[xw]\d+\b/.test(match[0])) {
++      return true
++    }
++  }
++  return false
++}
++
+ /** Conservative mnemonic inspection of a caller-selected secret-handling region.
+  * A clean result means no listed hazards were found; it is not a timing proof.
+  */
+ export class ConstantTimeAuditor {
+-  public static auditX86_64(instructions: DisassembledInstruction[]): ConstantTimeAuditResult {
+-    return this.audit(instructions, 'x86_64', X86_BRANCHES, new Set(['div', 'idiv', 'divb', 'divw', 'divl', 'divq', 'idivb', 'idivw', 'idivl', 'idivq']))
++  public static auditX86_64(instructions: DisassembledInstruction[], options: ConstantTimeAuditOptions = {}): ConstantTimeAuditResult {
++    return this.audit(instructions, 'x86_64', X86_BRANCHES, new Set(['div', 'idiv', 'divb', 'divw', 'divl', 'divq', 'idivb', 'idivw', 'idivl', 'idivq']), options)
+   }
+ 
+-  public static auditARM64(instructions: DisassembledInstruction[]): ConstantTimeAuditResult {
+-    return this.audit(instructions, 'aarch64', ARM_BRANCHES, new Set(['udiv', 'sdiv']))
++  public static auditARM64(instructions: DisassembledInstruction[], options: ConstantTimeAuditOptions = {}): ConstantTimeAuditResult {
++    return this.audit(instructions, 'aarch64', ARM_BRANCHES, new Set(['udiv', 'sdiv']), options)
+   }
+ 
+-  public static auditBytes(code: Uint8Array, options: DisassemblyOptions): ConstantTimeAuditResult {
++  public static auditBytes(code: Uint8Array, options: DisassemblyOptions & ConstantTimeAuditOptions): ConstantTimeAuditResult {
+     const instructions = ReferenceDisassembler.disassemble(code, options)
+-    const result = options.arch === 'x86_64' ? this.auditX86_64(instructions) : this.auditARM64(instructions)
++    const result = options.arch === 'x86_64' ? this.auditX86_64(instructions, options) : this.auditARM64(instructions, options)
+     const decodedBytes = instructions.reduce((sum, instruction) => sum + instruction.length, 0)
+     if (decodedBytes < code.length) {
+       result.suspiciousInstructions.push({ offset: decodedBytes, mnemonic: '<unexamined>', reason: 'Instruction budget left bytes unexamined' })
++      result.hazards.push({ offset: decodedBytes, mnemonic: '<unexamined>', severity: 'WARN', category: 'UNDECODED', reason: 'Instruction budget left bytes unexamined' })
+       result.isCleanConstantTime = false
+     }
+     return result
+@@ -51,8 +83,10 @@ export class ConstantTimeAuditor {
+     arch: DecodedInstruction['arch'],
+     branches: ReadonlySet<string>,
+     divisions: ReadonlySet<string>,
++    options: ConstantTimeAuditOptions,
+   ): ConstantTimeAuditResult {
+     const suspiciousInstructions: ConstantTimeAuditResult['suspiciousInstructions'] = []
++    const hazards: AuditHazard[] = []
+     let branchCount = 0
+     let offset = 0
+     for (const instruction of instructions) {
+@@ -60,7 +94,10 @@ export class ConstantTimeAuditor {
+         throw new RangeError('Instruction length must be a positive safe integer')
+       }
+       const mnemonic = instruction.mnemonic.trim().toLowerCase()
+-      const issue = (reason: string) => suspiciousInstructions.push({ offset, mnemonic: instruction.mnemonic, reason })
++      const issue = (reason: string, category: AuditHazard['category'] = 'UNDECODED', severity: HazardSeverity = 'WARN') => {
++        suspiciousInstructions.push({ offset, mnemonic: instruction.mnemonic, reason })
++        hazards.push({ offset, mnemonic: instruction.mnemonic, operands: instruction.operands, reason, category, severity })
++      }
+       if (instruction.arch !== arch) issue('Instruction architecture does not match the audit architecture')
+       if (instruction.bytes.length !== instruction.length) issue('Instruction length does not match its byte span')
+       if (!instruction.isValid || ['db', '.byte', '.inst'].includes(mnemonic)) {
+@@ -68,9 +105,27 @@ export class ConstantTimeAuditor {
+       } else {
+         if (branches.has(mnemonic)) {
+           branchCount++
+-          issue('Conditional branch may depend on secret data; review branch dependencies')
++          issue('Conditional branch may depend on secret data; review branch dependencies', 'BRANCH', 'CRITICAL')
++        }
++        if (divisions.has(mnemonic)) issue('Division latency may depend on operands and processor; review timing guarantees', 'VARIABLE_LATENCY', 'HIGH')
++        if (options.checkMemoryLookups !== false && !/^lea[qwl]?$/.test(mnemonic) && hasIndexedMemory(instruction.operands, arch)) {
++          issue('Memory operand uses register indexing; potential cache-timing / table-lookup leak', 'CACHE_TIMING', 'HIGH')
++        }
++        const operands = instruction.operands.toLowerCase().split(',').map(operand => operand.trim())
++        if (arch === 'x86_64') {
++          if (/^bs[fr][qwl]?$/.test(mnemonic)) issue('Bit scan latency may depend on operands and processor', 'VARIABLE_LATENCY')
++          const shiftCount = instruction.operands.includes('%') ? operands[0] : operands[1]
++          if (/^(?:shl|sal|shr|sar|rol|ror)[bwlq]?$/.test(mnemonic)
++            && /^%?(?:cl|[re]?(?:ax|bx|cx|dx|si|di|bp|sp)|r\d+[dwb]?)$/.test(shiftCount ?? '')) {
++            issue('Register-controlled shift or rotate requires processor-specific timing review', 'VARIABLE_LATENCY')
++          }
++          if (/^rep(?:e|z|ne|nz)?\s+(?:movs|stos)[bwdql]?$/.test(`${mnemonic} ${instruction.operands}`.trim())) {
++            issue('Repeated string operation timing depends on count and memory access', 'VARIABLE_LATENCY', 'HIGH')
++          }
++        } else if (/^(?:lslv|lsrv|asrv|rorv|clz|cls|rbit)$/.test(mnemonic)
++          || (/^(?:lsl|lsr|asr|ror)$/.test(mnemonic) && /^[xw]\d+$/.test(operands[2] ?? ''))) {
++          issue('Variable bit operation requires processor-specific timing review', 'VARIABLE_LATENCY')
+         }
+-        if (divisions.has(mnemonic)) issue('Division latency may depend on operands and processor; review timing guarantees')
+       }
+       offset += instruction.length
+       if (!Number.isSafeInteger(offset)) throw new RangeError('Instruction byte offset exceeds the safe integer range')
+@@ -78,7 +133,10 @@ export class ConstantTimeAuditor {
+     return {
+       hasConditionalBranches: branchCount > 0,
+       branchCount,
++      hasCacheTimingHazards: hazards.some(hazard => hazard.category === 'CACHE_TIMING'),
++      hasVariableLatencyHazards: hazards.some(hazard => hazard.category === 'VARIABLE_LATENCY'),
+       suspiciousInstructions,
++      hazards,
+       isCleanConstantTime: instructions.length > 0 && suspiciousInstructions.length === 0,
+     }
+   }
+diff --git a/packages/core/src/native/disassembler.ts b/packages/core/src/native/disassembler.ts
+index 469a5fd..8e1c6cc 100644
+--- a/packages/core/src/native/disassembler.ts
++++ b/packages/core/src/native/disassembler.ts
+@@ -106,15 +106,93 @@ export class ReferenceDisassembler {
+     }
+ 
+     // Decode group-3 divisions, including REX, SIB and displacement lengths.
+-    const opcodeOffset = b0 >= 0x40 && b0 <= 0x4f ? 1 : 0
++    let opcodeOffset = 0
++    let operand16 = false
++    let repeat = false
++    while (opcodeOffset < 15 && [0x66, 0xf2, 0xf3].includes(bytes[opcodeOffset] ?? -1)) {
++      if (bytes[opcodeOffset] === 0x66) operand16 = true
++      else repeat = true
++      opcodeOffset++
++    }
++    const rex = (bytes[opcodeOffset] ?? 0) >= 0x40 && (bytes[opcodeOffset] ?? 0) <= 0x4f ? bytes[opcodeOffset++]! : 0
+     const opcode = bytes[opcodeOffset]
++    const width = (rex & 8) !== 0 ? 64 : operand16 ? 16 : 32
++    const register = (index: number, size = width): string => {
++      if (index >= 8) return `r${index}${size === 64 ? '' : size === 32 ? 'd' : size === 16 ? 'w' : 'b'}`
++      if (size === 8) return (rex ? ['al', 'cl', 'dl', 'bl', 'spl', 'bpl', 'sil', 'dil'] : ['al', 'cl', 'dl', 'bl', 'ah', 'ch', 'dh', 'bh'])[index]!
++      const names = ['ax', 'cx', 'dx', 'bx', 'sp', 'bp', 'si', 'di']
++      return `${size === 64 ? 'r' : size === 32 ? 'e' : ''}${names[index]}`
++    }
++    const memoryOperand = (offset: number, size = width): string => {
++      const modrm = bytes[offset]!
++      const mode = modrm >> 6
++      const rm = modrm & 7
++      if (mode === 3) return register(rm + ((rex & 1) << 3), size)
++      const parts: string[] = []
++      let cursor = offset + 1
++      let displacementSize = mode === 1 ? 1 : mode === 2 ? 4 : 0
++      if (rm === 4) {
++        const sib = bytes[cursor++]!
++        const base = sib & 7
++        const index = (sib >> 3) & 7
++        if (mode === 0 && base === 5) displacementSize = 4
++        else parts.push(register(base + ((rex & 1) << 3), 64))
++        if (index !== 4 || (rex & 2) !== 0) {
++          const scale = 1 << (sib >> 6)
++          const indexRegister = register(index + ((rex & 2) << 2), 64)
++          parts.push(scale === 1 ? indexRegister : `${indexRegister}*${scale}`)
++        }
++      } else if (mode === 0 && rm === 5) {
++        parts.push('rip')
++        displacementSize = 4
++      } else parts.push(register(rm + ((rex & 1) << 3), 64))
++      const displacement = displacementSize === 1 ? (bytes[cursor]! << 24) >> 24
++        : displacementSize === 4 ? new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getInt32(cursor, true) : 0
++      let expression = parts.join(' + ')
++      if (expression === '') expression = displacement.toString()
++      else if (displacement !== 0) expression += displacement < 0 ? ` - ${-displacement}` : ` + ${displacement}`
++      return `[${expression}]`
++    }
++    const complete = (length: number | null, mnemonic: string, operands: () => string): DecodedInstruction => {
++      if (length === null || length > 15 || length > bytes.length) {
++        return { ...decoded(Math.min(bytes.length, 15), 'db', ''), isValid: false }
++      }
++      return decoded(length, mnemonic, operands())
++    }
++    if (repeat && [0xa4, 0xa5, 0xaa, 0xab].includes(opcode ?? -1)) {
++      const suffix = opcode === 0xa4 || opcode === 0xaa ? 'b' : width === 64 ? 'q' : width === 16 ? 'w' : 'd'
++      return complete(opcodeOffset + 1, `rep ${opcode! < 0xaa ? 'movs' : 'stos'}${suffix}`, () => '')
++    }
++    if (opcode === 0x88 || opcode === 0x89 || opcode === 0x8a || opcode === 0x8b) {
++      const size = opcode === 0x88 || opcode === 0x8a ? 8 : width
++      return complete(modrmEnd(opcodeOffset + 1), 'mov', () => {
++        const destination = register(((bytes[opcodeOffset + 1]! >> 3) & 7) + ((rex & 4) << 1), size)
++        const memory = memoryOperand(opcodeOffset + 1, size)
++        return opcode === 0x8a || opcode === 0x8b ? `${destination}, ${memory}` : `${memory}, ${destination}`
++      })
++    }
++    if ([0xd0, 0xd1, 0xd2, 0xd3, 0xc0, 0xc1].includes(opcode ?? -1)) {
++      const operandEnd = modrmEnd(opcodeOffset + 1)
++      if (operandEnd === null) return complete(null, '', () => '')
++      const extension = (bytes[opcodeOffset + 1]! >> 3) & 7
++      const mnemonic = ['rol', 'ror', undefined, undefined, 'shl', 'shr', undefined, 'sar'][extension]
++      if (mnemonic !== undefined) {
++        const immediate = opcode === 0xc0 || opcode === 0xc1
++        return complete(operandEnd + (immediate ? 1 : 0), mnemonic, () =>
++          `${memoryOperand(opcodeOffset + 1, opcode! % 2 === 0 ? 8 : width)}, ${immediate ? bytes[operandEnd] : opcode === 0xd2 || opcode === 0xd3 ? 'cl' : '1'}`)
++      }
++    }
++    if (opcode === 0x0f && (bytes[opcodeOffset + 1] === 0xbc || bytes[opcodeOffset + 1] === 0xbd) && !repeat) {
++      return complete(modrmEnd(opcodeOffset + 2), bytes[opcodeOffset + 1] === 0xbc ? 'bsf' : 'bsr', () =>
++        `${register(((bytes[opcodeOffset + 2]! >> 3) & 7) + ((rex & 4) << 1))}, ${memoryOperand(opcodeOffset + 2)}`)
++    }
+     if ((opcode === 0xf6 || opcode === 0xf7) && bytes.length >= opcodeOffset + 2) {
+       const modrm = bytes[opcodeOffset + 1]!
+       const extension = (modrm >> 3) & 7
+       if (extension === 6 || extension === 7) {
+         const length = modrmEnd(opcodeOffset + 1)
+         if (length === null) return { ...decoded(bytes.length, 'db', ''), isValid: false }
+-        return decoded(length, extension === 6 ? 'div' : 'idiv', `modrm(0x${modrm.toString(16)})`)
++        return complete(length, extension === 6 ? 'div' : 'idiv', () => memoryOperand(opcodeOffset + 1, opcode === 0xf6 ? 8 : width))
+       }
+     }
+ 
+@@ -256,24 +334,10 @@ export class ReferenceDisassembler {
+       }
+     }
+ 
+-    // REX.W (0x48) common 64-bit prefixes
++    // REX.W (0x48) immediate arithmetic.
+     if (b0 === 0x48 && bytes.length >= 3) {
+       const b1 = bytes[1]!
+       const b2 = bytes[2]!
+-      if (b1 === 0x89) {
+-        // mov r/m64, r64
+-        const length = modrmEnd(2)
+-        if (length === null) return { ...decoded(bytes.length, 'db', ''), isValid: false }
+-        return {
+-          address: addr,
+-          bytes: bytes.subarray(0, length),
+-          length,
+-          mnemonic: 'mov',
+-          operands: `modrm(0x${b2.toString(16)})`,
+-          arch: 'x86_64',
+-          isValid: true,
+-        }
+-      }
+       if (b1 === 0x83) {
+         // add/sub/cmp r/m64, imm8
+         const operandEnd = modrmEnd(2)
+@@ -283,7 +347,7 @@ export class ReferenceDisassembler {
+           bytes: bytes.subarray(0, length),
+           length,
+           mnemonic: 'alu64',
+-          operands: `modrm(0x${b2.toString(16)})`,
++          operands: operandEnd === null ? `modrm(0x${b2.toString(16)})` : `${memoryOperand(2)}, ${bytes[operandEnd] ?? '<truncated>'}`,
+           arch: 'x86_64',
+           isValid: operandEnd !== null && bytes.length > operandEnd,
+         }
+@@ -343,6 +407,26 @@ export class ReferenceDisassembler {
+       const prefix = (insn >>> 31) === 1 ? 'x' : 'w'
+       return decoded(divisionOpcode === 0x1ac00800 ? 'udiv' : 'sdiv', `${prefix}${insn & 31}, ${prefix}${(insn >>> 5) & 31}, ${prefix}${(insn >>> 16) & 31}`)
+     }
++    if ([0x1ac02000, 0x1ac02400, 0x1ac02800, 0x1ac02c00].includes(divisionOpcode)) {
++      const prefix = (insn >>> 31) === 1 ? 'x' : 'w'
++      const mnemonic = ['lslv', 'lsrv', 'asrv', 'rorv'][(divisionOpcode - 0x1ac02000) >>> 10]!
++      return decoded(mnemonic, `${prefix}${insn & 31}, ${prefix}${(insn >>> 5) & 31}, ${prefix}${(insn >>> 16) & 31}`)
++    }
++    // Integer register-offset loads/stores; reject reserved extend/opcode combinations.
++    if (((insn & 0x3f200c00) >>> 0) === 0x38200800) {
++      const size = insn >>> 30
++      const operation = (insn >>> 22) & 3
++      const option = (insn >>> 13) & 7
++      if ([2, 3, 6, 7].includes(option) && operation <= 1) {
++        const register = (index: number, prefix: string) => index === 31 ? `${prefix}zr` : `${prefix}${index}`
++        const base = (insn >>> 5) & 31
++        const index = register((insn >>> 16) & 31, option === 2 || option === 6 ? 'w' : 'x')
++        const shift = (insn & 0x1000) !== 0 ? size : 0
++        const extension = option === 3 ? (shift ? `, lsl #${shift}` : '') : `, ${option === 2 ? 'uxtw' : option === 6 ? 'sxtw' : 'sxtx'}${shift ? ` #${shift}` : ''}`
++        const mnemonic = `${operation === 1 ? 'ldr' : 'str'}${size === 0 ? 'b' : size === 1 ? 'h' : ''}`
++        return decoded(mnemonic, `${register(insn & 31, size === 3 ? 'x' : 'w')}, [${base === 31 ? 'sp' : `x${base}`}, ${index}${extension}]`)
++      }
++    }
+ 
+     // NOP: 0xd503201f
+     if (insn === 0xd503201f) {
+diff --git a/packages/mcp/src/audit-tools.ts b/packages/mcp/src/audit-tools.ts
+index 2e4fd96..1159001 100644
+--- a/packages/mcp/src/audit-tools.ts
++++ b/packages/mcp/src/audit-tools.ts
+@@ -1,7 +1,7 @@
+ import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js'
+ import {
+   auditSecp256k1, ConstantTimeAuditor, FileByteSource, BitpeekError, parseHex,
+-  SECP256K1_AUDIT_MAX_BYTES, sha256Hex,
++  SECP256K1_AUDIT_MAX_BYTES, sha256Hex, Secp256k1Engine,
+ } from '../../core/src/index.js'
+ import type { Secp256k1AuditFormat } from '../../core/src/index.js'
+ import type { McpSecurityManager } from './security.js'
+@@ -19,11 +19,24 @@ const sourceChoices = [
+   { required: ['handle'], not: { required: ['rawHex'] } },
+ ]
+ const auditAnnotations = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
++const hex32 = { type: 'string', minLength: 64, maxLength: 96, description: '32-byte hexadecimal value.' }
++const pointHex = { type: 'string', minLength: 66, maxLength: 195, description: 'Compressed (33-byte) or uncompressed (65-byte) SEC public key; preserves Y parity.' }
++const verificationProperties = {
++  pubkeyHex: { ...hex32, description: 'BIP-340 x-only public key. rawHex/file range supplies the 64-byte signature.' },
++  messageHex: { ...hex32, description: '32-byte Schnorr message; optional 32-byte BIP-374 proof message.' },
++  g1Hex: { ...pointHex, description: 'DLEQ first generator G (G1).' },
++  p1Hex: { ...pointHex, description: 'DLEQ first public point A (P1).' },
++  g2Hex: { ...pointHex, description: 'DLEQ second generator B (G2).' },
++  p2Hex: { ...pointHex, description: 'DLEQ second public point C (P2). rawHex/file range supplies the 64-byte proof.' },
++  internalKeyHex: { ...hex32, description: 'Taproot x-only internal key. rawHex/file range supplies the 32-byte output key.' },
++  merkleRootHex: { ...hex32, description: 'Optional Taproot Merkle root; omit for a key-only tweak.' },
++  expectedParity: { type: 'integer', enum: [0, 1], description: 'Optional expected Taproot output Y parity.' },
++}
+ 
+ export const MCP_AUDIT_TOOLS: Tool[] = [
+   {
+     name: 'bitpeek_secp256k1_audit',
+-    description: 'Audit secp256k1 public keys, strict DER or compact ECDSA signatures, and raw Bitcoin transactions. Returns curve/scalar/encoding findings and low-S policy warnings. Does not verify signed messages or full consensus. Accepts inline hex or an open file range up to 1 MiB; use format when encodings are ambiguous.',
++    description: 'Audit secp256k1 encodings and Bitcoin transactions, or verify BIP-340 Schnorr signatures, BIP-374 DLEQ proofs (including BIP-375 shares), and BIP-341 Taproot tweaks. Verification formats return PASS/FAIL with exact reasons. Supply signature/proof/output key as rawHex or an open file range and matching key/message parameters. Maximum 1 MiB.',
+     annotations: auditAnnotations,
+     inputSchema: {
+       type: 'object', additionalProperties: false, oneOf: sourceChoices,
+@@ -31,13 +44,14 @@ export const MCP_AUDIT_TOOLS: Tool[] = [
+         ...sourceProperties,
+         rawHex: { ...sourceProperties.rawHex, maxLength: SECP256K1_AUDIT_MAX_BYTES * 3 },
+         length: { ...sourceProperties.length, maximum: SECP256K1_AUDIT_MAX_BYTES, description: 'Exact range length; defaults to all remaining file bytes. Maximum 1 MiB.' },
+-        format: { type: 'string', enum: ['auto', 'pubkey', 'der', 'compact', 'bitcoin-tx'], default: 'auto' },
++        format: { type: 'string', enum: ['auto', 'pubkey', 'der', 'compact', 'bitcoin-tx', 'bip340-schnorr', 'dleq', 'taproot-tweak'], default: 'auto' },
++        ...verificationProperties,
+       },
+     },
+   },
+   {
+     name: 'bitpeek_constant_time_audit',
+-    description: 'Statically inspect a caller-selected secret-handling code region for conditional branches, integer division, and undecoded instructions. Uses the reference x86_64/AArch64 disassembler. A clean result is not a timing proof. Accepts inline hex or an open file range up to 65536 bytes; reports exact relative/file offsets and bigint addresses.',
++    description: 'Statically inspect a secret-handling code region for conditional branches, indexed memory/cache hazards, variable-latency arithmetic, and undecoded instructions. Uses the reference x86_64/AArch64 disassembler. A clean result is not a timing proof. Maximum 65536 bytes; reports classified hazards, assembly context, and exact relative/file offsets and bigint addresses.',
+     annotations: auditAnnotations,
+     inputSchema: {
+       type: 'object', additionalProperties: false, oneOf: sourceChoices,
+@@ -48,6 +62,7 @@ export const MCP_AUDIT_TOOLS: Tool[] = [
+         arch: { type: 'string', enum: ['x86_64', 'aarch64'], default: 'x86_64' },
+         baseAddress: { type: 'string', pattern: '^(0[xX][0-9a-fA-F]{1,16}|[0-9]{1,20})$', description: 'Unsigned 64-bit address of the selected region; defaults to file offset or zero for inline hex.' },
+         maxInstructions: { type: 'integer', minimum: 1, maximum: MCP_TIMING_MAX_INSTRUCTIONS, default: MCP_TIMING_MAX_INSTRUCTIONS },
++        checkMemoryLookups: { type: 'boolean', default: true, description: 'Inspect indexed memory operands for potential cache-timing leaks.' },
+       },
+     },
+   },
+@@ -64,6 +79,26 @@ function checkSignal(signal?: AbortSignal): void {
+   if (signal?.aborted) throw new BitpeekError('CANCELLED', 'Audit request was cancelled')
+ }
+ 
++function hexArgument(args: Record<string, unknown>, name: string, maxBytes = 32): Uint8Array {
++  const value = args[name]
++  if (typeof value !== 'string' || value.length === 0 || value.length > maxBytes * 3) {
++    throw new BitpeekError('INVALID_INPUT', `${name} must be a nonempty hex string of at most ${maxBytes} bytes`)
++  }
++  const parsed = parseHex(value)
++  if (!parsed.ok) throw new BitpeekError('INVALID_INPUT', `${name}: ${parsed.error}`)
++  if (parsed.bytes.length === 0 || parsed.bytes.length > maxBytes) throw new BitpeekError('INVALID_INPUT', `${name} exceeds its byte limit or is empty`)
++  return parsed.bytes
++}
++
++function pointArgument(args: Record<string, unknown>, name: string): { x: bigint; y: bigint } {
++  const bytes = hexArgument(args, name, 65)
++  const inspection = Secp256k1Engine.inspectPubKey(bytes)
++  if (!inspection.isValid || (bytes.length !== 33 && bytes.length !== 65) || inspection.y === undefined) {
++    throw new BitpeekError('INVALID_INPUT', `${name}: ${inspection.rejectionReason ?? 'DLEQ requires a compressed or uncompressed SEC point'}`)
++  }
++  return { x: inspection.x, y: inspection.y }
++}
++
+ async function readAuditInput(
+   args: Record<string, unknown>, security: McpSecurityManager,
+   maxBytes: number, defaultLength?: number, signal?: AbortSignal,
+@@ -108,18 +143,47 @@ export async function callAuditTool(
+   name: 'bitpeek_secp256k1_audit' | 'bitpeek_constant_time_audit',
+   args: Record<string, unknown>, security: McpSecurityManager, signal?: AbortSignal,
+ ): Promise<CallToolResult> {
+-  const allowed = new Set(['rawHex', 'handle', 'offset', 'length', ...(name === 'bitpeek_secp256k1_audit' ? ['format'] : ['arch', 'baseAddress', 'maxInstructions'])])
++  const allowed = new Set(['rawHex', 'handle', 'offset', 'length', ...(name === 'bitpeek_secp256k1_audit' ? ['format', ...Object.keys(verificationProperties)] : ['arch', 'baseAddress', 'maxInstructions', 'checkMemoryLookups'])])
+   for (const key of Object.keys(args)) if (!allowed.has(key)) throw new BitpeekError('INVALID_INPUT', `Unsupported audit argument: ${key}`)
+   let payload: Record<string, unknown>
+   if (name === 'bitpeek_secp256k1_audit') {
+     const format = args.format ?? 'auto'
+-    if (typeof format !== 'string' || !['auto', 'pubkey', 'der', 'compact', 'bitcoin-tx'].includes(format)) throw new BitpeekError('INVALID_INPUT', 'Unsupported secp256k1 audit format')
++    if (typeof format !== 'string' || !['auto', 'pubkey', 'der', 'compact', 'bitcoin-tx', 'bip340-schnorr', 'dleq', 'taproot-tweak'].includes(format)) throw new BitpeekError('INVALID_INPUT', 'Unsupported secp256k1 audit format')
++    const parameters = format === 'bip340-schnorr' ? ['pubkeyHex', 'messageHex']
++      : format === 'dleq' ? ['g1Hex', 'p1Hex', 'g2Hex', 'p2Hex', 'messageHex']
++      : format === 'taproot-tweak' ? ['internalKeyHex', 'merkleRootHex', 'expectedParity'] : []
++    for (const key of Object.keys(verificationProperties)) {
++      if (args[key] !== undefined && !parameters.includes(key)) throw new BitpeekError('INVALID_INPUT', `${key} is not supported for format ${format}`)
++    }
+     const { bytes, source } = await readAuditInput(args, security, SECP256K1_AUDIT_MAX_BYTES, undefined, signal)
+-    payload = { ...auditSecp256k1(bytes, format as Secp256k1AuditFormat), source }
++    if (parameters.length === 0) payload = { ...auditSecp256k1(bytes, format as Secp256k1AuditFormat), source }
++    else {
++      let verification: { valid: boolean; reason?: string; parity?: number }
++      if (format === 'bip340-schnorr') {
++        verification = Secp256k1Engine.verifySchnorr(hexArgument(args, 'pubkeyHex'), hexArgument(args, 'messageHex'), bytes)
++      } else if (format === 'dleq') {
++        verification = Secp256k1Engine.verifyDLEQ(pointArgument(args, 'g1Hex'), pointArgument(args, 'p1Hex'),
++          pointArgument(args, 'g2Hex'), pointArgument(args, 'p2Hex'), bytes,
++          args.messageHex === undefined ? undefined : hexArgument(args, 'messageHex'))
++      } else {
++        if (args.expectedParity !== undefined && args.expectedParity !== 0 && args.expectedParity !== 1) throw new BitpeekError('INVALID_INPUT', 'expectedParity must be 0 or 1')
++        verification = Secp256k1Engine.verifyTaprootTweak(hexArgument(args, 'internalKeyHex'), bytes,
++          args.merkleRootHex === undefined ? undefined : hexArgument(args, 'merkleRootHex'))
++        if (verification.valid && args.expectedParity !== undefined && verification.parity !== args.expectedParity) {
++          verification = { ...verification, valid: false, reason: 'Taproot output Y parity mismatch' }
++        }
++      }
++      const status = verification.valid ? 'PASS' : 'FAIL'
++      payload = { format, ...verification, status, source, verificationScope: 'cryptographic-verification',
++        cryptographicSignaturesVerified: format === 'bip340-schnorr' && verification.valid,
++        summary: `${status}: ${format} ${verification.valid ? 'verification succeeded' : verification.reason}` }
++    }
+   } else {
+     const arch = args.arch ?? 'x86_64'
+     if (arch !== 'x86_64' && arch !== 'aarch64') throw new BitpeekError('INVALID_INPUT', 'arch must be x86_64 or aarch64')
+     const maxInstructions = safeInteger(args.maxInstructions ?? MCP_TIMING_MAX_INSTRUCTIONS, 'maxInstructions', 1, MCP_TIMING_MAX_INSTRUCTIONS)
++    const checkMemoryLookups = args.checkMemoryLookups === undefined ? true : args.checkMemoryLookups
++    if (typeof checkMemoryLookups !== 'boolean') throw new BitpeekError('INVALID_INPUT', 'checkMemoryLookups must be a boolean')
+     let suppliedAddress: bigint | undefined
+     if (args.baseAddress !== undefined) {
+       if (typeof args.baseAddress !== 'string' || !/^(0[xX][0-9a-fA-F]{1,16}|[0-9]{1,20})$/.test(args.baseAddress)) throw new BitpeekError('INVALID_INPUT', 'baseAddress must be an unsigned 64-bit hexadecimal or decimal string')
+@@ -129,10 +193,17 @@ export async function callAuditTool(
+     const { bytes, source } = await readAuditInput(args, security, MCP_TIMING_MAX_BYTES, 256, signal)
+     const baseAddress = suppliedAddress ?? BigInt(source.offset ?? 0)
+     if (baseAddress + BigInt(bytes.length - 1) > 0xffffffffffffffffn) throw new BitpeekError('INVALID_RANGE', 'Code range exceeds the unsigned 64-bit address range')
+-    const audit = ConstantTimeAuditor.auditBytes(bytes, { arch, baseAddress, maxInstructions })
++    const audit = ConstantTimeAuditor.auditBytes(bytes, { arch, baseAddress, maxInstructions, checkMemoryLookups })
+     payload = {
+       ...audit, arch, baseAddress: `0x${baseAddress.toString(16)}`, source,
+       verificationScope: 'static-instruction-patterns', constantTimeProven: false,
++      checkMemoryLookups,
++      summary: audit.isCleanConstantTime ? 'No listed static instruction hazards found'
++        : `${audit.hazards.length} hazard(s); ${audit.branchCount} conditional branch(es)${audit.hazards.length === 0 ? '; no instructions examined' : ''}`,
++      hazards: audit.hazards.map(hazard => ({
++        ...hazard, address: `0x${(baseAddress + BigInt(hazard.offset)).toString(16)}`,
++        ...(source.offset !== undefined ? { fileOffset: source.offset + hazard.offset } : {}),
++      })),
+       suspiciousInstructions: audit.suspiciousInstructions.map(finding => ({
+         ...finding, address: `0x${(baseAddress + BigInt(finding.offset)).toString(16)}`,
+         ...(source.offset !== undefined ? { fileOffset: source.offset + finding.offset } : {}),
+===============================================================================
+LAMPIRAN C - SUMBER LENGKAP KETIGA FILE TES BARU
+===============================================================================
+
+FILE: packages/core/src/native/constant-time-deep.test.ts
+-------------------------------------------------------------------------------
+import { describe, expect, it } from 'vitest'
+import { ConstantTimeAuditor as Auditor } from './constant-time'
+import type { DisassembledInstruction } from './constant-time'
+import { ReferenceDisassembler } from './disassembler'
+
+function instruction(mnemonic: string, operands: string, arch: 'x86_64' | 'aarch64' = 'x86_64'): DisassembledInstruction {
+  return { mnemonic, operands, arch, address: 0n, bytes: new Uint8Array(4), length: 4, isValid: true }
+}
+
+function x86(hex: string, checkMemoryLookups = true) {
+  return Auditor.auditBytes(Uint8Array.from(Buffer.from(hex, 'hex')), { arch: 'x86_64', checkMemoryLookups })
+}
+
+function arm(word: number) {
+  const bytes = new Uint8Array(4)
+  new DataView(bytes.buffer).setUint32(0, word, true)
+  return Auditor.auditBytes(bytes, { arch: 'aarch64' })
+}
+
+describe('classified constant-time hazards', () => {
+  it.each(['rax, [rbx + rcx*8]', 'rax, [rax + rbx]', 'eax, [rsi + rdx]', 'rax, [rsp + rax*4]'])(
+    'flags indexed x86 memory %s', operands => {
+      const result = Auditor.auditX86_64([instruction('mov', operands)])
+      expect(result).toMatchObject({ hasCacheTimingHazards: true, hasVariableLatencyHazards: false, isCleanConstantTime: false })
+      expect(result.hazards).toEqual([expect.objectContaining({ offset: 0, mnemonic: 'mov', operands, severity: 'HIGH', category: 'CACHE_TIMING' })])
+    },
+  )
+  it.each(['rax, [rbp - 16]', 'rax, [rsp + 8]', 'rax, [rip + 0x100]', 'rax, [rdi]', 'rax, [0x1000]'])(
+    'accepts fixed/base x86 memory %s', operands => {
+      expect(Auditor.auditX86_64([instruction('mov', operands)]).hazards).toEqual([])
+    },
+  )
+  it('excludes LEA address arithmetic and honors memory opt-out', () => {
+    expect(Auditor.auditX86_64([instruction('lea', 'rax, [rbx + rcx*8]')]).isCleanConstantTime).toBe(true)
+    expect(Auditor.auditX86_64([instruction('mov', 'rax, [rbx + rcx*8]')], { checkMemoryLookups: false }).hazards).toEqual([])
+  })
+  it.each(['x0, [x1, x2]', 'x0, [x1, x2, lsl #3]', 'w0, [sp, w2, uxtw #2]'])(
+    'flags ARM register-offset memory %s', operands => {
+      expect(Auditor.auditARM64([instruction('ldr', operands, 'aarch64')]).hazards[0]).toMatchObject({ category: 'CACHE_TIMING', severity: 'HIGH' })
+    },
+  )
+  it.each(['x0, [sp, #16]', 'x0, [x1]', 'x0, [x1, xzr]'])(
+    'accepts fixed ARM memory %s', operands => {
+      expect(Auditor.auditARM64([instruction('ldr', operands, 'aarch64')]).hasCacheTimingHazards).toBe(false)
+    },
+  )
+  it.each([['shl', 'rax, cl'], ['ror', 'eax, ecx'], ['shlq', '%cl, %rax'], ['bsf', 'eax, ebx'], ['bsr', 'rax, rbx'], ['rep movsb', ''], ['rep', 'stosq']])(
+    'flags variable x86 instruction %s %s', (mnemonic, operands) => {
+      expect(Auditor.auditX86_64([instruction(mnemonic, operands)])).toMatchObject({ hasVariableLatencyHazards: true, isCleanConstantTime: false })
+    },
+  )
+  it.each([['shl', 'rax, 3'], ['shlq', '$3, %rax'], ['ror', 'rax, 1']])(
+    'accepts constant-count shift %s %s', (mnemonic, operands) => {
+      expect(Auditor.auditX86_64([instruction(mnemonic, operands)]).hasVariableLatencyHazards).toBe(false)
+    },
+  )
+  it.each(['lslv', 'lsrv', 'asrv', 'rorv', 'clz', 'cls', 'rbit', 'lsl'])(
+    'flags ARM bit operation %s', mnemonic => {
+      expect(Auditor.auditARM64([instruction(mnemonic, 'x0, x1, x2', 'aarch64')]).hasVariableLatencyHazards).toBe(true)
+    },
+  )
+  it('retains byte offsets, multiple hazard categories, and legacy findings', () => {
+    const result = Auditor.auditX86_64([instruction('nop', ''), instruction('je', '0x10'), instruction('div', '[rax + rbx]')])
+    expect(result.branchCount).toBe(1)
+    expect(result.hazards.map(hazard => [hazard.offset, hazard.category, hazard.severity])).toEqual([
+      [4, 'BRANCH', 'CRITICAL'], [8, 'VARIABLE_LATENCY', 'HIGH'], [8, 'CACHE_TIMING', 'HIGH'],
+    ])
+    expect(result.suspiciousInstructions).toEqual(result.hazards.map(({ offset, mnemonic, reason }) => ({ offset, mnemonic, reason })))
+  })
+  it('classifies undecoded code and an unexamined tail', () => {
+    expect(x86('00').hazards[0]).toMatchObject({ category: 'UNDECODED', severity: 'WARN' })
+    expect(Auditor.auditBytes(Uint8Array.of(0x90, 0xc3), { arch: 'x86_64', maxInstructions: 1 }).hazards[0]).toMatchObject({ offset: 1, category: 'UNDECODED' })
+  })
+})
+
+describe('deep hazards from real machine code', () => {
+  it.each(['488b04cb', '488904cb', '4b8b04cc', '488b0418', '488b048df0ffffff', '48f734cb', '4883bc087400000001'])(
+    'decodes indexed x86 memory without losing byte spans: %s', hex => {
+      const bytes = Uint8Array.from(Buffer.from(hex, 'hex'))
+      const decoded = ReferenceDisassembler.disassemble(bytes, { arch: 'x86_64' })
+      expect(decoded).toHaveLength(1)
+      expect(decoded[0]).toMatchObject({ length: bytes.length, isValid: true })
+      expect(x86(hex).hasCacheTimingHazards).toBe(true)
+    },
+  )
+  it.each(['488b45f0', '488b442408', '488b0574000000', '488b042574000000', '488b04e3', '498b442408'])(
+    'decodes fixed memory without false cache findings: %s', hex => {
+      expect(x86(hex)).toMatchObject({ hasCacheTimingHazards: false, isCleanConstantTime: true })
+    },
+  )
+  it.each(['48d3e0', 'd3e8', '48d3c8', '480fbcc1', '0fbdc1', 'f3a4', 'f348ab', '66f3a5'])(
+    'decodes variable-latency x86 machine code: %s', hex => {
+      expect(x86(hex)).toMatchObject({ hasVariableLatencyHazards: true, isCleanConstantTime: false })
+      expect(x86(hex).hazards.every(hazard => hazard.category !== 'UNDECODED')).toBe(true)
+    },
+  )
+  it.each(['48c1e003', '48d1e0', '66c1c001'])(
+    'keeps immediate shifts clean: %s', hex => expect(x86(hex).isCleanConstantTime).toBe(true),
+  )
+  it.each(['488b04', '488b0574', '48c1e0', '480fbc', 'f3', '66d3'])(
+    'fails closed on truncated deep instructions: %s', hex => expect(x86(hex).isCleanConstantTime).toBe(false),
+  )
+  it('reports exact SIB operands and offsets, including extended registers', () => {
+    expect(x86('90488b04cb').hazards[0]).toMatchObject({ offset: 1, operands: 'rax, [rbx + rcx*8]' })
+    expect(x86('4b8b04cc').hazards[0]?.operands).toBe('rax, [r12 + r9*8]')
+    expect(x86('488b04cb', false).isCleanConstantTime).toBe(true)
+  })
+  it.each([0xf8626820, 0xf8627820, 0xf8226820, 0xb8625820])('decodes ARM register-offset loads/stores: %s', word => {
+    expect(arm(word)).toMatchObject({ hasCacheTimingHazards: true, hasVariableLatencyHazards: false })
+    expect(arm(word).hazards[0]?.operands).toContain('[x1,')
+  })
+  it('ignores ARM zero register offsets', () => {
+    expect(arm(0xf87f6820).isCleanConstantTime).toBe(true)
+  })
+  it.each([0x9ac22020, 0x9ac22420, 0x1ac22820, 0x9ac22c20])('decodes ARM variable shifts: %s', word => {
+    expect(arm(word).hazards[0]).toMatchObject({ category: 'VARIABLE_LATENCY', severity: 'WARN' })
+  })
+})
+
+
+FILE: packages/core/src/bchain/secp256k1-deep.test.ts
+-------------------------------------------------------------------------------
+import { createECDH, createHash } from 'node:crypto'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import * as crypto from '../crypto'
+import { unsignedBigEndian } from '../bytes'
+import { Secp256k1Engine as Engine, pointAdd, pointDouble, scalarMul, liftX,
+  SECP256K1_P as P, SECP256K1_N as N, SECP256K1_GX as GX, SECP256K1_GY as GY } from './secp256k1'
+import type { Point } from './secp256k1'
+
+const hex = (value: string) => Uint8Array.from(Buffer.from(value, 'hex'))
+const be = (value: bigint) => hex(value.toString(16).padStart(64, '0'))
+const G = { x: GX, y: GY }
+const KEY = hex('F9308A019258C31049344F85F89D5229B531C845836F99B08601F113BCE036F9')
+const SIG = hex('E907831F80848D1069A5371B402410364BDF1C5F8307B0084C55F1CE2DCA821525F66A4A85EA8B71E482A74F382D2CE5EBEEE8FDB2172F477DF4900D310536C0')
+const MSG = new Uint8Array(32)
+
+// Published BIP-374 verification vectors 0 (custom generator/message) and 5 (no message).
+// https://github.com/bitcoin/bips/blob/master/bip-0374/test_vectors_verify_proof.csv
+const DLEQ_VECTORS = [
+  [
+    '02cef38f55e78b321a1f785cb1c6e33dfcef9784c18bdc4e279801c449ccdfb88e',
+    '02b540b22c2c5ef0dc886abdaad27498453d893265560bc08a187319af6f845f58',
+    '02dad4b35c2379ba8334c9a5dda8f6e6d5cd575a7cc9d3ca4faaac51839daaa30f',
+    '03fefe00951dcd0ef10b12523393c2b8113119de4fdeeab320694e96bdccd2775b',
+    '7e7e934169e0bf4706e6b29e5a621c7fe199a524744a25af80071e111c0e2e94118e730d8add118dd2ee4f7d1cc183e1b87168362d1a6f85c16d8671a3fc7a8a',
+    'efb07d4b382d3da1079fbf24df623ba6c2e4c764993bbfa6dd7a4fe4aaf33859',
+  ],
+  [
+    `02${GX.toString(16)}`,
+    '02637b2c3ea8ca80b9caecc50f4134c86ae9cf7a269133e7afc71f30e3a3cda60c',
+    '034bccb1c570ac1f3bc42d61fe35de605b99626501ccb20297e1acbbf2d7152aa1',
+    '0285b826c8dd175805901906b6c9b4140a30cbcc94c6e7dcf36476038bf90d4718',
+    '503562d36910cd2d61a4d07c8ff680265c713e63dde0dcb88e6ea3c58597bdc05b86db9af95eccc475ce2177f941c118fefed20227d4ce8ce9557cb008758de6',
+    '',
+  ],
+] as const
+
+function point(value: string) {
+  const inspection = Engine.inspectPubKey(hex(value))
+  if (!inspection.isValid || inspection.y === undefined) throw new Error('Invalid vector point')
+  return { x: inspection.x, y: inspection.y }
+}
+
+afterEach(() => vi.restoreAllMocks())
+
+describe('tagged hashes and secp256k1 arithmetic', () => {
+  it('matches native SHA-256 for mixed UTF-8, empty and multi-block inputs', () => {
+    for (const messages of [[], [''], ['é', new Uint8Array(200).fill(42), '支付']] as (string | Uint8Array)[][]) {
+      const tagHash = createHash('sha256').update('test/タグ').digest()
+      const expected = createHash('sha256').update(tagHash).update(tagHash)
+      for (const message of messages) expected.update(message)
+      expect(Buffer.from(crypto.taggedHash('test/タグ', ...messages))).toEqual(expected.digest())
+    }
+  })
+  it('handles infinity, inverse points, doubling and scalar reduction', () => {
+    expect(pointAdd(G, null)).toEqual(G)
+    expect(pointAdd(null, G)).toEqual(G)
+    expect(pointAdd(null, null)).toBeNull()
+    expect(pointAdd(G, { x: GX, y: P - GY })).toBeNull()
+    expect(pointDouble(null)).toBeNull()
+    expect(pointDouble({ x: 0n, y: 0n })).toBeNull()
+    expect(pointAdd(G, G)).toEqual(pointDouble(G))
+    expect(scalarMul(0n, G)).toBeNull()
+    expect(scalarMul(N, G)).toBeNull()
+    expect(scalarMul(42n, null)).toBeNull()
+    expect(scalarMul(N + 1n, G)).toEqual(G)
+    expect(scalarMul(-1n, G)).toEqual({ x: GX, y: P - GY })
+    expect(Engine.pointDouble(G)).toEqual(Engine.pointAdd(G, G))
+    expect(Engine.scalarMul(2n, G)).toEqual(pointDouble(G))
+  })
+  it.each([1n, 2n, 3n, 42n, 0x123456789abcdefn, N - 1n])('matches independent OpenSSL multiplication for %s', scalar => {
+    const ecdh = createECDH('secp256k1')
+    ecdh.setPrivateKey(be(scalar))
+    const key = ecdh.getPublicKey(undefined, 'uncompressed')
+    expect(scalarMul(scalar, G)).toEqual({ x: unsignedBigEndian(key.subarray(1, 33)), y: unsignedBigEndian(key.subarray(33)) })
+  })
+  it('checks addition independently with a native combined scalar', () => {
+    const ecdh = createECDH('secp256k1')
+    ecdh.setPrivateKey(be(43n))
+    expect(pointAdd(scalarMul(17n, G), scalarMul(26n, G))).toEqual(point(ecdh.getPublicKey(undefined, 'compressed').toString('hex')))
+  })
+  it('lifts X to even Y and rejects lengths, overflow and non-residues', () => {
+    expect(liftX(be(GX))).toEqual(G)
+    expect(Engine.liftX(KEY)!.y & 1n).toBe(0n)
+    for (const bytes of [new Uint8Array(31), new Uint8Array(33), be(P), be(0n)]) expect(liftX(bytes)).toBeNull()
+  })
+})
+
+describe('BIP-340 Schnorr verification (32-byte messages)', () => {
+  // https://github.com/bitcoin/bips/blob/master/bip-0340/test-vectors.csv (vectors 0, 1, 3, 4).
+  it.each([
+    [Buffer.from(KEY).toString('hex'), '00'.repeat(32), Buffer.from(SIG).toString('hex')],
+    ['DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843240F7B502BA659', '243F6A8885A308D313198A2E03707344A4093822299F31D0082EFA98EC4E6C89', '6896BD60EEAE296DB48A229FF71DFE071BDE413E6D43F917DC8DCF8C78DE33418906D11AC976ABCCB20B091292BFF4EA897EFCB639EA871CFA95F6DE339E4B0A'],
+    ['25D1DFF95105F5253C4022F628A996AD3A0D95FBF21D468A1B33F8C160D8F517', 'FF'.repeat(32), '7EB0509757E246F19449885651611CB965ECC1A187DD51B64FDA1EDC9637D5EC97582B9CB13DB3933705B32BA982AF5AF25FD78881EBB32771FC5922EFC66EA3'],
+    ['D69C3509BB99E412E68B0FE8544E72837DFA30746D8BE2AA65975F29D22DC7B9', '4DF3C3F68FCC83B27E9D42C90431A72499F17875C81A599B566C9889B9696703', '00000000000000000000003B78CE563F89A0ED9414F5AA28AD0D96D6795F9C6376AFB1548AF603B3EB45C9F8207DEE1060CB71C04E80F593060B07D28308D7F4'],
+  ])('accepts published vector for key %s', (key, message, signature) => {
+    expect(Engine.verifySchnorr(hex(key), hex(message), hex(signature))).toEqual({ valid: true })
+  })
+  it('rejects r >= p and s >= n without reducing either scalar', () => {
+    const signature = SIG.slice()
+    signature.set(be(P))
+    expect(Engine.verifySchnorr(KEY, MSG, signature).reason).toBe('r >= p')
+    signature.set(SIG)
+    signature.set(be(N), 32)
+    expect(Engine.verifySchnorr(KEY, MSG, signature).reason).toBe('s >= n')
+  })
+  it('rejects corrupted signatures, messages and public keys', () => {
+    const signature = SIG.slice()
+    signature[10] = signature[10]! ^ 1
+    const message = MSG.slice()
+    message[0] = 1
+    expect(Engine.verifySchnorr(KEY, MSG, signature).valid).toBe(false)
+    expect(Engine.verifySchnorr(KEY, message, SIG).valid).toBe(false)
+    expect(Engine.verifySchnorr(be(P), MSG, SIG).reason).toBe('Invalid public key X coordinate')
+    expect(Engine.verifySchnorr(be(0n), MSG, SIG).valid).toBe(false)
+  })
+  it.each([
+    ['FFF97BD5755EEEA420453A14355235D382F6472F8568A18B2F057A14602975563CC27944640AC607CD107AE10923D9EF7A73C643E166BE5EBEAFA34B1AC553E2', 'R has odd Y coordinate'],
+    ['0000000000000000000000000000000000000000000000000000000000000000123DDA8328AF9C23A94C1FEECFD123BA4FB73476F0D594DCB65C6425BD186051', 'R is infinity'],
+    ['4A298DACAE57395A15D0795DDBFD1DCB564DA82B0F269BC70A74F8220429BA1D69E89B4C5564D00349106B8497785DD7D1D713A8AE82B32FA79D5F7FC407D39B', 'Signature verification equation failed (Rx != r)'],
+  ])('rejects published invalid vector: %s', (signature, reason) => {
+    expect(Engine.verifySchnorr(hex('DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843240F7B502BA659'),
+      hex('243F6A8885A308D313198A2E03707344A4093822299F31D0082EFA98EC4E6C89'), hex(signature))).toEqual({ valid: false, reason })
+  })
+  it('rejects malformed input lengths', () => {
+    expect(Engine.verifySchnorr(KEY.subarray(1), MSG, SIG).valid).toBe(false)
+    expect(Engine.verifySchnorr(KEY, new Uint8Array(0), SIG).valid).toBe(false)
+    expect(Engine.verifySchnorr(KEY, MSG, SIG.subarray(1)).valid).toBe(false)
+  })
+})
+
+describe('BIP-374 DLEQ proof verification', () => {
+  it.each(DLEQ_VECTORS)('accepts published vector with generator %s', (g, a, b, c, proof, message) => {
+    expect(Engine.verifyDLEQ(point(g), point(a), point(b), point(c), hex(proof), message ? hex(message) : undefined)).toEqual({ valid: true })
+  })
+  it('binds proof to the message, point ordering and compressed Y parity', () => {
+    const [g, a, b, c, proof, message] = DLEQ_VECTORS[0]
+    const points = [point(g), point(a), point(b), point(c)] as const
+    const damaged = hex(proof)
+    damaged[40] = damaged[40]! ^ 1
+    expect(Engine.verifyDLEQ(...points, damaged, hex(message)).valid).toBe(false)
+    expect(Engine.verifyDLEQ(...points, hex(proof)).valid).toBe(false)
+    expect(Engine.verifyDLEQ(points[0], points[1], points[3], points[2], hex(proof), hex(message)).valid).toBe(false)
+    expect(Engine.verifyDLEQ(points[0], points[1], points[2], { x: points[3].x, y: P - points[3].y }, hex(proof), hex(message)).valid).toBe(false)
+  })
+  it('rejects proof overflow, infinity, off-curve and noncanonical points', () => {
+    const [g, a, b, c, proof, message] = DLEQ_VECTORS[0]
+    const points = [point(g), point(a), point(b), point(c)] as const
+    for (const [offset, reason] of [[0, 'e >= n'], [32, 's >= n']] as const) {
+      const invalid = hex(proof)
+      invalid.set(be(N), offset)
+      expect(Engine.verifyDLEQ(...points, invalid, hex(message)).reason).toBe(reason)
+    }
+    expect(Engine.verifyDLEQ(...points, new Uint8Array(63)).valid).toBe(false)
+    expect(Engine.verifyDLEQ(...points, hex(proof), new Uint8Array(1)).valid).toBe(false)
+    for (const invalid of [null, { x: 0n, y: 0n }, { x: GX + P, y: GY }, { x: GX, y: -GY }]) {
+      for (let index = 0; index < 4; index++) {
+        const inputs: [Point, Point, Point, Point] = [...points]
+        inputs[index] = invalid
+        expect(Engine.verifyDLEQ(...inputs, hex(proof)).valid).toBe(false)
+      }
+    }
+    expect(Engine.verifyDLEQ(G, G, G, G, new Uint8Array(64)).reason).toBe('R1 is infinity')
+    const oneProof = new Uint8Array(64)
+    oneProof.set(be(1n)); oneProof.set(be(1n), 32)
+    expect(Engine.verifyDLEQ(G, pointDouble(G), G, G, oneProof).reason).toBe('R2 is infinity')
+  })
+})
+
+describe('BIP-341 Taproot tweak verification', () => {
+  // Published wallet-test-vectors.json cases with odd and even control-block parity.
+  it.each([
+    ['187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27', '147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3', '5b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21', 1],
+    ['93478e9488f956df2396be2ce6c5cced75f900dfa18e7dabd2428aae78451820', 'e4d810fd50586274face62b8a807eb9719cef49c04177cc6b76a9a4251d5450e', 'c525714a7f49c28aedbbba78c005931a81c234b2f6c99a73e4d06082adc8bf2b', 0],
+  ] as const)('checks published output and parity for %s', (internal, output, root, parity) => {
+    expect(Engine.verifyTaprootTweak(hex(internal), hex(output), hex(root))).toEqual({ valid: true, parity })
+    expect(Engine.verifyTaprootTweak(hex(internal), hex(output)).valid).toBe(false)
+  })
+  it('checks a published key-only tweak', () => {
+    expect(Engine.verifyTaprootTweak(hex('d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961d'),
+      hex('53a1f6e454df1aa2776a2814a721372d6258050de330b3c6d10ee8f4e0dda343')).valid).toBe(true)
+  })
+  it('rejects lengths, field overflow, invalid internal key and output mismatch', () => {
+    expect(Engine.verifyTaprootTweak(KEY.subarray(1), KEY).valid).toBe(false)
+    expect(Engine.verifyTaprootTweak(KEY, KEY.subarray(1)).valid).toBe(false)
+    expect(Engine.verifyTaprootTweak(KEY, KEY, new Uint8Array(0)).reason).toContain('Merkle root')
+    expect(Engine.verifyTaprootTweak(be(0n), KEY).reason).toBe('Invalid internal key X coordinate')
+    expect(Engine.verifyTaprootTweak(KEY, be(P)).reason).toBe('Output key X coordinate >= p')
+    expect(Engine.verifyTaprootTweak(KEY, KEY).reason).toBe('Taproot output key mismatch')
+  })
+  it('rejects overflowing tweak and infinity; accepts zero tweak', () => {
+    const hash = vi.spyOn(crypto, 'taggedHash').mockReturnValue(be(N))
+    expect(Engine.verifyTaprootTweak(KEY, KEY)).toEqual({ valid: false, parity: -1, reason: 'Taproot tweak >= n' })
+    hash.mockReturnValue(be(N - 3n))
+    expect(Engine.verifyTaprootTweak(KEY, KEY).reason).toBe('Tweaked point is infinity')
+    hash.mockReturnValue(be(0n))
+    expect(Engine.verifyTaprootTweak(KEY, KEY)).toEqual({ valid: true, parity: 0 })
+  })
+})
+
+
+FILE: packages/mcp/src/audit-tools-deep.test.ts
+-------------------------------------------------------------------------------
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
+import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js'
+import { createBitpeekMcpServer } from './server'
+import { McpSecurityManager } from './security'
+
+const schnorr = {
+  format: 'bip340-schnorr',
+  pubkeyHex: 'F9308A019258C31049344F85F89D5229B531C845836F99B08601F113BCE036F9',
+  messageHex: '00'.repeat(32),
+  rawHex: 'E907831F80848D1069A5371B402410364BDF1C5F8307B0084C55F1CE2DCA821525F66A4A85EA8B71E482A74F382D2CE5EBEEE8FDB2172F477DF4900D310536C0',
+}
+const taproot = {
+  format: 'taproot-tweak',
+  internalKeyHex: '187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27',
+  merkleRootHex: '5b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21',
+  rawHex: '147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3',
+}
+const dleq = {
+  format: 'dleq',
+  g1Hex: '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+  p1Hex: '02637b2c3ea8ca80b9caecc50f4134c86ae9cf7a269133e7afc71f30e3a3cda60c',
+  g2Hex: '034bccb1c570ac1f3bc42d61fe35de605b99626501ccb20297e1acbbf2d7152aa1',
+  p2Hex: '0285b826c8dd175805901906b6c9b4140a30cbcc94c6e7dcf36476038bf90d4718',
+  rawHex: '503562d36910cd2d61a4d07c8ff680265c713e63dde0dcb88e6ea3c58597bdc05b86db9af95eccc475ce2177f941c118fefed20227d4ce8ce9557cb008758de6',
+}
+
+describe('deep audits through MCP protocol calls', () => {
+  let client: Client
+  let server: ReturnType<typeof createBitpeekMcpServer>
+  let security: McpSecurityManager
+  let directory: string
+
+  beforeEach(async () => {
+    directory = await mkdtemp(join(tmpdir(), 'bitpeek-deep-audit-'))
+    security = new McpSecurityManager({ allowedInputRoots: [directory], allowedOutputRoots: [directory] })
+    server = createBitpeekMcpServer(security)
+    client = new Client({ name: 'deep-audit-tests', version: '1.0.0' })
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+    await server.connect(serverTransport)
+    await client.connect(clientTransport)
+  })
+  afterEach(async () => {
+    await client.close()
+    await server.close()
+    security.closeAll()
+    await rm(directory, { recursive: true, force: true })
+  })
+
+  async function call(name: string, args: Record<string, unknown>) {
+    const response = CallToolResultSchema.parse(await client.callTool({ name, arguments: args }))
+    const content = response.content.find(item => item.type === 'text')
+    if (!content || content.type !== 'text') throw new Error('Missing text response')
+    const payload = response.isError ? undefined : response.structuredContent ?? JSON.parse(content.text) as Record<string, unknown>
+    return { response, payload, text: content.text }
+  }
+
+  it('advertises new formats and default memory inspection', async () => {
+    const { tools } = await client.listTools()
+    const timing = tools.find(tool => tool.name === 'bitpeek_constant_time_audit')!
+    expect(timing.inputSchema.properties?.checkMemoryLookups).toMatchObject({ type: 'boolean', default: true })
+    const crypto = tools.find(tool => tool.name === 'bitpeek_secp256k1_audit')!
+    expect(crypto.inputSchema.properties?.format).toMatchObject({ enum: expect.arrayContaining(['bip340-schnorr', 'dleq', 'taproot-tweak']) })
+  })
+  it.each([undefined, true])('returns structured indexed memory hazards when enabled (%s)', async checkMemoryLookups => {
+    const { response, payload, text } = await call('bitpeek_constant_time_audit', {
+      rawHex: '90488b04cb', baseAddress: '0x8000000000000000', ...(checkMemoryLookups === undefined ? {} : { checkMemoryLookups }),
+    })
+    expect(response.isError).toBeUndefined()
+    expect(payload).toMatchObject({ checkMemoryLookups: true, hasCacheTimingHazards: true, hasVariableLatencyHazards: false, branchCount: 0, isCleanConstantTime: false, summary: expect.stringContaining('1 hazard') })
+    expect(payload?.hazards).toEqual([expect.objectContaining({ offset: 1, address: '0x8000000000000001', mnemonic: 'mov', operands: 'rax, [rbx + rcx*8]', severity: 'HIGH', category: 'CACHE_TIMING' })])
+    expect(JSON.parse(text)).toEqual(payload)
+  })
+  it('disables memory inspection while retaining branches and variable latency checks', async () => {
+    const { payload } = await call('bitpeek_constant_time_audit', { rawHex: '488b04cb48d3e07400', checkMemoryLookups: false })
+    expect(payload).toMatchObject({ hasCacheTimingHazards: false, hasVariableLatencyHazards: true, branchCount: 1, isCleanConstantTime: false })
+    expect(payload?.hazards).toEqual([
+      expect.objectContaining({ offset: 4, category: 'VARIABLE_LATENCY', operands: 'rax, cl', severity: 'WARN' }),
+      expect.objectContaining({ offset: 7, category: 'BRANCH', severity: 'CRITICAL' }),
+    ])
+  })
+  it('reports exact file offsets for a selected indexed memory range', async () => {
+    const path = join(directory, 'code.bin')
+    await writeFile(path, Buffer.from('000090488b04cb', 'hex'))
+    const { payload: opened } = await call('bitpeek_open', { filePath: path })
+    const { payload } = await call('bitpeek_constant_time_audit', { handle: opened?.handle, offset: 2, length: 5 })
+    expect(payload?.hazards).toEqual([expect.objectContaining({ offset: 1, fileOffset: 3, address: '0x3' })])
+  })
+  it('reports ARM register-offset loads and undecoded byte spans', async () => {
+    const { payload } = await call('bitpeek_constant_time_audit', { rawHex: '206862f800', arch: 'aarch64' })
+    expect(payload?.hazards).toEqual([
+      expect.objectContaining({ offset: 0, mnemonic: 'ldr', operands: 'x0, [x1, x2]', category: 'CACHE_TIMING' }),
+      expect.objectContaining({ offset: 4, category: 'UNDECODED' }),
+    ])
+  })
+  it('verifies a published BIP-340 signature with PASS and matching JSON content', async () => {
+    const { response, payload, text } = await call('bitpeek_secp256k1_audit', schnorr)
+    expect(response.isError).toBeUndefined()
+    expect(payload).toMatchObject({ valid: true, status: 'PASS', cryptographicSignaturesVerified: true, verificationScope: 'cryptographic-verification', source: { length: 64 } })
+    expect(JSON.parse(text)).toEqual(payload)
+  })
+  it('returns FAIL and the exact scalar overflow reason as an audit result', async () => {
+    const { response, payload } = await call('bitpeek_secp256k1_audit', {
+      ...schnorr, rawHex: schnorr.rawHex.slice(0, 64) + 'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141',
+    })
+    expect(response.isError).toBeUndefined()
+    expect(payload).toMatchObject({ valid: false, status: 'FAIL', reason: 's >= n', cryptographicSignaturesVerified: false, summary: 'FAIL: bip340-schnorr s >= n' })
+  })
+  it('verifies a signature read from an authorized file range', async () => {
+    const path = join(directory, 'signature.bin')
+    await writeFile(path, Buffer.from(`00${schnorr.rawHex}00`, 'hex'))
+    const { payload: opened } = await call('bitpeek_open', { filePath: path })
+    const { rawHex: _rawHex, ...parameters } = schnorr
+    const { payload } = await call('bitpeek_secp256k1_audit', { ...parameters, handle: opened?.handle, offset: 1, length: 64 })
+    expect(payload).toMatchObject({ valid: true, status: 'PASS', source: { kind: 'session', offset: 1, length: 64 } })
+  })
+  it('verifies BIP-374 proof and detects a changed share', async () => {
+    expect((await call('bitpeek_secp256k1_audit', dleq)).payload).toMatchObject({ valid: true, status: 'PASS', cryptographicSignaturesVerified: false })
+    expect((await call('bitpeek_secp256k1_audit', { ...dleq, p2Hex: dleq.p1Hex })).payload).toMatchObject({ valid: false, status: 'FAIL', reason: 'DLEQ challenge verification failed' })
+  })
+  it('verifies Taproot output, Merkle root and optional parity', async () => {
+    expect((await call('bitpeek_secp256k1_audit', { ...taproot, expectedParity: 1 })).payload).toMatchObject({ valid: true, status: 'PASS', parity: 1 })
+    expect((await call('bitpeek_secp256k1_audit', { ...taproot, expectedParity: 0 })).payload).toMatchObject({ valid: false, status: 'FAIL', parity: 1, reason: 'Taproot output Y parity mismatch' })
+    expect((await call('bitpeek_secp256k1_audit', { ...taproot, rawHex: schnorr.pubkeyHex })).payload?.status).toBe('FAIL')
+  })
+  it.each([
+    { ...schnorr, pubkeyHex: undefined }, { ...schnorr, messageHex: undefined },
+    { ...schnorr, messageHex: 'gg'.repeat(32) }, { ...schnorr, pubkeyHex: 12 },
+    { ...schnorr, g1Hex: dleq.g1Hex }, { ...dleq, g1Hex: schnorr.pubkeyHex },
+    { ...dleq, p2Hex: '00'.repeat(33) }, { ...dleq, p2Hex: undefined },
+    { ...taproot, expectedParity: 2 }, { ...taproot, expectedParity: '1' },
+    { rawHex: dleq.g1Hex, format: 'pubkey', messageHex: schnorr.messageHex },
+  ])('rejects missing, malformed or inapplicable crypto arguments %j', async args => {
+    expect((await call('bitpeek_secp256k1_audit', args)).response.isError).toBe(true)
+  })
+  it.each([0, 'true', null])('rejects non-boolean checkMemoryLookups %s', async checkMemoryLookups => {
+    expect((await call('bitpeek_constant_time_audit', { rawHex: '90', checkMemoryLookups })).response.isError).toBe(true)
+  })
+})
+

@@ -1,7 +1,7 @@
 import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js'
 import {
   auditSecp256k1, ConstantTimeAuditor, FileByteSource, BitpeekError, parseHex,
-  SECP256K1_AUDIT_MAX_BYTES, sha256Hex,
+  SECP256K1_AUDIT_MAX_BYTES, sha256Hex, Secp256k1Engine,
 } from '../../core/src/index.js'
 import type { Secp256k1AuditFormat } from '../../core/src/index.js'
 import type { McpSecurityManager } from './security.js'
@@ -19,11 +19,24 @@ const sourceChoices = [
   { required: ['handle'], not: { required: ['rawHex'] } },
 ]
 const auditAnnotations = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+const hex32 = { type: 'string', minLength: 64, maxLength: 96, description: '32-byte hexadecimal value.' }
+const pointHex = { type: 'string', minLength: 66, maxLength: 195, description: 'Compressed (33-byte) or uncompressed (65-byte) SEC public key; preserves Y parity.' }
+const verificationProperties = {
+  pubkeyHex: { ...hex32, description: 'BIP-340 x-only public key. rawHex/file range supplies the 64-byte signature.' },
+  messageHex: { ...hex32, description: '32-byte Schnorr message; optional 32-byte BIP-374 proof message.' },
+  g1Hex: { ...pointHex, description: 'DLEQ first generator G (G1).' },
+  p1Hex: { ...pointHex, description: 'DLEQ first public point A (P1).' },
+  g2Hex: { ...pointHex, description: 'DLEQ second generator B (G2).' },
+  p2Hex: { ...pointHex, description: 'DLEQ second public point C (P2). rawHex/file range supplies the 64-byte proof.' },
+  internalKeyHex: { ...hex32, description: 'Taproot x-only internal key. rawHex/file range supplies the 32-byte output key.' },
+  merkleRootHex: { ...hex32, description: 'Optional Taproot Merkle root; omit for a key-only tweak.' },
+  expectedParity: { type: 'integer', enum: [0, 1], description: 'Optional expected Taproot output Y parity.' },
+}
 
 export const MCP_AUDIT_TOOLS: Tool[] = [
   {
     name: 'bitpeek_secp256k1_audit',
-    description: 'Audit secp256k1 public keys, strict DER or compact ECDSA signatures, and raw Bitcoin transactions. Returns curve/scalar/encoding findings and low-S policy warnings. Does not verify signed messages or full consensus. Accepts inline hex or an open file range up to 1 MiB; use format when encodings are ambiguous.',
+    description: 'Audit secp256k1 encodings and Bitcoin transactions, or verify BIP-340 Schnorr signatures, BIP-374 DLEQ proofs (including BIP-375 shares), and BIP-341 Taproot tweaks. Verification formats return PASS/FAIL with exact reasons. Supply signature/proof/output key as rawHex or an open file range and matching key/message parameters. Maximum 1 MiB.',
     annotations: auditAnnotations,
     inputSchema: {
       type: 'object', additionalProperties: false, oneOf: sourceChoices,
@@ -31,13 +44,14 @@ export const MCP_AUDIT_TOOLS: Tool[] = [
         ...sourceProperties,
         rawHex: { ...sourceProperties.rawHex, maxLength: SECP256K1_AUDIT_MAX_BYTES * 3 },
         length: { ...sourceProperties.length, maximum: SECP256K1_AUDIT_MAX_BYTES, description: 'Exact range length; defaults to all remaining file bytes. Maximum 1 MiB.' },
-        format: { type: 'string', enum: ['auto', 'pubkey', 'der', 'compact', 'bitcoin-tx'], default: 'auto' },
+        format: { type: 'string', enum: ['auto', 'pubkey', 'der', 'compact', 'bitcoin-tx', 'bip340-schnorr', 'dleq', 'taproot-tweak'], default: 'auto' },
+        ...verificationProperties,
       },
     },
   },
   {
     name: 'bitpeek_constant_time_audit',
-    description: 'Statically inspect a caller-selected secret-handling code region for conditional branches, integer division, and undecoded instructions. Uses the reference x86_64/AArch64 disassembler. A clean result is not a timing proof. Accepts inline hex or an open file range up to 65536 bytes; reports exact relative/file offsets and bigint addresses.',
+    description: 'Statically inspect a secret-handling code region for conditional branches, indexed memory/cache hazards, variable-latency arithmetic, and undecoded instructions. Uses the reference x86_64/AArch64 disassembler. A clean result is not a timing proof. Maximum 65536 bytes; reports classified hazards, assembly context, and exact relative/file offsets and bigint addresses.',
     annotations: auditAnnotations,
     inputSchema: {
       type: 'object', additionalProperties: false, oneOf: sourceChoices,
@@ -48,6 +62,7 @@ export const MCP_AUDIT_TOOLS: Tool[] = [
         arch: { type: 'string', enum: ['x86_64', 'aarch64'], default: 'x86_64' },
         baseAddress: { type: 'string', pattern: '^(0[xX][0-9a-fA-F]{1,16}|[0-9]{1,20})$', description: 'Unsigned 64-bit address of the selected region; defaults to file offset or zero for inline hex.' },
         maxInstructions: { type: 'integer', minimum: 1, maximum: MCP_TIMING_MAX_INSTRUCTIONS, default: MCP_TIMING_MAX_INSTRUCTIONS },
+        checkMemoryLookups: { type: 'boolean', default: true, description: 'Inspect indexed memory operands for potential cache-timing leaks.' },
       },
     },
   },
@@ -62,6 +77,26 @@ function safeInteger(value: unknown, name: string, minimum: number, maximum: num
 
 function checkSignal(signal?: AbortSignal): void {
   if (signal?.aborted) throw new BitpeekError('CANCELLED', 'Audit request was cancelled')
+}
+
+function hexArgument(args: Record<string, unknown>, name: string, maxBytes = 32): Uint8Array {
+  const value = args[name]
+  if (typeof value !== 'string' || value.length === 0 || value.length > maxBytes * 3) {
+    throw new BitpeekError('INVALID_INPUT', `${name} must be a nonempty hex string of at most ${maxBytes} bytes`)
+  }
+  const parsed = parseHex(value)
+  if (!parsed.ok) throw new BitpeekError('INVALID_INPUT', `${name}: ${parsed.error}`)
+  if (parsed.bytes.length === 0 || parsed.bytes.length > maxBytes) throw new BitpeekError('INVALID_INPUT', `${name} exceeds its byte limit or is empty`)
+  return parsed.bytes
+}
+
+function pointArgument(args: Record<string, unknown>, name: string): { x: bigint; y: bigint } {
+  const bytes = hexArgument(args, name, 65)
+  const inspection = Secp256k1Engine.inspectPubKey(bytes)
+  if (!inspection.isValid || (bytes.length !== 33 && bytes.length !== 65) || inspection.y === undefined) {
+    throw new BitpeekError('INVALID_INPUT', `${name}: ${inspection.rejectionReason ?? 'DLEQ requires a compressed or uncompressed SEC point'}`)
+  }
+  return { x: inspection.x, y: inspection.y }
 }
 
 async function readAuditInput(
@@ -108,18 +143,47 @@ export async function callAuditTool(
   name: 'bitpeek_secp256k1_audit' | 'bitpeek_constant_time_audit',
   args: Record<string, unknown>, security: McpSecurityManager, signal?: AbortSignal,
 ): Promise<CallToolResult> {
-  const allowed = new Set(['rawHex', 'handle', 'offset', 'length', ...(name === 'bitpeek_secp256k1_audit' ? ['format'] : ['arch', 'baseAddress', 'maxInstructions'])])
+  const allowed = new Set(['rawHex', 'handle', 'offset', 'length', ...(name === 'bitpeek_secp256k1_audit' ? ['format', ...Object.keys(verificationProperties)] : ['arch', 'baseAddress', 'maxInstructions', 'checkMemoryLookups'])])
   for (const key of Object.keys(args)) if (!allowed.has(key)) throw new BitpeekError('INVALID_INPUT', `Unsupported audit argument: ${key}`)
   let payload: Record<string, unknown>
   if (name === 'bitpeek_secp256k1_audit') {
     const format = args.format ?? 'auto'
-    if (typeof format !== 'string' || !['auto', 'pubkey', 'der', 'compact', 'bitcoin-tx'].includes(format)) throw new BitpeekError('INVALID_INPUT', 'Unsupported secp256k1 audit format')
+    if (typeof format !== 'string' || !['auto', 'pubkey', 'der', 'compact', 'bitcoin-tx', 'bip340-schnorr', 'dleq', 'taproot-tweak'].includes(format)) throw new BitpeekError('INVALID_INPUT', 'Unsupported secp256k1 audit format')
+    const parameters = format === 'bip340-schnorr' ? ['pubkeyHex', 'messageHex']
+      : format === 'dleq' ? ['g1Hex', 'p1Hex', 'g2Hex', 'p2Hex', 'messageHex']
+      : format === 'taproot-tweak' ? ['internalKeyHex', 'merkleRootHex', 'expectedParity'] : []
+    for (const key of Object.keys(verificationProperties)) {
+      if (args[key] !== undefined && !parameters.includes(key)) throw new BitpeekError('INVALID_INPUT', `${key} is not supported for format ${format}`)
+    }
     const { bytes, source } = await readAuditInput(args, security, SECP256K1_AUDIT_MAX_BYTES, undefined, signal)
-    payload = { ...auditSecp256k1(bytes, format as Secp256k1AuditFormat), source }
+    if (parameters.length === 0) payload = { ...auditSecp256k1(bytes, format as Secp256k1AuditFormat), source }
+    else {
+      let verification: { valid: boolean; reason?: string; parity?: number }
+      if (format === 'bip340-schnorr') {
+        verification = Secp256k1Engine.verifySchnorr(hexArgument(args, 'pubkeyHex'), hexArgument(args, 'messageHex'), bytes)
+      } else if (format === 'dleq') {
+        verification = Secp256k1Engine.verifyDLEQ(pointArgument(args, 'g1Hex'), pointArgument(args, 'p1Hex'),
+          pointArgument(args, 'g2Hex'), pointArgument(args, 'p2Hex'), bytes,
+          args.messageHex === undefined ? undefined : hexArgument(args, 'messageHex'))
+      } else {
+        if (args.expectedParity !== undefined && args.expectedParity !== 0 && args.expectedParity !== 1) throw new BitpeekError('INVALID_INPUT', 'expectedParity must be 0 or 1')
+        verification = Secp256k1Engine.verifyTaprootTweak(hexArgument(args, 'internalKeyHex'), bytes,
+          args.merkleRootHex === undefined ? undefined : hexArgument(args, 'merkleRootHex'))
+        if (verification.valid && args.expectedParity !== undefined && verification.parity !== args.expectedParity) {
+          verification = { ...verification, valid: false, reason: 'Taproot output Y parity mismatch' }
+        }
+      }
+      const status = verification.valid ? 'PASS' : 'FAIL'
+      payload = { format, ...verification, status, source, verificationScope: 'cryptographic-verification',
+        cryptographicSignaturesVerified: format === 'bip340-schnorr' && verification.valid,
+        summary: `${status}: ${format} ${verification.valid ? 'verification succeeded' : verification.reason}` }
+    }
   } else {
     const arch = args.arch ?? 'x86_64'
     if (arch !== 'x86_64' && arch !== 'aarch64') throw new BitpeekError('INVALID_INPUT', 'arch must be x86_64 or aarch64')
     const maxInstructions = safeInteger(args.maxInstructions ?? MCP_TIMING_MAX_INSTRUCTIONS, 'maxInstructions', 1, MCP_TIMING_MAX_INSTRUCTIONS)
+    const checkMemoryLookups = args.checkMemoryLookups === undefined ? true : args.checkMemoryLookups
+    if (typeof checkMemoryLookups !== 'boolean') throw new BitpeekError('INVALID_INPUT', 'checkMemoryLookups must be a boolean')
     let suppliedAddress: bigint | undefined
     if (args.baseAddress !== undefined) {
       if (typeof args.baseAddress !== 'string' || !/^(0[xX][0-9a-fA-F]{1,16}|[0-9]{1,20})$/.test(args.baseAddress)) throw new BitpeekError('INVALID_INPUT', 'baseAddress must be an unsigned 64-bit hexadecimal or decimal string')
@@ -129,10 +193,17 @@ export async function callAuditTool(
     const { bytes, source } = await readAuditInput(args, security, MCP_TIMING_MAX_BYTES, 256, signal)
     const baseAddress = suppliedAddress ?? BigInt(source.offset ?? 0)
     if (baseAddress + BigInt(bytes.length - 1) > 0xffffffffffffffffn) throw new BitpeekError('INVALID_RANGE', 'Code range exceeds the unsigned 64-bit address range')
-    const audit = ConstantTimeAuditor.auditBytes(bytes, { arch, baseAddress, maxInstructions })
+    const audit = ConstantTimeAuditor.auditBytes(bytes, { arch, baseAddress, maxInstructions, checkMemoryLookups })
     payload = {
       ...audit, arch, baseAddress: `0x${baseAddress.toString(16)}`, source,
       verificationScope: 'static-instruction-patterns', constantTimeProven: false,
+      checkMemoryLookups,
+      summary: audit.isCleanConstantTime ? 'No listed static instruction hazards found'
+        : `${audit.hazards.length} hazard(s); ${audit.branchCount} conditional branch(es)${audit.hazards.length === 0 ? '; no instructions examined' : ''}`,
+      hazards: audit.hazards.map(hazard => ({
+        ...hazard, address: `0x${(baseAddress + BigInt(hazard.offset)).toString(16)}`,
+        ...(source.offset !== undefined ? { fileOffset: source.offset + hazard.offset } : {}),
+      })),
       suspiciousInstructions: audit.suspiciousInstructions.map(finding => ({
         ...finding, address: `0x${(baseAddress + BigInt(finding.offset)).toString(16)}`,
         ...(source.offset !== undefined ? { fileOffset: source.offset + finding.offset } : {}),

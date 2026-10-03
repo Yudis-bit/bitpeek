@@ -3,10 +3,28 @@ import type { DecodedInstruction, DisassemblyOptions } from './disassembler'
 
 export type DisassembledInstruction = DecodedInstruction
 
+export type HazardSeverity = 'CRITICAL' | 'HIGH' | 'WARN'
+
+export interface AuditHazard {
+  offset: number
+  mnemonic: string
+  operands?: string
+  severity: HazardSeverity
+  category: 'BRANCH' | 'VARIABLE_LATENCY' | 'CACHE_TIMING' | 'UNDECODED'
+  reason: string
+}
+
+export interface ConstantTimeAuditOptions {
+  checkMemoryLookups?: boolean
+}
+
 export interface ConstantTimeAuditResult {
   hasConditionalBranches: boolean
   branchCount: number
+  hasCacheTimingHazards: boolean
+  hasVariableLatencyHazards: boolean
   suspiciousInstructions: Array<{ offset: number; mnemonic: string; reason: string }>
+  hazards: AuditHazard[]
   isCleanConstantTime: boolean
 }
 
@@ -23,24 +41,38 @@ const ARM_BRANCHES = new Set([
   'bc.hi', 'bc.ls', 'bc.ge', 'bc.lt', 'bc.gt', 'bc.le',
 ])
 
+function hasIndexedMemory(operands: string, arch: DecodedInstruction['arch']): boolean {
+  for (const match of operands.toLowerCase().matchAll(/\[([^\]]+)\]/g)) {
+    const memory = match[1]!
+    if (arch === 'x86_64') {
+      const registers = memory.match(/\b(?:r(?:1[0-5]|[0-9])[dwb]?|[re]?(?:ax|bx|cx|dx|si|di|bp|sp)|rip|eip)\b/g) ?? []
+      if (registers.length > 1 || (registers.length > 0 && memory.includes('*'))) return true
+    } else if (/\[\s*(?:x\d+|sp)\s*,\s*[xw]\d+\b/.test(match[0])) {
+      return true
+    }
+  }
+  return false
+}
+
 /** Conservative mnemonic inspection of a caller-selected secret-handling region.
  * A clean result means no listed hazards were found; it is not a timing proof.
  */
 export class ConstantTimeAuditor {
-  public static auditX86_64(instructions: DisassembledInstruction[]): ConstantTimeAuditResult {
-    return this.audit(instructions, 'x86_64', X86_BRANCHES, new Set(['div', 'idiv', 'divb', 'divw', 'divl', 'divq', 'idivb', 'idivw', 'idivl', 'idivq']))
+  public static auditX86_64(instructions: DisassembledInstruction[], options: ConstantTimeAuditOptions = {}): ConstantTimeAuditResult {
+    return this.audit(instructions, 'x86_64', X86_BRANCHES, new Set(['div', 'idiv', 'divb', 'divw', 'divl', 'divq', 'idivb', 'idivw', 'idivl', 'idivq']), options)
   }
 
-  public static auditARM64(instructions: DisassembledInstruction[]): ConstantTimeAuditResult {
-    return this.audit(instructions, 'aarch64', ARM_BRANCHES, new Set(['udiv', 'sdiv']))
+  public static auditARM64(instructions: DisassembledInstruction[], options: ConstantTimeAuditOptions = {}): ConstantTimeAuditResult {
+    return this.audit(instructions, 'aarch64', ARM_BRANCHES, new Set(['udiv', 'sdiv']), options)
   }
 
-  public static auditBytes(code: Uint8Array, options: DisassemblyOptions): ConstantTimeAuditResult {
+  public static auditBytes(code: Uint8Array, options: DisassemblyOptions & ConstantTimeAuditOptions): ConstantTimeAuditResult {
     const instructions = ReferenceDisassembler.disassemble(code, options)
-    const result = options.arch === 'x86_64' ? this.auditX86_64(instructions) : this.auditARM64(instructions)
+    const result = options.arch === 'x86_64' ? this.auditX86_64(instructions, options) : this.auditARM64(instructions, options)
     const decodedBytes = instructions.reduce((sum, instruction) => sum + instruction.length, 0)
     if (decodedBytes < code.length) {
       result.suspiciousInstructions.push({ offset: decodedBytes, mnemonic: '<unexamined>', reason: 'Instruction budget left bytes unexamined' })
+      result.hazards.push({ offset: decodedBytes, mnemonic: '<unexamined>', severity: 'WARN', category: 'UNDECODED', reason: 'Instruction budget left bytes unexamined' })
       result.isCleanConstantTime = false
     }
     return result
@@ -51,8 +83,10 @@ export class ConstantTimeAuditor {
     arch: DecodedInstruction['arch'],
     branches: ReadonlySet<string>,
     divisions: ReadonlySet<string>,
+    options: ConstantTimeAuditOptions,
   ): ConstantTimeAuditResult {
     const suspiciousInstructions: ConstantTimeAuditResult['suspiciousInstructions'] = []
+    const hazards: AuditHazard[] = []
     let branchCount = 0
     let offset = 0
     for (const instruction of instructions) {
@@ -60,7 +94,10 @@ export class ConstantTimeAuditor {
         throw new RangeError('Instruction length must be a positive safe integer')
       }
       const mnemonic = instruction.mnemonic.trim().toLowerCase()
-      const issue = (reason: string) => suspiciousInstructions.push({ offset, mnemonic: instruction.mnemonic, reason })
+      const issue = (reason: string, category: AuditHazard['category'] = 'UNDECODED', severity: HazardSeverity = 'WARN') => {
+        suspiciousInstructions.push({ offset, mnemonic: instruction.mnemonic, reason })
+        hazards.push({ offset, mnemonic: instruction.mnemonic, operands: instruction.operands, reason, category, severity })
+      }
       if (instruction.arch !== arch) issue('Instruction architecture does not match the audit architecture')
       if (instruction.bytes.length !== instruction.length) issue('Instruction length does not match its byte span')
       if (!instruction.isValid || ['db', '.byte', '.inst'].includes(mnemonic)) {
@@ -68,9 +105,27 @@ export class ConstantTimeAuditor {
       } else {
         if (branches.has(mnemonic)) {
           branchCount++
-          issue('Conditional branch may depend on secret data; review branch dependencies')
+          issue('Conditional branch may depend on secret data; review branch dependencies', 'BRANCH', 'CRITICAL')
         }
-        if (divisions.has(mnemonic)) issue('Division latency may depend on operands and processor; review timing guarantees')
+        if (divisions.has(mnemonic)) issue('Division latency may depend on operands and processor; review timing guarantees', 'VARIABLE_LATENCY', 'HIGH')
+        if (options.checkMemoryLookups !== false && !/^lea[qwl]?$/.test(mnemonic) && hasIndexedMemory(instruction.operands, arch)) {
+          issue('Memory operand uses register indexing; potential cache-timing / table-lookup leak', 'CACHE_TIMING', 'HIGH')
+        }
+        const operands = instruction.operands.toLowerCase().split(',').map(operand => operand.trim())
+        if (arch === 'x86_64') {
+          if (/^bs[fr][qwl]?$/.test(mnemonic)) issue('Bit scan latency may depend on operands and processor', 'VARIABLE_LATENCY')
+          const shiftCount = instruction.operands.includes('%') ? operands[0] : operands[1]
+          if (/^(?:shl|sal|shr|sar|rol|ror)[bwlq]?$/.test(mnemonic)
+            && /^%?(?:cl|[re]?(?:ax|bx|cx|dx|si|di|bp|sp)|r\d+[dwb]?)$/.test(shiftCount ?? '')) {
+            issue('Register-controlled shift or rotate requires processor-specific timing review', 'VARIABLE_LATENCY')
+          }
+          if (/^rep(?:e|z|ne|nz)?\s+(?:movs|stos)[bwdql]?$/.test(`${mnemonic} ${instruction.operands}`.trim())) {
+            issue('Repeated string operation timing depends on count and memory access', 'VARIABLE_LATENCY', 'HIGH')
+          }
+        } else if (/^(?:lslv|lsrv|asrv|rorv|clz|cls|rbit)$/.test(mnemonic)
+          || (/^(?:lsl|lsr|asr|ror)$/.test(mnemonic) && /^[xw]\d+$/.test(operands[2] ?? ''))) {
+          issue('Variable bit operation requires processor-specific timing review', 'VARIABLE_LATENCY')
+        }
       }
       offset += instruction.length
       if (!Number.isSafeInteger(offset)) throw new RangeError('Instruction byte offset exceeds the safe integer range')
@@ -78,7 +133,10 @@ export class ConstantTimeAuditor {
     return {
       hasConditionalBranches: branchCount > 0,
       branchCount,
+      hasCacheTimingHazards: hazards.some(hazard => hazard.category === 'CACHE_TIMING'),
+      hasVariableLatencyHazards: hazards.some(hazard => hazard.category === 'VARIABLE_LATENCY'),
       suspiciousInstructions,
+      hazards,
       isCleanConstantTime: instructions.length > 0 && suspiciousInstructions.length === 0,
     }
   }

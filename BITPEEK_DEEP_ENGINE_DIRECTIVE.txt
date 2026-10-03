@@ -1,0 +1,231 @@
+# BITPEEK DEEP ENGINE DIRECTIVE (ULTRA-HARDENING & SURGICAL EXPANSION)
+# Target Model: Frontier Autonomous Coding Agent (GPT-5 / GPT-o1 / Claude 3.5 Sonnet / Opus / Sol 6.1)
+# Workspace Root: C:\Users\LENOVO\Documents\bugbounty\bitpeek
+
+================================================================================
+00. STRICT TOKEN-CONSERVATION & ANTI-HALLUCINATION RULES (NON-NEGOTIABLE)
+================================================================================
+1. ZERO PHILOSOPHICAL YAP & ZERO CHAT FILLER:
+   Do NOT output introductory greetings, conversational fluff, explanations of what
+   you are about to do, or speculative essays. Jump straight into inspecting files,
+   modifying code, and running tests.
+2. SURGICAL MODIFICATIONS ONLY:
+   Do NOT rewrite entire files from scratch if you are only adding methods or exports.
+   Preserve existing imports, function signatures, error handling, and class designs.
+3. ZERO DEPENDENCY HALLUCINATION:
+   Do NOT introduce any external npm packages (no @noble/secp256k1, no elliptic, no bigi).
+   All elliptic curve math, hash functions, and instruction inspections MUST use native
+   TypeScript, JavaScript BigInt, Node.js built-ins (crypto), and existing Bitpeek core code.
+4. ZERO REGRESSION POLICY:
+   All 36 existing test files and 436 tests MUST stay 100% green at all times.
+   Run `npm test` to verify before declaring completion.
+5. DOCUMENTATION TIMING:
+   Produce technical documentation ONLY at the very end of your response, after all tests
+   have passed.
+
+================================================================================
+01. TARGET FILE MAP & ARCHITECTURAL OVERVIEW
+================================================================================
+- `packages/core/src/crypto.ts`
+  Native cryptographic primitives (Sha256, Crc32, Crc16).
+  ADD: `taggedHash(tag: string, ...messages: (Uint8Array | string)[]): Uint8Array`
+  Standard BIP-340 / BIP-374 tagged hash: SHA256(SHA256(tag) || SHA256(tag) || msg).
+
+- `packages/core/src/native/constant-time.ts`
+  Class `ConstantTimeAuditor`, Interface `ConstantTimeAuditResult`.
+  UPGRADE:
+  1. Cache-Timing & Memory-Index Hazard Detection (indirect / scaled memory lookups).
+  2. Variable-Latency Arithmetic Detection (variable shifts by register, bit scans).
+  3. Severity Classification (`CRITICAL`, `HIGH`, `WARN`).
+
+- `packages/core/src/bchain/secp256k1.ts`
+  Class `Secp256k1Engine`, curve constants (`SECP256K1_P`, `SECP256K1_N`, `SECP256K1_GX`, `SECP256K1_GY`).
+  UPGRADE:
+  1. Affine / Jacobian Point Arithmetic (`pointAdd`, `pointDouble`, `scalarMul`, `liftX`).
+  2. BIP-340 Schnorr Signature Verification (`verifySchnorr`).
+  3. BIP-374 / BIP-375 Discrete Log Equality Proof Verification (`verifyDLEQ`).
+  4. BIP-341 Taproot Tweak Verification (`verifyTaprootTweak`).
+
+- `packages/mcp/src/audit-tools.ts`
+  MCP tool declarations `bitpeek_constant_time_audit` and `bitpeek_secp256k1_audit`.
+  UPGRADE:
+  Expose new audit options and return structured reports containing byte offsets,
+  severity levels, and cryptographic verification outcomes.
+
+================================================================================
+02. SPECIFICATION 1: CONSTANT-TIME & CACHE-TIMING AUDIT ENGINE
+================================================================================
+File: `packages/core/src/native/constant-time.ts`
+
+Currently, `ConstantTimeAuditor` only flags simple jump mnemonics and division instructions.
+Upgrade it to detect microarchitectural side-channels:
+
+1. Memory Hazard Detection (Cache-Timing Leaks):
+   In secret-handling code, memory lookups indexed by non-constant registers leak data
+   via L1/L2/L3 cache timing (e.g. S-box lookups, naive scalar table lookups).
+   - Inspect `instruction.operands` for x86_64:
+     Detect indexed addressing modes: patterns containing `*` (scaled index, e.g. `[rax + rbx*8]`)
+     or multiple registers inside `[...]` (e.g. `[rax + rbx]`, `[rsi + rdx]`).
+     Exclude fixed stack offsets (e.g., `[rbp - 0x10]`, `[rsp + 8]`) and RIP-relative offsets (`[rip + ...]`).
+   - For AArch64:
+     Detect register-offset loads (e.g., `ldr x0, [x1, x2]`, `ldr x0, [x1, x2, lsl #3]`).
+   - Flag as: `HIGH: Memory operand uses register indexing; potential cache-timing / table-lookup leak`.
+
+2. Variable-Latency Instructions:
+   - x86_64:
+     - `bsf`, `bsr` (bit scans with data-dependent latency on pre-Zen / Intel CPUs).
+     - Variable shifts by register `%cl`: `shl`, `shr`, `sar`, `rol`, `ror` when second operand is `%cl` or register.
+     - String operations: `rep movs*`, `rep stos*`.
+   - AArch64:
+     - Variable bit operations and divisions (`udiv`, `sdiv`).
+
+3. Hazard Classification:
+   Update `ConstantTimeAuditResult` interface:
+   ```typescript
+   export type HazardSeverity = 'CRITICAL' | 'HIGH' | 'WARN'
+
+   export interface AuditHazard {
+     offset: number
+     mnemonic: string
+     operands?: string
+     severity: HazardSeverity
+     category: 'BRANCH' | 'VARIABLE_LATENCY' | 'CACHE_TIMING' | 'UNDECODED'
+     reason: string
+   }
+
+   export interface ConstantTimeAuditResult {
+     hasConditionalBranches: boolean
+     branchCount: number
+     hasCacheTimingHazards: boolean
+     hasVariableLatencyHazards: boolean
+     suspiciousInstructions: Array<{ offset: number; mnemonic: string; reason: string }> // preserve backwards compatibility
+     hazards: AuditHazard[]
+     isCleanConstantTime: boolean
+   }
+   ```
+
+================================================================================
+03. SPECIFICATION 2: DEEP SECP256K1 & BITCOIN CRYPTOGRAPHIC ENGINE
+================================================================================
+Files: `packages/core/src/crypto.ts` and `packages/core/src/bchain/secp256k1.ts`
+
+1. Tagged Hash in `packages/core/src/crypto.ts`:
+   Implement BIP-340 tagged hash:
+   ```typescript
+   export function taggedHash(tag: string, ...messages: (Uint8Array | string)[]): Uint8Array
+   ```
+   Rule: `SHA256(SHA256(tag) || SHA256(tag) || concatenated_messages)`.
+   Cache the midstate or tag hash for performance if desired, or compute directly.
+
+2. Secp256k1 Point Arithmetic in `packages/core/src/bchain/secp256k1.ts`:
+   Curve: y^2 = x^3 + 7 over F_p.
+   Implement pure BigInt projective or affine point operations (verification only,
+   constant-time is not required in TS verification, but mathematical correctness is mandatory):
+   - `Point = { x: bigint; y: bigint } | null` (null represents infinity).
+   - `pointAdd(P: Point, Q: Point): Point`
+   - `pointDouble(P: Point): Point`
+   - `scalarMul(k: bigint, P: Point): Point` (k modulo n)
+   - `liftX(xBytes: Uint8Array): { x: bigint; y: bigint } | null`:
+     Parse 32-byte big-endian $x$.
+     If $x \ge p$, return null.
+     Compute $y^2 = (x^3 + 7) \pmod p$.
+     Compute $y = \text{sqrtModP}(y^2)$. If null, return null.
+     If $y \pmod 2 \ne 0$, $y = p - y$ (ensure even Y per BIP-340).
+     Return `{ x, y }`.
+
+3. BIP-340 Schnorr Verification:
+   Add method to `Secp256k1Engine`:
+   ```typescript
+   public static verifySchnorr(
+     pubkey32: Uint8Array,
+     msg32: Uint8Array,
+     sig64: Uint8Array
+   ): { valid: boolean; reason?: string }
+   ```
+   Verification Steps:
+   - Check lengths: pubkey32 must be 32 bytes, msg32 must be 32 bytes, sig64 must be 64 bytes.
+   - $P = \text{liftX}(pubkey32)$. If null, return `{ valid: false, reason: 'Invalid public key X coordinate' }`.
+   - $r = \text{unsignedBigEndian}(sig[0..32])$. If $r \ge p$, return `{ valid: false, reason: 'r >= p' }`.
+   - $s = \text{unsignedBigEndian}(sig[32..64])$. If $s \ge n$, return `{ valid: false, reason: 's >= n' }`.
+   - $e = \text{unsignedBigEndian}(\text{taggedHash}('BIP0340/challenge', sig.subarray(0, 32), pubkey32, msg32)) \pmod n$.
+   - Compute $R = s \cdot G - e \cdot P = s \cdot G + (n - e) \cdot P$.
+   - If $R == \text{null}$ (infinity), return `{ valid: false, reason: 'R is infinity' }`.
+   - If $R.y \pmod 2 \ne 0$ (odd Y), return `{ valid: false, reason: 'R has odd Y coordinate' }`.
+   - If $R.x \ne r$, return `{ valid: false, reason: 'Signature verification equation failed (Rx != r)' }`.
+   - Return `{ valid: true }`.
+
+4. BIP-374 DLEQ Proof Verification (Silent Payments Hardware Wallet Support):
+   Add method to `Secp256k1Engine`:
+   ```typescript
+   public static verifyDLEQ(
+     G1: { x: bigint; y: bigint },
+     P1: { x: bigint; y: bigint },
+     G2: { x: bigint; y: bigint },
+     P2: { x: bigint; y: bigint },
+     proof64: Uint8Array
+   ): { valid: boolean; reason?: string }
+   ```
+   Verifies that $\log_{G_1}(P_1) == \log_{G_2}(P_2)$.
+   Proof contains challenge $e$ (32 bytes) and scalar $s$ (32 bytes).
+   Computes $R_1 = s \cdot G_1 - e \cdot P_1$ and $R_2 = s \cdot G_2 - e \cdot P_2$.
+   Verifies challenge equation according to BIP-374 specification.
+
+5. BIP-341 Taproot Tweak Verification:
+   Add method:
+   ```typescript
+   public static verifyTaprootTweak(
+     internalKey32: Uint8Array,
+     outputKey32: Uint8Array,
+     merkleRoot?: Uint8Array
+   ): { valid: boolean; parity: number; reason?: string }
+   ```
+   Computes tweak $t = \text{taggedHash}('TapTweak', internalKey32, merkleRoot ?? new Uint8Array(0)) \pmod n$.
+   Computes $Q = P + t \cdot G$.
+   Verifies that $Q.x == \text{unsignedBigEndian}(outputKey32)$.
+
+================================================================================
+04. SPECIFICATION 3: MCP AUDIT TOOLS EXPOSURE
+================================================================================
+File: `packages/mcp/src/audit-tools.ts`
+
+1. Update `bitpeek_constant_time_audit`:
+   - Add parameter `checkMemoryLookups?: boolean` (defaults to true).
+   - In response content, include structured summary:
+     - `isCleanConstantTime`: boolean
+     - `branchCount`: number
+     - `hazards`: array of classified hazards with exact byte offset and assembly context.
+     - `summary`: concise human/agent-readable diagnostic.
+
+2. Update `bitpeek_secp256k1_audit`:
+   - Support `format: 'bip340-schnorr'`, `format: 'dleq'`, and `format: 'taproot-tweak'`
+     when caller supplies corresponding signature/proof and message/key parameters.
+   - Return clear PASS/FAIL with exact cryptographic failure reasons.
+
+================================================================================
+05. TEST-DRIVEN VERIFICATION SUITES
+================================================================================
+Add comprehensive test suites:
+- `packages/core/src/native/constant-time-deep.test.ts`
+  - Test x86_64 SIB scaled index lookup detection (`mov rax, [rbx + rcx*8]`).
+  - Test fixed stack offset is NOT flagged (`mov rax, [rbp - 16]`).
+  - Test variable shift by `%cl` (`shl rax, cl`).
+  - Test AArch64 register-offset load detection (`ldr x0, [x1, x2]`).
+- `packages/core/src/bchain/secp256k1-deep.test.ts`
+  - Test BIP-340 test vectors (valid signatures, invalid $r \ge p$, invalid $s \ge n$, corrupted challenge).
+  - Test BIP-341 Taproot tweak derivation and parity matching.
+  - Test BIP-374 DLEQ proof verification vector.
+- `packages/mcp/src/audit-tools-deep.test.ts`
+  - Test MCP invocation for `bitpeek_constant_time_audit` with memory lookups enabled.
+  - Test MCP invocation for `bitpeek_secp256k1_audit` with BIP-340 Schnorr signature.
+
+================================================================================
+06. EXECUTION CHECKLIST FOR MODEL
+================================================================================
+[ ] Step 1: Read target files to confirm exact types and exports.
+[ ] Step 2: Implement taggedHash in `packages/core/src/crypto.ts`.
+[ ] Step 3: Implement point arithmetic & verification in `packages/core/src/bchain/secp256k1.ts`.
+[ ] Step 4: Implement memory & variable-latency checks in `packages/core/src/native/constant-time.ts`.
+[ ] Step 5: Wire new capabilities into `packages/mcp/src/audit-tools.ts`.
+[ ] Step 6: Write unit tests in packages/core and packages/mcp.
+[ ] Step 7: Run `npm test` and ensure all tests (existing + new) pass 100%.
+[ ] Step 8: Output ONLY final summary documentation: modified files, new features, and test results.
