@@ -1,0 +1,209 @@
+# BITPEEK DIRECTIVE: SYMBOLIC TAINT & NON-INTERFERENCE VERIFICATION ENGINE
+# Target Agent: Frontier Autonomous Coding Agent (GPT-5 / GPT-o1 / Sol 6.1 / Claude 3.5 Sonnet)
+# Workspace Root: C:\Users\LENOVO\Documents\bugbounty\bitpeek
+# Execution Mode: Surgical Enhancement (Additive Only, Zero Architectural Regression)
+
+================================================================================
+00. STRICT NON-INTERFERENCE SPECIFICATION & VERIFICATION OBJECTIVES
+================================================================================
+The objective is to surgically augment Bitpeek's constant-time analysis from
+passive heuristic inspection into a forward Symbolic Taint & Information Flow
+Control (IFC) Verification Engine.
+
+This formal verifier proves the fundamental Non-Interference Property:
+"Secret data flowing into cryptographic subroutines must never influence
+control-flow decisions (branch targets) or effective memory address lookups."
+
+CRITICAL QUALITY CONSTRAINTS:
+1. ADDITIVE ENHANCEMENT ONLY:
+   Do NOT rewrite, alter, or remove existing public methods (`auditX86_64`,
+   `auditARM64`, `auditBytes`) or existing interfaces in `constant-time.ts`.
+   All existing callers, exports, and MCP signatures MUST retain 100% backward
+   compatibility.
+2. ZERO DEPENDENCY POLICY:
+   Do NOT install any new npm dependencies. Implement all logic using native
+   TypeScript, standard JavaScript BigInt/Set/Map, and existing Bitpeek core
+   primitives.
+3. ZERO REGRESSION POLICY:
+   All existing 566 tests across 39 test files MUST remain 100% green. Run
+   `npm test` to verify.
+4. TARGET-DRIVEN VERIFICATION:
+   Expose the verification engine cleanly to both the programmatic API in
+   `@bitpeek/core` and the MCP tool `bitpeek_constant_time_audit` in `@bitpeek/mcp`.
+
+================================================================================
+01. TARGET FILE MAP & ARCHITECTURAL OVERVIEW
+================================================================================
+- `packages/core/src/native/constant-time.ts`:
+  ADD:
+  * Interfaces: `TaintSource`, `TaintTraceStep`, `TaintAuditResult`, `TaintAuditOptions`.
+  * Class method: `ConstantTimeAuditor.verifyNonInterference(instructions, secrets, arch, options)`.
+  * Forward Symbolic Taint Tracker class or internal helper engine.
+
+- `packages/core/src/native/index.ts`:
+  Re-export the new types (`TaintSource`, `TaintTraceStep`, `TaintAuditResult`, `TaintAuditOptions`).
+
+- `packages/mcp/src/audit-tools.ts`:
+  UPGRADE `bitpeek_constant_time_audit`:
+  * Add optional input parameter: `secretRegisters: { type: 'array', items: { type: 'string' }, description: 'List of input register names designated as secret (e.g. ["rdi", "rsi"] or ["x0"]). When supplied, triggers forward symbolic taint tracking.' }`.
+  * When `secretRegisters` is supplied, execute `verifyNonInterference` and include the structured `taintAnalysis` section in the result JSON.
+
+- `packages/core/src/native/non-interference.test.ts`:
+  NEW test suite verifying forward taint propagation, register aliases, zeroization clearing, and branch/memory violation detection.
+
+- `packages/mcp/src/audit-tools-taint.test.ts`:
+  NEW test suite verifying MCP parameter parsing and response formatting for `secretRegisters`.
+
+================================================================================
+02. SPECIFICATION: FORWARD SYMBOLIC TAINT ENGINE
+================================================================================
+Location: `packages/core/src/native/constant-time.ts`
+
+1. TYPES & CONTRACTS:
+```typescript
+export interface TaintSource {
+  type: 'REGISTER' | 'STACK_OFFSET'
+  identifier: string // e.g. "rdi", "rsi", "x0", "rsp+8"
+}
+
+export interface TaintTraceStep {
+  offset: number
+  mnemonic: string
+  operands?: string
+  taintedInputs: string[]
+  taintedOutputs: string[]
+  violation?: {
+    type: 'BRANCH_DEPENDENCY' | 'INDEXED_MEMORY_LEAK' | 'VARIABLE_LATENCY'
+    severity: HazardSeverity
+    reason: string
+  }
+}
+
+export interface TaintAuditOptions {
+  baseAddress?: bigint | number
+  stopOnFirstViolation?: boolean
+  trackMemoryTaints?: boolean
+}
+
+export interface TaintAuditResult {
+  isProvablyConstantTime: boolean
+  hasViolations: boolean
+  activeTaints: string[]
+  trace: TaintTraceStep[]
+  violations: AuditHazard[]
+}
+```
+
+2. FORWARD PROPAGATION RULES (x86_64 & AArch64):
+
+A. Register Normalization & Aliasing:
+- x86_64 64-bit/32-bit/16-bit/8-bit register alias mapping:
+  * `rax`, `eax`, `ax`, `al`, `ah` -> map to canonical root register `rax`.
+  * `rbx`, `ebx`, `bx`, `bl`, `bh` -> canonical `rbx`.
+  * `rcx`, `ecx`, `cx`, `cl`, `ch` -> canonical `rcx`.
+  * `rdx`, `edx`, `dx`, `dl`, `dh` -> canonical `rdx`.
+  * `rsi`, `esi`, `si`, `sil` -> canonical `rsi`.
+  * `rdi`, `edi`, `di`, `dil` -> canonical `rdi`.
+  * `rbp`, `ebp`, `bp`, `bpl` -> canonical `rbp`.
+  * `rsp`, `esp`, `sp`, `spl` -> canonical `rsp`.
+  * `r8` through `r15` (with `d`, `w`, `b` suffixes) -> canonical `r8`..`r15`.
+- AArch64 register alias mapping:
+  * `w0`-`w30` -> canonical `x0`-`x30`.
+  * `sp`, `wsp` -> canonical `sp`.
+- Flag registers:
+  * x86_64: `rflags` (specifically CF, ZF, SF, OF).
+  * AArch64: `nzcv`.
+
+B. Taint Invalidation / Zeroization (Self-Clearing):
+- If destination and source are identical in clearing patterns:
+  * `xor reg, reg`, `sub reg, reg`, `pxor reg, reg`, `eor reg, reg, reg`:
+    -> MUST REMOVE taint from `reg`. The register is now provably ZERO (clean).
+  * `mov reg, 0`, `mov reg, 0x0`:
+    -> MUST REMOVE taint from `reg`.
+
+C. Taint Propagation (Data-Flow):
+- Transfer operations:
+  * `mov dst, src`, `movzx dst, src`, `movsx dst, src`, `ldr dst, [src]`:
+    If `src` is tainted, `dst` becomes tainted. If `src` is clean, `dst` becomes clean.
+  * `xchg op1, op2`: swap taint states between `op1` and `op2`.
+- Arithmetic & Logical operations:
+  * `add dst, src`, `sub dst, src`, `adc dst, src`, `sbb dst, src`, `or dst, src`,
+    `and dst, src`, `xor dst, src` (when dst != src), `lea dst, [src1 + src2]`:
+    If ANY input operand is tainted:
+    1. Destination register `dst` becomes tainted.
+    2. Flag register (`rflags` / `nzcv`) becomes tainted.
+- Comparisons & Test operations:
+  * `cmp op1, op2`, `test op1, op2`, `subs ...`, `tst ...`:
+    If either `op1` or `op2` is tainted:
+    -> Flag register (`rflags` / `nzcv`) becomes tainted.
+
+D. Non-Interference Invariant Checks (Violations):
+- CRITICAL: Secret-Dependent Control Flow (Branch Hazard):
+  * When executing any conditional jump (`X86_BRANCHES` or `ARM_BRANCHES`):
+    If `rflags` or `nzcv` is tainted -> FLAG CRITICAL VIOLATION:
+    `"Conditional branch depends on secret-tainted flags; violates constant-time non-interference."`
+  * For AArch64 `cbz reg`, `cbnz reg`, `tbz reg`, `tbnz reg`:
+    If `reg` is tainted -> FLAG CRITICAL VIOLATION:
+    `"Direct register test branch depends on secret-tainted register."`
+
+- CRITICAL: Secret-Dependent Memory Addressing (Cache-Timing Hazard):
+  * In any memory operand `[...]`:
+    If ANY register inside the brackets is tainted:
+    Exception: stack access `[rsp + const]` or `[rbp - const]` where only the offset is constant
+    is allowed IF the stack base itself isn't tainted.
+    If an index register or dynamic base register is tainted:
+    -> FLAG CRITICAL VIOLATION:
+    `"Memory address calculation uses secret-tainted register; causes cache-timing side-channel."`
+
+- HIGH: Variable-Latency Arithmetic:
+  * `div`, `idiv`, `udiv`, `sdiv` where operand is tainted.
+  * Shift instructions where shift count register (`%cl` / variable) is tainted.
+
+E. Clean Verification (`isProvablyConstantTime`):
+- If all instructions in the selected sequence execute without triggering any of the
+  above invariant violations, set `isProvablyConstantTime: true` and `hasViolations: false`.
+
+================================================================================
+03. SPECIFICATION: MCP TOOL INTEGRATION
+================================================================================
+File: `packages/mcp/src/audit-tools.ts`
+
+1. Update `MCP_AUDIT_TOOLS` schema for `bitpeek_constant_time_audit`:
+```typescript
+properties: {
+  ...
+  secretRegisters: {
+    type: 'array',
+    items: { type: 'string' },
+    description: 'Optional list of register names to mark as secret taint sources (e.g. ["rdi", "rsi"] for x86_64 System V ABI, or ["x0", "x1"] for AAPCS64). Triggers forward symbolic taint verification.',
+  },
+}
+```
+
+2. In the audit execution handler:
+- If `secretRegisters` array is supplied and non-empty:
+  Convert string names into `TaintSource[]`:
+  `const sources: TaintSource[] = secretRegisters.map(r => ({ type: 'REGISTER', identifier: r.toLowerCase().trim() }))`
+  Run:
+  `const taintResult = ConstantTimeAuditor.verifyNonInterference(instructions, sources, arch, { baseAddress })`
+  Include `taintAnalysis: taintResult` in the response payload.
+  If `taintResult.hasViolations`, ensure `isCleanConstantTime` reflects the violation.
+
+================================================================================
+04. VERIFICATION & TEST CRITERIA
+================================================================================
+1. Unit Tests (`packages/core/src/native/non-interference.test.ts`):
+   - Test 1: Linear arithmetic (e.g., `add rax, rdx`, `xor r8, rax`, `sub r9, r8`) with `rdx` tainted. Verify taint propagates through `rax`, `r8`, and `r9`. All clean, zero branch violations.
+   - Test 2: Self-zeroing (e.g., `xor rax, rax` or `sub rax, rax`) on a tainted `rax`. Verify `rax` is removed from active taints.
+   - Test 3: Secret branch violation: `mov rax, rdi` (rdi tainted) -> `cmp rax, 0` -> `je .Lbranch`. Verify `rflags` tainted by `cmp` and `je` triggers CRITICAL `BRANCH_DEPENDENCY`.
+   - Test 4: Secret cache-timing violation: `mov rax, rdi` (rdi tainted) -> `mov rdx, [rbx + rax*8]`. Verify `rax` inside memory operand triggers CRITICAL `INDEXED_MEMORY_LEAK`.
+   - Test 5: AArch64 tests: `cbz x0, .Ltarget` with `x0` tainted triggers violation; `eor x0, x0, x0` untaints `x0`.
+
+2. MCP Integration Tests (`packages/mcp/src/audit-tools-taint.test.ts`):
+   - Test running `bitpeek_constant_time_audit` with `secretRegisters: ["rdi"]` over both clean code and branch-tainted code.
+   - Validate response schema, boolean flags, and violation details.
+
+3. Regression Checklist:
+   - Run `npm test` -> 100% green across all existing and new test suites.
+   - Run `npm run typecheck` -> zero TypeScript errors.
+   - Run `npm run lint` -> zero lint errors.

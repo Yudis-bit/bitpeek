@@ -1,9 +1,9 @@
 import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js'
 import {
   auditSecp256k1, ConstantTimeAuditor, FileByteSource, BitpeekError, parseHex,
-  SECP256K1_AUDIT_MAX_BYTES, sha256Hex, Secp256k1Engine,
+  SECP256K1_AUDIT_MAX_BYTES, sha256Hex, Secp256k1Engine, ReferenceDisassembler,
 } from '../../core/src/index.js'
-import type { Secp256k1AuditFormat } from '../../core/src/index.js'
+import type { Secp256k1AuditFormat, TaintSource } from '../../core/src/index.js'
 import type { McpSecurityManager } from './security.js'
 
 export const MCP_TIMING_MAX_BYTES = 65536
@@ -51,7 +51,7 @@ export const MCP_AUDIT_TOOLS: Tool[] = [
   },
   {
     name: 'bitpeek_constant_time_audit',
-    description: 'Statically inspect a secret-handling code region for conditional branches, indexed memory/cache hazards, variable-latency arithmetic, and undecoded instructions. Uses the reference x86_64/AArch64 disassembler. A clean result is not a timing proof. Maximum 65536 bytes; reports classified hazards, assembly context, and exact relative/file offsets and bigint addresses.',
+    description: 'Statically inspect a secret-handling code region for conditional branches, indexed memory/cache hazards, variable-latency arithmetic, and undecoded instructions. Uses the reference x86_64/AArch64 disassembler. Optional secretRegisters adds forward symbolic taint verification of the selected sequence. A clean result is not a timing proof. Maximum 65536 bytes; reports classified hazards, assembly context, and exact relative/file offsets and bigint addresses.',
     annotations: auditAnnotations,
     inputSchema: {
       type: 'object', additionalProperties: false, oneOf: sourceChoices,
@@ -63,6 +63,10 @@ export const MCP_AUDIT_TOOLS: Tool[] = [
         baseAddress: { type: 'string', pattern: '^(0[xX][0-9a-fA-F]{1,16}|[0-9]{1,20})$', description: 'Unsigned 64-bit address of the selected region; defaults to file offset or zero for inline hex.' },
         maxInstructions: { type: 'integer', minimum: 1, maximum: MCP_TIMING_MAX_INSTRUCTIONS, default: MCP_TIMING_MAX_INSTRUCTIONS },
         checkMemoryLookups: { type: 'boolean', default: true, description: 'Inspect indexed memory operands for potential cache-timing leaks.' },
+        secretRegisters: {
+          type: 'array', items: { type: 'string' },
+          description: 'Optional list of register names to mark as secret taint sources (e.g. ["rdi", "rsi"] for x86_64 System V ABI, or ["x0", "x1"] for AAPCS64). Triggers forward symbolic taint verification.',
+        },
       },
     },
   },
@@ -143,7 +147,7 @@ export async function callAuditTool(
   name: 'bitpeek_secp256k1_audit' | 'bitpeek_constant_time_audit',
   args: Record<string, unknown>, security: McpSecurityManager, signal?: AbortSignal,
 ): Promise<CallToolResult> {
-  const allowed = new Set(['rawHex', 'handle', 'offset', 'length', ...(name === 'bitpeek_secp256k1_audit' ? ['format', ...Object.keys(verificationProperties)] : ['arch', 'baseAddress', 'maxInstructions', 'checkMemoryLookups'])])
+  const allowed = new Set(['rawHex', 'handle', 'offset', 'length', ...(name === 'bitpeek_secp256k1_audit' ? ['format', ...Object.keys(verificationProperties)] : ['arch', 'baseAddress', 'maxInstructions', 'checkMemoryLookups', 'secretRegisters'])])
   for (const key of Object.keys(args)) if (!allowed.has(key)) throw new BitpeekError('INVALID_INPUT', `Unsupported audit argument: ${key}`)
   let payload: Record<string, unknown>
   if (name === 'bitpeek_secp256k1_audit') {
@@ -184,6 +188,13 @@ export async function callAuditTool(
     const maxInstructions = safeInteger(args.maxInstructions ?? MCP_TIMING_MAX_INSTRUCTIONS, 'maxInstructions', 1, MCP_TIMING_MAX_INSTRUCTIONS)
     const checkMemoryLookups = args.checkMemoryLookups === undefined ? true : args.checkMemoryLookups
     if (typeof checkMemoryLookups !== 'boolean') throw new BitpeekError('INVALID_INPUT', 'checkMemoryLookups must be a boolean')
+    let secrets: TaintSource[] = []
+    if (args.secretRegisters !== undefined) {
+      if (!Array.isArray(args.secretRegisters) || Array.from(args.secretRegisters).some(register => typeof register !== 'string' || register.trim().length === 0)) {
+        throw new BitpeekError('INVALID_INPUT', 'secretRegisters must be an array of nonempty register names')
+      }
+      secrets = args.secretRegisters.map((register: string) => ({ type: 'REGISTER', identifier: register.toLowerCase().trim() }))
+    }
     let suppliedAddress: bigint | undefined
     if (args.baseAddress !== undefined) {
       if (typeof args.baseAddress !== 'string' || !/^(0[xX][0-9a-fA-F]{1,16}|[0-9]{1,20})$/.test(args.baseAddress)) throw new BitpeekError('INVALID_INPUT', 'baseAddress must be an unsigned 64-bit hexadecimal or decimal string')
@@ -208,6 +219,35 @@ export async function callAuditTool(
         ...finding, address: `0x${(baseAddress + BigInt(finding.offset)).toString(16)}`,
         ...(source.offset !== undefined ? { fileOffset: source.offset + finding.offset } : {}),
       })),
+    }
+    if (secrets.length > 0) {
+      const instructions = ReferenceDisassembler.disassemble(bytes, { arch, baseAddress, maxInstructions })
+      let taintAnalysis
+      try {
+        taintAnalysis = ConstantTimeAuditor.verifyNonInterference(instructions, secrets, arch, { baseAddress })
+      } catch (error) {
+        if (error instanceof RangeError) throw new BitpeekError('INVALID_INPUT', error.message)
+        throw error
+      }
+      const decodedBytes = instructions.reduce((sum, instruction) => sum + instruction.length, 0)
+      if (decodedBytes < bytes.length) {
+        taintAnalysis.violations.push({ offset: decodedBytes, mnemonic: '<unexamined>', category: 'UNDECODED', severity: 'WARN', reason: 'Instruction budget left bytes unexamined' })
+        taintAnalysis.hasViolations = true
+        taintAnalysis.isProvablyConstantTime = false
+      }
+      payload.taintAnalysis = {
+        ...taintAnalysis,
+        violations: taintAnalysis.violations.map(hazard => ({
+          ...hazard, address: `0x${(baseAddress + BigInt(hazard.offset)).toString(16)}`,
+          ...(source.offset !== undefined ? { fileOffset: source.offset + hazard.offset } : {}),
+        })),
+      }
+      if (taintAnalysis.hasViolations) {
+        payload.isCleanConstantTime = false
+        payload.hasCacheTimingHazards = audit.hasCacheTimingHazards || taintAnalysis.violations.some(hazard => hazard.category === 'CACHE_TIMING')
+        payload.hasVariableLatencyHazards = audit.hasVariableLatencyHazards || taintAnalysis.violations.some(hazard => hazard.category === 'VARIABLE_LATENCY')
+        payload.summary = `${payload.summary}; ${taintAnalysis.violations.length} taint verification finding(s)`
+      }
     }
   }
   return { structuredContent: payload, content: [{ type: 'text', text: JSON.stringify(payload) }] }
