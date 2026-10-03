@@ -31,12 +31,14 @@ const verificationProperties = {
   internalKeyHex: { ...hex32, description: 'Taproot x-only internal key. rawHex/file range supplies the 32-byte output key.' },
   merkleRootHex: { ...hex32, description: 'Optional Taproot Merkle root; omit for a key-only tweak.' },
   expectedParity: { type: 'integer', enum: [0, 1], description: 'Optional expected Taproot output Y parity.' },
+  spendKeyHex: { type: 'string', minLength: 64, maxLength: 66, description: 'BIP-352 spend public key B_spend (32-byte x-only or 33-byte compressed hex).' },
+  tweakHex: { type: 'string', minLength: 64, maxLength: 64, description: '32-byte BIP-352 scalar tweak t_k.' },
 }
 
 export const MCP_AUDIT_TOOLS: Tool[] = [
   {
     name: 'bitpeek_secp256k1_audit',
-    description: 'Audit secp256k1 encodings and Bitcoin transactions, or verify BIP-340 Schnorr signatures, BIP-374 DLEQ proofs (including BIP-375 shares), and BIP-341 Taproot tweaks. Verification formats return PASS/FAIL with exact reasons. Supply signature/proof/output key as rawHex or an open file range and matching key/message parameters. Maximum 1 MiB.',
+    description: 'Audit secp256k1 encodings and Bitcoin transactions, or verify BIP-340 Schnorr signatures, BIP-374 DLEQ proofs (including BIP-375 shares), BIP-341 Taproot tweaks, and BIP-352 Silent Payments output-key tweaks. Verification formats return PASS/FAIL with exact reasons. Supply signature/proof/output key as rawHex or an open file range and matching key/message parameters. Maximum 1 MiB.',
     annotations: auditAnnotations,
     inputSchema: {
       type: 'object', additionalProperties: false, oneOf: sourceChoices,
@@ -44,7 +46,7 @@ export const MCP_AUDIT_TOOLS: Tool[] = [
         ...sourceProperties,
         rawHex: { ...sourceProperties.rawHex, maxLength: SECP256K1_AUDIT_MAX_BYTES * 3 },
         length: { ...sourceProperties.length, maximum: SECP256K1_AUDIT_MAX_BYTES, description: 'Exact range length; defaults to all remaining file bytes. Maximum 1 MiB.' },
-        format: { type: 'string', enum: ['auto', 'pubkey', 'der', 'compact', 'bitcoin-tx', 'bip340-schnorr', 'dleq', 'taproot-tweak'], default: 'auto' },
+        format: { type: 'string', enum: ['auto', 'pubkey', 'der', 'compact', 'bitcoin-tx', 'bip340-schnorr', 'dleq', 'taproot-tweak', 'bip352-tweak'], default: 'auto' },
         ...verificationProperties,
       },
     },
@@ -152,10 +154,11 @@ export async function callAuditTool(
   let payload: Record<string, unknown>
   if (name === 'bitpeek_secp256k1_audit') {
     const format = args.format ?? 'auto'
-    if (typeof format !== 'string' || !['auto', 'pubkey', 'der', 'compact', 'bitcoin-tx', 'bip340-schnorr', 'dleq', 'taproot-tweak'].includes(format)) throw new BitpeekError('INVALID_INPUT', 'Unsupported secp256k1 audit format')
+    if (typeof format !== 'string' || !['auto', 'pubkey', 'der', 'compact', 'bitcoin-tx', 'bip340-schnorr', 'dleq', 'taproot-tweak', 'bip352-tweak'].includes(format)) throw new BitpeekError('INVALID_INPUT', 'Unsupported secp256k1 audit format')
     const parameters = format === 'bip340-schnorr' ? ['pubkeyHex', 'messageHex']
       : format === 'dleq' ? ['g1Hex', 'p1Hex', 'g2Hex', 'p2Hex', 'messageHex']
-      : format === 'taproot-tweak' ? ['internalKeyHex', 'merkleRootHex', 'expectedParity'] : []
+      : format === 'taproot-tweak' ? ['internalKeyHex', 'merkleRootHex', 'expectedParity']
+      : format === 'bip352-tweak' ? ['spendKeyHex', 'tweakHex'] : []
     for (const key of Object.keys(verificationProperties)) {
       if (args[key] !== undefined && !parameters.includes(key)) throw new BitpeekError('INVALID_INPUT', `${key} is not supported for format ${format}`)
     }
@@ -169,6 +172,18 @@ export async function callAuditTool(
         verification = Secp256k1Engine.verifyDLEQ(pointArgument(args, 'g1Hex'), pointArgument(args, 'p1Hex'),
           pointArgument(args, 'g2Hex'), pointArgument(args, 'p2Hex'), bytes,
           args.messageHex === undefined ? undefined : hexArgument(args, 'messageHex'))
+      } else if (format === 'bip352-tweak') {
+        if (typeof args.spendKeyHex !== 'string' || args.spendKeyHex.length < 64 || args.spendKeyHex.length > 66) {
+          throw new BitpeekError('INVALID_INPUT', 'spendKeyHex must contain 64 to 66 hexadecimal characters')
+        }
+        if (typeof args.tweakHex !== 'string' || args.tweakHex.length !== 64) {
+          throw new BitpeekError('INVALID_INPUT', 'tweakHex must contain 64 hexadecimal characters')
+        }
+        const spendPubKey = hexArgument(args, 'spendKeyHex', 33)
+        const tweak = hexArgument(args, 'tweakHex')
+        if (spendPubKey.length !== 32 && spendPubKey.length !== 33) throw new BitpeekError('INVALID_INPUT', 'spendKeyHex must contain 32 or 33 bytes')
+        if (tweak.length !== 32) throw new BitpeekError('INVALID_INPUT', 'tweakHex must contain 32 bytes')
+        verification = Secp256k1Engine.verifySilentPaymentTweak(spendPubKey, tweak, bytes)
       } else {
         if (args.expectedParity !== undefined && args.expectedParity !== 0 && args.expectedParity !== 1) throw new BitpeekError('INVALID_INPUT', 'expectedParity must be 0 or 1')
         verification = Secp256k1Engine.verifyTaprootTweak(hexArgument(args, 'internalKeyHex'), bytes,
@@ -181,6 +196,7 @@ export async function callAuditTool(
       payload = { format, ...verification, status, source, verificationScope: 'cryptographic-verification',
         cryptographicSignaturesVerified: format === 'bip340-schnorr' && verification.valid,
         summary: `${status}: ${format} ${verification.valid ? 'verification succeeded' : verification.reason}` }
+      if (format === 'bip352-tweak' && !verification.valid) payload.rejectionReason = verification.reason
     }
   } else {
     const arch = args.arch ?? 'x86_64'

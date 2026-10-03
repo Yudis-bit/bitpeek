@@ -28,6 +28,10 @@ export * from './native'
 export * from './trace'
 export * from './runner'
 export * from './bchain'
+export type {
+  Secp256k1PublicKeyAggregationResult, SilentPaymentTweakResult,
+  SilentPaymentOutputKeyResult, SilentPaymentTweakVerificationResult,
+} from './bchain/secp256k1'
 export * from './ai'
 export * from './operations'
 export * from './sdk'

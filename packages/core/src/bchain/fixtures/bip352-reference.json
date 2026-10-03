@@ -1,0 +1,495 @@
+{
+  "source": "https://raw.githubusercontent.com/bitcoin/bips/c2ac36f48f71615984087fd151f410457edfed72/bip-0352/send_and_receive_test_vectors.json",
+  "sourceSha256": "f5f9ed4afd76a1b76f3c70b1cbe67532f89abbe559f8e02d7fc3d8ecb93af4a1",
+  "notes": "Curve inputs, aggregates and output X coordinates are copied from the BIP-352 vectors. Output parity and label hashes are independently calculated with Node SHA-256 and OpenSSL; labeled spend keys are checked against the published recipients.",
+  "aggregation": [
+    {
+      "comment": "Simple send: two inputs",
+      "pubkeys": [
+        "025a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5",
+        "03bd85685d03d111699b15d046319febe77f8de5286e9e512703cdee1bf3be3792"
+      ],
+      "compressed": "032562c1ab2d6bd45d7ca4d78f569999e5333dffd3ac5263924fd00d00dedc4bee"
+    },
+    {
+      "comment": "Simple send: two inputs, order reversed",
+      "pubkeys": [
+        "025a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5",
+        "03bd85685d03d111699b15d046319febe77f8de5286e9e512703cdee1bf3be3792"
+      ],
+      "compressed": "032562c1ab2d6bd45d7ca4d78f569999e5333dffd3ac5263924fd00d00dedc4bee"
+    },
+    {
+      "comment": "Simple send: two inputs from the same transaction",
+      "pubkeys": [
+        "025a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5",
+        "03bd85685d03d111699b15d046319febe77f8de5286e9e512703cdee1bf3be3792"
+      ],
+      "compressed": "032562c1ab2d6bd45d7ca4d78f569999e5333dffd3ac5263924fd00d00dedc4bee"
+    },
+    {
+      "comment": "Simple send: two inputs from the same transaction, order reversed",
+      "pubkeys": [
+        "025a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5",
+        "03bd85685d03d111699b15d046319febe77f8de5286e9e512703cdee1bf3be3792"
+      ],
+      "compressed": "032562c1ab2d6bd45d7ca4d78f569999e5333dffd3ac5263924fd00d00dedc4bee"
+    },
+    {
+      "comment": "Outpoint ordering byte-lexicographically vs. vout-integer",
+      "pubkeys": [
+        "025a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5",
+        "03bd85685d03d111699b15d046319febe77f8de5286e9e512703cdee1bf3be3792"
+      ],
+      "compressed": "032562c1ab2d6bd45d7ca4d78f569999e5333dffd3ac5263924fd00d00dedc4bee"
+    },
+    {
+      "comment": "Single recipient: multiple UTXOs from the same public key",
+      "pubkeys": [
+        "025a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5",
+        "025a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5"
+      ],
+      "compressed": "03e40664e222ba71e29b80efc907fa22a3c6c64f45e89dbb8511dc7a3712b0a186"
+    },
+    {
+      "comment": "Single recipient: taproot only inputs with even y-values",
+      "pubkeys": [
+        "5a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5",
+        "782eeb913431ca6e9b8c2fd80a5f72ed2024ef72a3c6fb10263c379937323338"
+      ],
+      "compressed": "038180a2125f9d6dd116e1a6139be4d72fd5057dab6aaabaa5654817c11baeb3ba"
+    },
+    {
+      "comment": "Single recipient: taproot only with mixed even/odd y-values",
+      "pubkeys": [
+        "5a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5",
+        "8c8d23d4764feffcd5e72e380802540fa0f88e3d62ad5e0b47955f74d7b283c4"
+      ],
+      "compressed": "020f0ab50f420ab1249bc2a21659c607f2873400853035aad0ca6d0ded04d62623"
+    },
+    {
+      "comment": "Single recipient: taproot input with even y-value and non-taproot input",
+      "pubkeys": [
+        "5a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5",
+        "03e0ec4f64b3fa2e463ccfcf4e856e37d5e1e20275bc89ec1def9eb098eff1f85d"
+      ],
+      "compressed": "031ecda9c64faaa6cd57c9f3d7c62bcfc0763c2627ed8dc0e2c3018e9ff37a0bf0"
+    },
+    {
+      "comment": "Single recipient: taproot input with odd y-value and non-taproot input",
+      "pubkeys": [
+        "8c8d23d4764feffcd5e72e380802540fa0f88e3d62ad5e0b47955f74d7b283c4",
+        "03e0ec4f64b3fa2e463ccfcf4e856e37d5e1e20275bc89ec1def9eb098eff1f85d"
+      ],
+      "compressed": "03bc118b1c8178915b716d6137633722c71adfe721551ec7b3938054691de6a2b9"
+    },
+    {
+      "comment": "Multiple outputs: multiple outputs, same recipient",
+      "pubkeys": [
+        "025a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5",
+        "03782eeb913431ca6e9b8c2fd80a5f72ed2024ef72a3c6fb10263c379937323338"
+      ],
+      "compressed": "03853f51bef283502181e93238c8708ae27235dc51ae45a0c4053987c52fc6428b"
+    },
+    {
+      "comment": "Multiple outputs: multiple outputs, multiple recipients",
+      "pubkeys": [
+        "025a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5",
+        "03782eeb913431ca6e9b8c2fd80a5f72ed2024ef72a3c6fb10263c379937323338"
+      ],
+      "compressed": "03853f51bef283502181e93238c8708ae27235dc51ae45a0c4053987c52fc6428b"
+    },
+    {
+      "comment": "Receiving with labels: label with even parity",
+      "pubkeys": [
+        "025a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5",
+        "03782eeb913431ca6e9b8c2fd80a5f72ed2024ef72a3c6fb10263c379937323338"
+      ],
+      "compressed": "03853f51bef283502181e93238c8708ae27235dc51ae45a0c4053987c52fc6428b"
+    },
+    {
+      "comment": "Receiving with labels: label with odd parity",
+      "pubkeys": [
+        "025a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5",
+        "03782eeb913431ca6e9b8c2fd80a5f72ed2024ef72a3c6fb10263c379937323338"
+      ],
+      "compressed": "03853f51bef283502181e93238c8708ae27235dc51ae45a0c4053987c52fc6428b"
+    },
+    {
+      "comment": "Receiving with labels: large label integer",
+      "pubkeys": [
+        "025a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5",
+        "03782eeb913431ca6e9b8c2fd80a5f72ed2024ef72a3c6fb10263c379937323338"
+      ],
+      "compressed": "03853f51bef283502181e93238c8708ae27235dc51ae45a0c4053987c52fc6428b"
+    },
+    {
+      "comment": "Multiple outputs with labels: un-labeled and labeled address; same recipient",
+      "pubkeys": [
+        "025a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5",
+        "03782eeb913431ca6e9b8c2fd80a5f72ed2024ef72a3c6fb10263c379937323338"
+      ],
+      "compressed": "03853f51bef283502181e93238c8708ae27235dc51ae45a0c4053987c52fc6428b"
+    },
+    {
+      "comment": "Multiple outputs with labels: multiple outputs for labeled address; same recipient",
+      "pubkeys": [
+        "025a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5",
+        "03782eeb913431ca6e9b8c2fd80a5f72ed2024ef72a3c6fb10263c379937323338"
+      ],
+      "compressed": "03853f51bef283502181e93238c8708ae27235dc51ae45a0c4053987c52fc6428b"
+    },
+    {
+      "comment": "Multiple outputs with labels: un-labeled, labeled, and multiple outputs for labeled address; same recipients",
+      "pubkeys": [
+        "025a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5",
+        "03782eeb913431ca6e9b8c2fd80a5f72ed2024ef72a3c6fb10263c379937323338"
+      ],
+      "compressed": "03853f51bef283502181e93238c8708ae27235dc51ae45a0c4053987c52fc6428b"
+    },
+    {
+      "comment": "Single recipient: use silent payments for sender change",
+      "pubkeys": [
+        "025a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5",
+        "03782eeb913431ca6e9b8c2fd80a5f72ed2024ef72a3c6fb10263c379937323338"
+      ],
+      "compressed": "03853f51bef283502181e93238c8708ae27235dc51ae45a0c4053987c52fc6428b"
+    },
+    {
+      "comment": "Single recipient: taproot input with NUMS point",
+      "pubkeys": [
+        "782eeb913431ca6e9b8c2fd80a5f72ed2024ef72a3c6fb10263c379937323338"
+      ],
+      "compressed": "02782eeb913431ca6e9b8c2fd80a5f72ed2024ef72a3c6fb10263c379937323338"
+    },
+    {
+      "comment": "Pubkey extraction from malleated p2pkh",
+      "pubkeys": [
+        "025a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5",
+        "03782eeb913431ca6e9b8c2fd80a5f72ed2024ef72a3c6fb10263c379937323338",
+        "02e0ec4f64b3fa2e463ccfcf4e856e37d5e1e20275bc89ec1def9eb098eff1f85d"
+      ],
+      "compressed": "038b0d201fe111bdc0e6953772bd02a41959d25d5b2f66bcbe348af27bbdd42735"
+    },
+    {
+      "comment": "P2PKH and P2WPKH Uncompressed Keys are skipped",
+      "pubkeys": [
+        "025a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5"
+      ],
+      "compressed": "025a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5"
+    },
+    {
+      "comment": "Skip invalid P2SH inputs",
+      "pubkeys": [
+        "025a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5"
+      ],
+      "compressed": "025a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5"
+    },
+    {
+      "comment": "Recipient ignores unrelated outputs",
+      "pubkeys": [
+        "5a1e61f898173040e20616d43e9f496fba90338a39faa1ed98fcbaeee4dd9be5",
+        "03782eeb913431ca6e9b8c2fd80a5f72ed2024ef72a3c6fb10263c379937323338"
+      ],
+      "compressed": "03853f51bef283502181e93238c8708ae27235dc51ae45a0c4053987c52fc6428b"
+    },
+    {
+      "comment": "Input keys intermediate sum is zero but final sum is non-zero",
+      "pubkeys": [
+        "02557ef3e55b0a52489b4454c1169e06bdea43687a69c1f190eb50781644ab6975",
+        "03557ef3e55b0a52489b4454c1169e06bdea43687a69c1f190eb50781644ab6975",
+        "02557ef3e55b0a52489b4454c1169e06bdea43687a69c1f190eb50781644ab6975"
+      ],
+      "compressed": "02557ef3e55b0a52489b4454c1169e06bdea43687a69c1f190eb50781644ab6975"
+    },
+    {
+      "comment": "Maximum per-group recipient limit K_max is exceeded (2324 matches): sending fails, receiver doesn't scan beyond limit",
+      "pubkeys": [
+        "bca87f72e604e8850064552bedf380ca4584227057efe12a6cc238470658aaa3"
+      ],
+      "compressed": "02bca87f72e604e8850064552bedf380ca4584227057efe12a6cc238470658aaa3"
+    }
+  ],
+  "outputs": [
+    {
+      "comment": "Simple send: two inputs",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "f438b40179a3c4262de12986c0e6cce0634007cdc79c1dcd3e20b9ebc2e7eef6",
+      "outputKey": "3e9fce73d4e77a4809908e3c3a2e54ee147b9312dc5044a193d1fc85de46e3c1",
+      "parity": 1
+    },
+    {
+      "comment": "Simple send: two inputs, order reversed",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "f438b40179a3c4262de12986c0e6cce0634007cdc79c1dcd3e20b9ebc2e7eef6",
+      "outputKey": "3e9fce73d4e77a4809908e3c3a2e54ee147b9312dc5044a193d1fc85de46e3c1",
+      "parity": 1
+    },
+    {
+      "comment": "Simple send: two inputs from the same transaction",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "4851455bfbe1ab4f80156570aa45063201aa5c9e1b1dcd29f0f8c33d10bf77ae",
+      "outputKey": "79e71baa2ba3fc66396de3a04f168c7bf24d6870ec88ca877754790c1db357b6",
+      "parity": 1
+    },
+    {
+      "comment": "Simple send: two inputs from the same transaction, order reversed",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "ab0c9b87181bf527879f48db9f14a02233619b986f8e8f2d5d408ce68a709f51",
+      "outputKey": "f4c2da807f89cb1501f1a77322a895acfb93c28e08ed2724d2beb8e44539ba38",
+      "parity": 1
+    },
+    {
+      "comment": "Outpoint ordering byte-lexicographically vs. vout-integer",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "c8ac0292997b5bca98b3ebd99a57e253071137550f270452cd3df8a3e2266d36",
+      "outputKey": "a85ef8701394b517a4b35217c4bd37ac01ebeed4b008f8d0879f9e09ba95319c",
+      "parity": 1
+    },
+    {
+      "comment": "Single recipient: multiple UTXOs from the same public key",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "f032695e2636619efa523fffaa9ef93c8802299181fd0461913c1b8daf9784cd",
+      "outputKey": "548ae55c8eec1e736e8d3e520f011f1f42a56d166116ad210b3937599f87f566",
+      "parity": 1
+    },
+    {
+      "comment": "Single recipient: taproot only inputs with even y-values",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "3fb9ce5ce1746ced103c8ed254e81f6690764637ddbc876ec1f9b3ddab776b03",
+      "outputKey": "de88bea8e7ffc9ce1af30d1132f910323c505185aec8eae361670421e749a1fb",
+      "parity": 0
+    },
+    {
+      "comment": "Single recipient: taproot only with mixed even/odd y-values",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "f5382508609771068ed079b24e1f72e4a17ee6d1c979066bf1d4e2a5676f09d4",
+      "outputKey": "77cab7dd12b10259ee82c6ea4b509774e33e7078e7138f568092241bf26b99f1",
+      "parity": 1
+    },
+    {
+      "comment": "Single recipient: taproot input with even y-value and non-taproot input",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "b40017865c79b1fcbed68896791be93186d08f47e416b289b8c063777e14e8df",
+      "outputKey": "30523cca96b2a9ae3c98beb5e60f7d190ec5bc79b2d11a0b2d4d09a608c448f0",
+      "parity": 1
+    },
+    {
+      "comment": "Single recipient: taproot input with odd y-value and non-taproot input",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "a2f9dd05d1d398347c885d9c61a64d18a264de6d49cea4326bafc2791d627fa7",
+      "outputKey": "359358f59ee9e9eec3f00bdf4882570fd5c182e451aa2650b788544aff012a3a",
+      "parity": 1
+    },
+    {
+      "comment": "Multiple outputs: multiple outputs, same recipient",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "d97e442d110c0bdd31161a7bb6e7862e038d02a09b1484dfbb463f2e0f7c9230",
+      "outputKey": "e976a58fbd38aeb4e6093d4df02e9c1de0c4513ae0c588cef68cda5b2f8834ca",
+      "parity": 0
+    },
+    {
+      "comment": "Multiple outputs: multiple outputs, same recipient",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "33ce085c3c11eaad13694aae3c20301a6c83382ec89a7cde96c6799e2f88805a",
+      "outputKey": "f207162b1a7abc51c42017bef055e9ec1efc3d3567cb720357e2b84325db33ac",
+      "parity": 1
+    },
+    {
+      "comment": "Multiple outputs: multiple outputs, multiple recipients",
+      "spendPubKey": "0381eb9a9a9ec739d527c1631b31b421566f5c2a47b4ab5b1f6a686dfb68eab716",
+      "tweak": "72cd082cccb633bf85240a83494b32dc943a4d05647a6686d23ad4ca59c0ebe4",
+      "outputKey": "2e847bb01d1b491da512ddd760b8509617ee38057003d6115d00ba562451323a",
+      "parity": 1
+    },
+    {
+      "comment": "Multiple outputs: multiple outputs, multiple recipients",
+      "spendPubKey": "0381eb9a9a9ec739d527c1631b31b421566f5c2a47b4ab5b1f6a686dfb68eab716",
+      "tweak": "2f17ea873a0047fc01ba8010fef0969e76d0e4283f600d48f735098b1fee6eb9",
+      "outputKey": "841792c33c9dc6193e76744134125d40add8f2f4a96475f28ba150be032d64e8",
+      "parity": 1
+    },
+    {
+      "comment": "Receiving with labels: label with even parity",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "51d4e9d0d482b5700109b4b2e16ff508269b03d800192a043d61dca4a0a72a52",
+      "outputKey": "d014d4860f67d607d60b1af70e0ee236b99658b61bb769832acbbe87c374439a",
+      "parity": 0
+    },
+    {
+      "comment": "Receiving with labels: label with odd parity",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "6024ae214876356b8d917716e7707d267ae16a0fdb07de2a786b74a7bbcddead",
+      "outputKey": "67626aebb3c4307cf0f6c39ca23247598fabf675ab783292eb2f81ae75ad1f8c",
+      "parity": 1
+    },
+    {
+      "comment": "Receiving with labels: large label integer",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "e336b92330c33030285ce42e4115ad92d5197913c88e06b9072b4a9b47c664a2",
+      "outputKey": "7efa60ce78ac343df8a013a2027c6c5ef29f9502edcbd769d2c21717fecc5951",
+      "parity": 1
+    },
+    {
+      "comment": "Multiple outputs with labels: un-labeled and labeled address; same recipient",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "43100f89f1a6bf10081c92b473ffc57ceac7dbed600b6aba9bb3976f17dbb914",
+      "outputKey": "39f42624d5c32a77fda80ff0acee269afec601d3791803e80252ae04e4ffcf4c",
+      "parity": 0
+    },
+    {
+      "comment": "Multiple outputs with labels: un-labeled and labeled address; same recipient",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "33ce085c3c11eaad13694aae3c20301a6c83382ec89a7cde96c6799e2f88805a",
+      "outputKey": "f207162b1a7abc51c42017bef055e9ec1efc3d3567cb720357e2b84325db33ac",
+      "parity": 1
+    },
+    {
+      "comment": "Multiple outputs with labels: multiple outputs for labeled address; same recipient",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "43100f89f1a6bf10081c92b473ffc57ceac7dbed600b6aba9bb3976f17dbb914",
+      "outputKey": "39f42624d5c32a77fda80ff0acee269afec601d3791803e80252ae04e4ffcf4c",
+      "parity": 0
+    },
+    {
+      "comment": "Multiple outputs with labels: multiple outputs for labeled address; same recipient",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "9d5fd3b91cac9ddfea6fc2e6f9386f680e6cee623cda02f53706306c081de87f",
+      "outputKey": "83dc944e61603137294829aed56c74c9b087d80f2c021b98a7fae5799000696c",
+      "parity": 1
+    },
+    {
+      "comment": "Multiple outputs with labels: un-labeled, labeled, and multiple outputs for labeled address; same recipients",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "4e3352fbe0505c25e718d96007c259ef08db34f8c844e4ff742d9855ff03805a",
+      "outputKey": "006a02c308ccdbf3ac49f0638f6de128f875db5a213095cf112b3b77722472ae",
+      "parity": 0
+    },
+    {
+      "comment": "Multiple outputs with labels: un-labeled, labeled, and multiple outputs for labeled address; same recipients",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "43100f89f1a6bf10081c92b473ffc57ceac7dbed600b6aba9bb3976f17dbb914",
+      "outputKey": "39f42624d5c32a77fda80ff0acee269afec601d3791803e80252ae04e4ffcf4c",
+      "parity": 0
+    },
+    {
+      "comment": "Multiple outputs with labels: un-labeled, labeled, and multiple outputs for labeled address; same recipients",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "bf709f98d4418f8a67e738154ae48818dad44689cd37fbc070891a396dd1c633",
+      "outputKey": "ae1a780c04237bd577283c3ddb2e499767c3214160d5a6b0767e6b8c278bd701",
+      "parity": 1
+    },
+    {
+      "comment": "Multiple outputs with labels: un-labeled, labeled, and multiple outputs for labeled address; same recipients",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "736f05e4e3072c3b8656bedef2e9bf54cbcaa2b6fe5320d3e86f5b96874dda71",
+      "outputKey": "ca64abe1e0f737823fb9a94f597eed418fb2df77b1317e26b881a14bb594faaa",
+      "parity": 1
+    },
+    {
+      "comment": "Single recipient: use silent payments for sender change",
+      "spendPubKey": "03bc95144daf15336db3456825c70ced0a4462f89aca42c4921ee7ccb2b3a44796",
+      "tweak": "80cd767ed20bd0bb7d8ea5e803f8c381293a62e8a073cf46fb0081da46e64e1f",
+      "outputKey": "be368e28979d950245d742891ae6064020ba548c1e2e65a639a8bb0675d95cff",
+      "parity": 0
+    },
+    {
+      "comment": "Single recipient: use silent payments for sender change",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "33ce085c3c11eaad13694aae3c20301a6c83382ec89a7cde96c6799e2f88805a",
+      "outputKey": "f207162b1a7abc51c42017bef055e9ec1efc3d3567cb720357e2b84325db33ac",
+      "parity": 1
+    },
+    {
+      "comment": "Single recipient: taproot input with NUMS point",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "3ddec3232609d348d6b8b53123b4f40f6d4f5398ca586f087b0416ec3b851496",
+      "outputKey": "79e79897c52935bfd97fc6e076a6431a0c7543ca8c31e0fc3cf719bb572c842d",
+      "parity": 1
+    },
+    {
+      "comment": "Pubkey extraction from malleated p2pkh",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "10bde9781def20d7701e7603ef1b1e5e71c67bae7154818814e3c81ef5b1a3d3",
+      "outputKey": "4612cdbf845c66c7511d70aab4d9aed11e49e48cdb8d799d787101cdd0d53e4f",
+      "parity": 0
+    },
+    {
+      "comment": "P2PKH and P2WPKH Uncompressed Keys are skipped",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "688fa3aeb97d2a46ae87b03591921c2eaf4b505eb0ddca2733c94701e01060cf",
+      "outputKey": "67fee277da9e8542b5d2e6f32d660a9bbd3f0e107c2d53638ab1d869088882d6",
+      "parity": 1
+    },
+    {
+      "comment": "Skip invalid P2SH inputs",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "688fa3aeb97d2a46ae87b03591921c2eaf4b505eb0ddca2733c94701e01060cf",
+      "outputKey": "67fee277da9e8542b5d2e6f32d660a9bbd3f0e107c2d53638ab1d869088882d6",
+      "parity": 1
+    },
+    {
+      "comment": "Input keys intermediate sum is zero but final sum is non-zero",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "tweak": "3d5b7a284108f93b9fe78f2c300d2ca9ef3b4e0cd0de673fc72990f2a4f417b9",
+      "outputKey": "7e88a7536c90770be4d2693a84ed03abe3fdcc5a29f96ec3433effec3b0c2194",
+      "parity": 0
+    }
+  ],
+  "labels": [
+    {
+      "comment": "Receiving with labels: label with even parity",
+      "scanPrivKey": "0f694e068028a717f8af6b9411f9a133dd3565258714cc226594b34db90c1f2c",
+      "index": 2,
+      "tweak": "1e06e1749870cac2eda06a04a54fc4edba17cba9377ead25a69b6306711ea9f8",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "labeledSpendPubKey": "0259352add837b6686e8d22b87017814a46b3ad308702167c65bd5c8599cd28d1c",
+      "parity": 0
+    },
+    {
+      "comment": "Receiving with labels: label with odd parity",
+      "scanPrivKey": "0f694e068028a717f8af6b9411f9a133dd3565258714cc226594b34db90c1f2c",
+      "index": 3,
+      "tweak": "2c56a5c50c644abe7a282c68ab504d0c0e5e31e1126d614be1a4fb098c455e53",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "labeledSpendPubKey": "0208a144a18433a83f633c822c1bf5ee4c8c8e24601d6ca75e20a7dc57a0ff9280",
+      "parity": 0
+    },
+    {
+      "comment": "Receiving with labels: large label integer",
+      "scanPrivKey": "0f694e068028a717f8af6b9411f9a133dd3565258714cc226594b34db90c1f2c",
+      "index": 1001337,
+      "tweak": "af68b0c6f4b1458314f3998004f57d78689640e4fff389da7064d0fd183de448",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "labeledSpendPubKey": "03d85092bbe3468f684ce1d8a2a66ebec96a9e6e09e7110720a5d5faa4aa7880d0",
+      "parity": 1
+    },
+    {
+      "comment": "Multiple outputs with labels: un-labeled and labeled address; same recipient",
+      "scanPrivKey": "0f694e068028a717f8af6b9411f9a133dd3565258714cc226594b34db90c1f2c",
+      "index": 1,
+      "tweak": "6991cb5ce09ab332d7067838bd183f4da1e9b633743f8616a03fb6cdd8956825",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "labeledSpendPubKey": "03a6739499dc667d308baefea4de0c4a85cc72aece181bc05712d3919662610ff1",
+      "parity": 1
+    },
+    {
+      "comment": "Multiple outputs with labels: un-labeled, labeled, and multiple outputs for labeled address; same recipients",
+      "scanPrivKey": "0f694e068028a717f8af6b9411f9a133dd3565258714cc226594b34db90c1f2c",
+      "index": 1337,
+      "tweak": "3fa0fd88a6f5418e72ed7430b6c98f3a5f476a8835b8a3f551a8e1f857c55a17",
+      "spendPubKey": "025cc9856d6f8375350e123978daac200c260cb5b5ae83106cab90484dcd8fcf36",
+      "labeledSpendPubKey": "0244baa5cf5db444a9e922832ff2c88716b566a85d62e8235aebd91884d4f64942",
+      "parity": 0
+    },
+    {
+      "comment": "Single recipient: use silent payments for sender change",
+      "scanPrivKey": "11b7a82e06ca2648d5fded2366478078ec4fc9dc1d8ff487518226f229d768fd",
+      "index": 0,
+      "tweak": "015d1b458151642ee96c0f534aa795c962dc3ece7eeebe4d0e30820391a53bea",
+      "spendPubKey": "03bc95144daf15336db3456825c70ced0a4462f89aca42c4921ee7ccb2b3a44796",
+      "labeledSpendPubKey": "03ecd43b9fdad484ff57278b21878b844276ce390622d03dd0cfb4288b7e02a6f5",
+      "parity": 1
+    }
+  ]
+}

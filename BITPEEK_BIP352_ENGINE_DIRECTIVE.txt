@@ -1,0 +1,169 @@
+# BITPEEK DIRECTIVE: BIP-352 SILENT PAYMENTS MATHEMATICAL & ELLIPTIC CURVE VERIFICATION ENGINE
+# Target Agent: Frontier Autonomous Coding Agent (GPT-5 / GPT-o1 / Sol 6.1 / Claude 3.5 Sonnet)
+# Workspace Root: C:\Users\LENOVO\Documents\bugbounty\bitpeek
+# Execution Mode: Surgical Enhancement (Additive Only, Zero Architectural Regression)
+
+================================================================================
+00. FORMAL SPECIFICATION & CRYPTOGRAPHIC INVARIANTS (BIP-352)
+================================================================================
+Implement reference mathematical operations, public key aggregation, and tweak
+verification for BIP-352 (Silent Payments) on secp256k1.
+
+This engine enforces formal mathematical invariants specified in BIP-352:
+1. Tagged hashing per BIP-340 / BIP-352:
+   - "BIP0352/SharedSecret": SHA256(SHA256(tag) || SHA256(tag) || compressed(Q) || outpoints_hash || ser32(k))
+   - "BIP0352/Inputs": SHA256(SHA256(tag) || SHA256(tag) || outpoints_data)
+   - "BIP0352/Label": SHA256(SHA256(tag) || SHA256(tag) || B_scan || ser32(m))
+2. Point aggregation:
+   - A_sum = A_1 + A_2 + ... + A_m.
+   - Every input public key A_i must be a valid point on secp256k1.
+   - If A_sum evaluates to the point at infinity (O), the aggregation is invalid.
+3. Output key derivation:
+   - P = B_spend + t_k * G, where t_k is the scalar tweak.
+   - If t_k >= n or t_k == 0, the tweak is non-canonical and rejected.
+   - If P is the point at infinity, the output key is rejected.
+   - Returns 32-byte x-only public key X(P) and its Y-coordinate parity (0 for even, 1 for odd).
+
+CRITICAL NON-NEGOTIABLE CONSTRAINTS:
+1. STRICTLY ADDITIVE:
+   Do NOT rewrite, alter, or remove any existing methods in `Secp256k1Engine`
+   (`verifySchnorr`, `verifyDLEQ`, `verifyTaprootTweak`, `pointAdd`, `scalarMul`,
+   `liftX`, etc.). Retain 100% backward compatibility for all existing callers.
+2. ZERO EXTERNAL DEPENDENCIES:
+   Use only native TypeScript, JavaScript BigInt, existing Bitpeek primitives
+   (`taggedHash`, `unsignedBigEndian`), and Node.js built-ins. Do NOT install npm packages.
+3. ZERO REGRESSION POLICY:
+   All existing 798 tests across 41 test files MUST remain 100% green (`npm test`).
+
+================================================================================
+01. TARGET FILE MAP & ARCHITECTURAL OVERVIEW
+================================================================================
+- `packages/core/src/bchain/secp256k1.ts`:
+  ADD methods to `Secp256k1Engine`:
+  * `aggregatePublicKeys(pubkeys: Uint8Array[]): { valid: boolean; point: Point; compressed?: Uint8Array; reason?: string }`
+  * `createSilentPaymentTweak(ecdhPoint: Point, outpointsHash32: Uint8Array, k?: number): { valid: boolean; tweak: bigint; tweakBytes?: Uint8Array; reason?: string }`
+  * `deriveSilentPaymentOutputKey(spendPubKey: Uint8Array, tweakScalarOrBytes: bigint | Uint8Array): { valid: boolean; outputKey32?: Uint8Array; parity?: number; reason?: string }`
+  * `deriveSilentPaymentLabelTweak(scanPrivKey32: Uint8Array, labelIndex: number): { valid: boolean; tweak: bigint; tweakBytes?: Uint8Array; reason?: string }`
+  * `verifySilentPaymentTweak(spendPubKey: Uint8Array, tweakScalarOrBytes: bigint | Uint8Array, expectedOutputKey32: Uint8Array): { valid: boolean; parity: number; reason?: string }`
+
+- `packages/core/src/index.ts`:
+  Export the new BIP-352 types and helper interfaces.
+
+- `packages/mcp/src/audit-tools.ts`:
+  UPGRADE `bitpeek_secp256k1_audit`:
+  * Add format: `'bip352-tweak'` to `format` enum.
+  * Add input properties:
+    - `spendKeyHex`: 32-byte x-only or 33-byte compressed spend public key B_spend.
+    - `tweakHex`: 32-byte scalar tweak t_k.
+    - `rawHex` or file range supplies the expected 32-byte output key.
+  * Execute `Secp256k1Engine.verifySilentPaymentTweak` when format `'bip352-tweak'` is selected.
+
+- `packages/core/src/bchain/bip352-silent-payments.test.ts`:
+  NEW test suite covering:
+  1. Input key aggregation with 1, 2, and multiple compressed/x-only pubkeys.
+  2. Degenerate inputs: point at infinity sums, tweak >= n, tweak == 0, invalid curve points.
+  3. Reference BIP-352 tweak and output key derivations.
+  4. Labeled address tweak derivation.
+
+- `packages/mcp/src/audit-tools-bip352.test.ts`:
+  NEW integration test suite verifying MCP tool execution for format `'bip352-tweak'`.
+
+================================================================================
+02. DETAILED MATHEMATICAL IMPLEMENTATION SPECIFICATION
+================================================================================
+File: `packages/core/src/bchain/secp256k1.ts`
+
+1. Key Aggregation:
+   ```typescript
+   public static aggregatePublicKeys(pubkeys: Uint8Array[]): {
+     valid: boolean
+     point: Point
+     compressed?: Uint8Array
+     reason?: string
+   }
+   ```
+   - Input: Array of public keys (33-byte compressed or 32-byte x-only; if 32-byte, liftX with even Y).
+   - If pubkeys is empty, return `{ valid: false, point: null, reason: 'Empty public key list' }`.
+   - Parse each public key. If any key is invalid or not on curve, return `{ valid: false, point: null, reason: 'Invalid public key in aggregation' }`.
+   - Accumulate using `pointAdd`.
+   - If accumulated sum is null (point at infinity O), return `{ valid: false, point: null, reason: 'Aggregated public key is point at infinity' }`.
+   - Return `{ valid: true, point: sum, compressed: compressedPoint(sum) }`.
+
+2. Shared Secret Tweak Derivation:
+   ```typescript
+   public static createSilentPaymentTweak(
+     ecdhPoint: Point,
+     outpointsHash32: Uint8Array,
+     k = 0
+   ): { valid: boolean; tweak: bigint; tweakBytes?: Uint8Array; reason?: string }
+   ```
+   - If ecdhPoint is null or not on curve, return `{ valid: false, tweak: 0n, reason: 'ECDH point is null or invalid' }`.
+   - If outpointsHash32.length !== 32, return `{ valid: false, tweak: 0n, reason: 'Outpoints hash must be 32 bytes' }`.
+   - Serialize index k as 4-byte big-endian uint32: `const kBytes = new Uint8Array(4); new DataView(kBytes.buffer).setUint32(0, k, false);`
+   - Compute `hash = taggedHash('BIP0352/SharedSecret', compressedPoint(ecdhPoint), outpointsHash32, kBytes)`.
+   - Convert hash to scalar BigInt `tweak = unsignedBigEndian(hash)`.
+   - If `tweak >= SECP256K1_N`, return `{ valid: false, tweak: 0n, reason: 'Tweak scalar >= n' }`.
+   - If `tweak === 0n`, return `{ valid: false, tweak: 0n, reason: 'Tweak scalar is zero' }`.
+   - Return `{ valid: true, tweak, tweakBytes: hash }`.
+
+3. Output Key Derivation & Tweak Verification:
+   ```typescript
+   public static deriveSilentPaymentOutputKey(
+     spendPubKey: Uint8Array,
+     tweakScalarOrBytes: bigint | Uint8Array
+   ): { valid: boolean; outputKey32?: Uint8Array; parity?: number; reason?: string }
+   ```
+   - Parse `spendPubKey`: if 32 bytes, `liftX(spendPubKey)`; if 33 bytes, parse compressed SEC point.
+   - If spend point is invalid, return `{ valid: false, reason: 'Invalid spend public key' }`.
+   - If tweak is Uint8Array, verify length === 32 and convert via `unsignedBigEndian`.
+   - Check `tweak > 0n && tweak < SECP256K1_N`. If not, return `{ valid: false, reason: 'Tweak scalar outside valid range (0 < t < n)' }`.
+   - Compute `P = pointAdd(spendPoint, scalarMul(tweak, GENERATOR))`.
+   - If `P === null`, return `{ valid: false, reason: 'Tweaked point is point at infinity' }`.
+   - Extract x-coordinate as 32-byte big-endian Uint8Array. Parity is `Number(P.y & 1n)`.
+   - Return `{ valid: true, outputKey32: xBytes, parity }`.
+
+4. Verification Method:
+   ```typescript
+   public static verifySilentPaymentTweak(
+     spendPubKey: Uint8Array,
+     tweakScalarOrBytes: bigint | Uint8Array,
+     expectedOutputKey32: Uint8Array
+   ): { valid: boolean; parity: number; reason?: string }
+   ```
+   - If `expectedOutputKey32.length !== 32`, return `{ valid: false, parity: -1, reason: 'Expected output key must be 32 bytes' }`.
+   - Execute `deriveSilentPaymentOutputKey(spendPubKey, tweakScalarOrBytes)`.
+   - If derivation fails, return `{ valid: false, parity: -1, reason: derived.reason }`.
+   - Compare `derived.outputKey32` with `expectedOutputKey32`. If identical, return `{ valid: true, parity: derived.parity! }`. Otherwise return `{ valid: false, parity: derived.parity!, reason: 'Output key mismatch' }`.
+
+================================================================================
+03. MCP INTEGRATION SPECIFICATION
+================================================================================
+File: `packages/mcp/src/audit-tools.ts`
+
+1. Update `MCP_AUDIT_TOOLS` schema for `bitpeek_secp256k1_audit`:
+   - Extend `format` enum: `['auto', 'pubkey', 'der', 'compact', 'bitcoin-tx', 'bip340-schnorr', 'dleq', 'taproot-tweak', 'bip352-tweak']`.
+   - Add properties:
+     * `spendKeyHex`: `{ type: 'string', minLength: 64, maxLength: 66, description: 'BIP-352 spend public key B_spend (32-byte x-only or 33-byte compressed hex).' }`
+     * `tweakHex`: `{ type: 'string', minLength: 64, maxLength: 64, description: '32-byte BIP-352 scalar tweak t_k.' }`
+2. In audit execution handler:
+   - When `format === 'bip352-tweak'`:
+     Validate `spendKeyHex`, `tweakHex`, and extract `rawHex` (the 32-byte expected output key).
+     Run `Secp256k1Engine.verifySilentPaymentTweak`.
+     Return structured JSON with `valid`, `parity`, `rejectionReason` (if any), and source metadata.
+
+================================================================================
+04. VERIFICATION & QUALITY GATES
+================================================================================
+1. `packages/core/src/bchain/bip352-silent-payments.test.ts`:
+   - Comprehensive test cases including:
+     * Known BIP-352 test vectors for tweak addition.
+     * Rejection of tweak >= n and tweak == 0.
+     * Rejection of invalid spend pubkey.
+     * Rejection when point addition yields point at infinity.
+     * Key aggregation with multiple inputs and empty list handling.
+2. `packages/mcp/src/audit-tools-bip352.test.ts`:
+   - End-to-end MCP tool call verifying PASS and FAIL cases for `bip352-tweak`.
+3. Quality gates:
+   - `npm test`: 100% green across all existing 798 tests + all new tests.
+   - `npm run typecheck`: zero errors.
+   - `npm run lint`: zero errors.

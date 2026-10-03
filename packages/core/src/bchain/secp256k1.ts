@@ -8,6 +8,34 @@ export const SECP256K1_GX = 0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959
 export const SECP256K1_GY = 0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8n
 
 export type Point = { x: bigint; y: bigint } | null
+
+export interface Secp256k1PublicKeyAggregationResult {
+  valid: boolean
+  point: Point
+  compressed?: Uint8Array
+  reason?: string
+}
+
+export interface SilentPaymentTweakResult {
+  valid: boolean
+  tweak: bigint
+  tweakBytes?: Uint8Array
+  reason?: string
+}
+
+export interface SilentPaymentOutputKeyResult {
+  valid: boolean
+  outputKey32?: Uint8Array
+  parity?: number
+  reason?: string
+}
+
+export interface SilentPaymentTweakVerificationResult {
+  valid: boolean
+  parity: number
+  reason?: string
+}
+
 const GENERATOR = { x: SECP256K1_GX, y: SECP256K1_GY }
 
 function mod(value: bigint, modulus = SECP256K1_P): bigint {
@@ -79,6 +107,27 @@ function compressedPoint(point: NonNullable<Point>): Uint8Array {
     x >>= 8n
   }
   return bytes
+}
+
+function silentPaymentPubKey(bytes: Uint8Array): Point {
+  if (bytes.length === 32) return liftX(bytes)
+  if (bytes.length !== 33) return null
+  const inspection = Secp256k1Engine.inspectPubKey(bytes)
+  return inspection.isValid && inspection.y !== undefined ? { x: inspection.x, y: inspection.y } : null
+}
+
+function silentPaymentIndexBytes(index: number): Uint8Array | undefined {
+  if (!Number.isSafeInteger(index) || index < 0 || index > 0xffffffff) return undefined
+  const bytes = new Uint8Array(4)
+  new DataView(bytes.buffer).setUint32(0, index, false)
+  return bytes
+}
+
+function silentPaymentHashTweak(hash: Uint8Array): SilentPaymentTweakResult {
+  const tweak = unsignedBigEndian(hash)
+  if (tweak >= SECP256K1_N) return { valid: false, tweak: 0n, reason: 'Tweak scalar >= n' }
+  if (tweak === 0n) return { valid: false, tweak: 0n, reason: 'Tweak scalar is zero' }
+  return { valid: true, tweak, tweakBytes: hash }
 }
 
 export type Secp256k1PubKeyFormat = 'compressed' | 'uncompressed' | 'x-only-bip340' | 'invalid'
@@ -187,6 +236,87 @@ export class Secp256k1Engine {
     return output.x === unsignedBigEndian(outputKey32)
       ? { valid: true, parity }
       : { valid: false, parity, reason: 'Taproot output key mismatch' }
+  }
+
+  /** Add compressed SEC points, lifting x-only keys to their even-Y points. */
+  public static aggregatePublicKeys(pubkeys: Uint8Array[]): Secp256k1PublicKeyAggregationResult {
+    if (pubkeys.length === 0) return { valid: false, point: null, reason: 'Empty public key list' }
+    let sum: Point = null
+    for (const pubkey of pubkeys) {
+      const point = silentPaymentPubKey(pubkey)
+      if (point === null) return { valid: false, point: null, reason: 'Invalid public key in aggregation' }
+      sum = pointAdd(sum, point)
+    }
+    if (sum === null) return { valid: false, point: null, reason: 'Aggregated public key is point at infinity' }
+    return { valid: true, point: sum, compressed: compressedPoint(sum) }
+  }
+
+  /** Directive transcript: compressed(Q) || outpointsHash32 || ser32(k).
+   * The published BIP-352 transcript hashes compressed(sharedSecret) || ser32(k),
+   * with the input hash already multiplied into sharedSecret. This method follows
+   * BITPEEK_BIP352_ENGINE_DIRECTIVE.txt's explicit transcript instead.
+   */
+  public static createSilentPaymentTweak(
+    ecdhPoint: Point,
+    outpointsHash32: Uint8Array,
+    k = 0,
+  ): SilentPaymentTweakResult {
+    if (!isCurvePoint(ecdhPoint)) return { valid: false, tweak: 0n, reason: 'ECDH point is null or invalid' }
+    if (outpointsHash32.length !== 32) return { valid: false, tweak: 0n, reason: 'Outpoints hash must be 32 bytes' }
+    const indexBytes = silentPaymentIndexBytes(k)
+    if (!indexBytes) return { valid: false, tweak: 0n, reason: 'Output index must be a uint32' }
+    return silentPaymentHashTweak(taggedHash('BIP0352/SharedSecret', compressedPoint(ecdhPoint), outpointsHash32, indexBytes))
+  }
+
+  /** Reference public-key addition P = B_spend + t*G; never reduce invalid tweaks. */
+  public static deriveSilentPaymentOutputKey(
+    spendPubKey: Uint8Array,
+    tweakScalarOrBytes: bigint | Uint8Array,
+  ): SilentPaymentOutputKeyResult {
+    const spendPoint = silentPaymentPubKey(spendPubKey)
+    if (spendPoint === null) return { valid: false, reason: 'Invalid spend public key' }
+    let tweak: bigint
+    if (tweakScalarOrBytes instanceof Uint8Array) {
+      if (tweakScalarOrBytes.length !== 32) return { valid: false, reason: 'Tweak scalar must be 32 bytes' }
+      tweak = unsignedBigEndian(tweakScalarOrBytes)
+    } else {
+      tweak = tweakScalarOrBytes
+    }
+    if (typeof tweak !== 'bigint' || tweak <= 0n || tweak >= SECP256K1_N) {
+      return { valid: false, reason: 'Tweak scalar outside valid range (0 < t < n)' }
+    }
+    const output = pointAdd(spendPoint, scalarMul(tweak, GENERATOR))
+    if (output === null) return { valid: false, reason: 'Tweaked point is point at infinity' }
+    return { valid: true, outputKey32: compressedPoint(output).slice(1), parity: Number(output.y & 1n) }
+  }
+
+  /** BIP-352 label hash uses the scan private scalar, including change label zero.
+   * This reference BigInt implementation does not provide constant-time handling
+   * of private input material.
+   */
+  public static deriveSilentPaymentLabelTweak(scanPrivKey32: Uint8Array, labelIndex: number): SilentPaymentTweakResult {
+    if (scanPrivKey32.length !== 32) return { valid: false, tweak: 0n, reason: 'Scan private key must be 32 bytes' }
+    const scanScalar = unsignedBigEndian(scanPrivKey32)
+    if (scanScalar === 0n || scanScalar >= SECP256K1_N) {
+      return { valid: false, tweak: 0n, reason: 'Scan private key outside valid range (0 < b_scan < n)' }
+    }
+    const indexBytes = silentPaymentIndexBytes(labelIndex)
+    if (!indexBytes) return { valid: false, tweak: 0n, reason: 'Label index must be a uint32' }
+    return silentPaymentHashTweak(taggedHash('BIP0352/Label', scanPrivKey32, indexBytes))
+  }
+
+  public static verifySilentPaymentTweak(
+    spendPubKey: Uint8Array,
+    tweakScalarOrBytes: bigint | Uint8Array,
+    expectedOutputKey32: Uint8Array,
+  ): SilentPaymentTweakVerificationResult {
+    if (expectedOutputKey32.length !== 32) return { valid: false, parity: -1, reason: 'Expected output key must be 32 bytes' }
+    const derived = this.deriveSilentPaymentOutputKey(spendPubKey, tweakScalarOrBytes)
+    if (!derived.valid) return { valid: false, parity: -1, reason: derived.reason }
+    let difference = 0
+    for (let index = 0; index < 32; index++) difference |= derived.outputKey32![index]! ^ expectedOutputKey32[index]!
+    return difference === 0 ? { valid: true, parity: derived.parity! }
+      : { valid: false, parity: derived.parity!, reason: 'Output key mismatch' }
   }
 
   public static validateScalar(scalar: bigint): { valid: boolean; reason?: string } {
