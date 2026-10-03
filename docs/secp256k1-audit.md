@@ -1,6 +1,6 @@
 # secp256k1 audit
 
-The core entry point exports `Secp256k1Engine`, curve constants `SECP256K1_P`,
+The core entry point exports `Secp256k1Engine`, `TaprootEngine`, curve constants `SECP256K1_P`,
 `SECP256K1_N`, `SECP256K1_HALF_N`, `SECP256K1_GX`, `SECP256K1_GY`,
 `ConstantTimeAuditor`, `auditSecp256k1`, and `SECP256K1_AUDIT_RECIPE` through its
 blockchain, native, and operations barrels.
@@ -29,8 +29,121 @@ and is outside these inspection methods.
 `sqrtModP(a)` reduces signed input modulo the field prime and evaluates the fixed
 public exponent `(p + 1) / 4` in 256 rounds, checking the result by squaring.
 JavaScript BigInt and the JavaScript runtime do not provide constant-time execution
-guarantees. This engine inspects public data and is not a secret-key signing backend.
+guarantees. Signing and nonce derivation are reference workbench operations, not a
+constant-time secret-key signing backend.
 Curve parameters and x-only lifting follow [BIP-340](https://bips.dev/340/).
+
+## BIP-340 reference signing and auxiliary audit
+
+`bip340DeriveNonce(seckey32, msg32, auxRand32?)` implements the BIP-340 tagged
+aux/nonce hash transcript and returns `k` normalized to an even-Y commitment,
+plus `rx`. `bip340Sign` returns a 64-byte `R.x || s` signature and the x-only
+public key, and verifies the generated signature before returning it. Keys,
+messages and supplied auxiliary data must each contain exactly 32 bytes. Secret
+keys must satisfy `0 < d < n`; invalid keys are rejected before reduction.
+Omitting aux selects 32 zero bytes. These APIs intentionally retain the
+workbench's 32-byte message contract; modern BIP-340 also supports other message
+lengths.
+
+`bip340AuditSignatureAux(seckey32, msg32, sig64, candidateAux32?)` compares the
+observed signature with both the zero-aux default and a supplied candidate.
+`valid` indicates that comparison inputs are valid; `matchesAux` and
+`isDeterministicDefault` report independent comparisons. Without a candidate,
+`matchesAux` equals `isDeterministicDefault`. A mismatch does not establish that
+the original signer used fresh randomness, nor does this API independently
+verify an unmatched signature. Malformed candidate aux is an invalid audit.
+
+Tests use [published BIP-340 signing vectors 0–3](https://github.com/bitcoin/bips/blob/master/bip-0340/test-vectors.csv).
+The two Schnorr samples in `BITPEEK_UPGRADE_SPEC.txt` differ from these published
+vectors, so they are not used as conformance expectations.
+
+## BIP-352 output batch scanning
+
+`scanSilentPaymentOutputs` accepts transaction output x-only keys, a spend public
+key, scan private key, one precomputed shared-secret tweak `t_k`, an optional
+precomputed label cache, and `batchSize` (default 50). It calculates
+`P_unlabeled = B_spend + t_k*G` and checks each output directly or through label
+points `P_even - P_unlabeled` and `-P_even - P_unlabeled`. Lookup keys preserve
+the label point's Y parity. `candidateSlotParity` selects the output's even-Y
+lift (0) or its negation (1), independently of the label point's parity.
+
+For slot `i` within a batch starting at transaction position `j_start`, the
+output index is `j_start + floor(i / 2)`. Matches retain absolute output indices,
+batch indices, batch starting offsets, and label metadata. Malformed output
+keys are skipped without compacting positions; `totalOutputsScanned` counts
+all supplied positions. An empty output list returns one empty batch, following
+the directive. Batch sizes must be positive safe integers.
+
+This API scans all transaction batches for the supplied `t_k`; it does not
+derive ECDH or iterate protocol output counter `k`. The scan private key is
+validated, while tweaks and label points are provided by the caller. Include
+change label 0 in the cache when needed. Optional `labelPubKey33` is the trusted
+precomputed point `m*G`, corresponding to `labelTweak32`, not the labeled spend
+key. `verifySilentPaymentBatchMapping(jStart, slotIndex)` exposes the correct
+index and the known incorrect `floor((j_start + i) / 2)` index for invariant
+audits; invalid or imprecise indices throw `RangeError`.
+
+The batch scanner tests exercise published BIP-352 labeled outputs, independent
+OpenSSL curve fixtures, both output-lift parities, and single matches in later
+batches with exact transaction-position assertions.
+
+## BIP-341 TapTrees and script-path commitments
+
+`TaprootEngine` is exported from the blockchain and core barrels, along with
+`TapLeaf`, `TapTreeStructure`, `TapTreeLeafInfo`, `TapTreeResult`,
+`TaprootControlBlockInspection`, `TaprootScriptPathVerificationResult`, and the
+Tapscript key audit types. The same seven methods are available as forwarding
+helpers on `Secp256k1Engine`.
+
+`tapLeafHash(script, leafVersion?)` hashes the even version byte (default `0xc0`),
+canonical Bitcoin CompactSize script length, and script under the `TapLeaf` tag.
+`tapBranchHash(a32, b32)` hashes the lexicographically smaller child before the
+larger child under `TapBranch`; equal children are permitted. `tapTweakHash`
+hashes an internal x-only key and optional Merkle root under `TapTweak`. Omitting
+the root differs from supplying a zero root.
+
+`inspectControlBlock(bytes)` checks the `33 + 32*m` encoding, limits `m` to
+0–128, validates the internal key, and extracts `leafVersion = header & 0xfe`
+and `outputParity = header & 1`. It returns independent copies of wire bytes,
+internal key and leaf-to-root siblings, including for Node Buffer inputs.
+
+`verifyScriptPath(controlBlock, outputKey32, leafScript)` evaluates the leaf and
+siblings, rejects tweaks at or above the group order before scalar reduction,
+and checks both the output X coordinate and the control block's Y parity. Zero
+tweaks are permitted; infinity is rejected. This verifies the BIP-341 script
+commitment. It does not execute Tapscript, validate signatures or transaction
+sighashes, or process witness annexes. Future even leaf versions can also have
+their commitments verified. See [BIP-341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki).
+
+`buildTapTree(leaves, internalKey32, structure?)` pairs adjacent nodes at each
+level and carries an unpaired node forward. Its optional custom binary shape
+uses leaf indices, e.g. `[0, [1, 2]]`; every leaf index must occur exactly once,
+and no proof may exceed 128 siblings. Returned leaves retain input order and
+include script copies, leaf hashes, Merkle paths and synthesized control blocks.
+Duplicate scripts and empty scripts are valid commitment inputs. Hashing and
+building methods throw `RangeError` for invalid inputs; inspectors and verifiers
+return invalid results with exact reasons.
+
+Conformance tests reproduce all published script-path hashes and control blocks
+from the [BIP-341 wallet vectors](https://github.com/bitcoin/bips/blob/e35a46ecf3031c21dc7f7fdb694986789a3a8144/bip-0341/wallet-test-vectors.json).
+Mutation tests change scripts, sibling nodes, internal/output keys, leaf versions
+and parity, and exercise the maximum control-block depth.
+
+## Tapscript descriptor key canonicalization
+
+`auditTapscriptKeys(pubkeys)` accepts descriptor keys in x-only or compressed
+SEC form, validates their curve coordinates, and groups them by canonical X.
+Opposite compressed parities produce a `parity-collision` warning; other
+repeated canonical keys produce a `duplicate-xonly` informational finding.
+Parity-collision findings take precedence over duplicate findings for the same
+group. Invalid encodings or off-curve keys produce `invalid-key` warnings and
+`valid: false`; collision warnings leave input validity unchanged.
+
+This audits conversion to x-only keys. BIP-342 does not automatically strip SEC
+prefixes in an executing script: a raw 33-byte key is an unknown public-key type,
+with different signature-validation rules. Collision findings identify redundant
+or ambiguous descriptor key conditions, not proof of transaction malleability.
+See [BIP-342 key rules](https://github.com/bitcoin/bips/blob/master/bip-0342.mediawiki#rules-for-signature-opcodes).
 
 ## Operation and recipe
 
@@ -198,12 +311,64 @@ are unsigned 64-bit hex strings, preserving values above `Number.MAX_SAFE_INTEGE
 `baseAddress` describes the region's first byte; by default it is the file offset
 for sessions and zero for inline hex.
 
-Choose exactly one input form, `rawHex` or `handle`. Offset and length apply only
-to sessions. Numbers are validated without coercion or clipping, unknown arguments
+For the existing audit formats, choose exactly one input form, `rawHex` or
+`handle`. Offset and length apply only to sessions. Numbers are validated without coercion or clipping, unknown arguments
 are rejected, file paths are revalidated against allowed roots, and changed file
 sizes require reopening. Every report includes the selected byte count and SHA-256
 in `source` to identify the bytes inspected. Capability discovery also reports
 the audit tools, byte limits, and `secp256k1.audit` recipe.
+
+The MCP tool additionally exposes `bip340-sign`, `bip340-aux-audit`, and
+`bip352-scan`:
+
+- Signing requires `seckeyHex`, a message supplied as `messageHex` or through
+  `rawHex`/`handle`, and optional `auxRandHex`. The reply includes `signatureHex`,
+  `publicKeyHex`, and hexadecimal `rx`/`s`; secret keys and nonces are not echoed.
+- Aux audit requires the observed signature in `rawHex`/`handle`, `seckeyHex`,
+  `messageHex`, and optional candidate `auxRandHex`. It returns the comparison
+  flags and `expectedSignatureHex`/`candidateSignatureHex`. `status` is PASS
+  when the supplied candidate (or omitted zero default) matches; a completed
+  unmatched comparison has `valid: true` and `status: "FAIL"`.
+- Scanning requires `spendKeyHex`, `scanPrivKeyHex`, `tweakHex`, and either
+  `outputsHex` or packed consecutive 32-byte keys in `rawHex`/`handle`. Optional
+  `batchSize` and `labels` expose the core scanner options. Each label has
+  `labelIndex`, `labelTweakHex`, and optional compressed `labelPubKeyHex`.
+  Matches contain `outputKeyHex` and optional `labelTweakHex`, alongside the
+  core match indices and parity. Empty `outputsHex` is accepted.
+
+Direct signing messages and output arrays also receive source byte counts and
+SHA-256 metadata. Conflicting message/output sources are rejected. All new
+results serialize byte arrays and bigints as hexadecimal strings.
+
+Phase 2 adds three more formats to the same MCP tool:
+
+- `taproot-control-block`: supply the expected 32-byte output key in
+  `rawHex`/`handle`, `controlBlockHex`, and `leafScriptHex` (which may be empty).
+  The response includes commitment verification, decoded version/parity, root,
+  path depth and computed output key as hex. Its scope is
+  `taproot-script-commitment`; it does not report signatures as verified.
+- `tapscript-keys`: supply mixed descriptor encodings in `keysHex`, or packed
+  `rawHex`/file bytes with `keySize` 32 (default) or 33. Reports use PASS for clean
+  inputs, WARN for valid inputs with canonicalization findings, and FAIL for
+  invalid keys. Empty arrays are accepted and report zero keys examined.
+- `taptree-builder`: supply `scriptHexes` and the internal key through
+  `internalKeyHex` or `rawHex`/`handle`. Optional `leafVersions` contains one even
+  version per script, and `treeStructure` selects the custom shape. Replies
+  include `merkleRootHex`, `outputKeyHex`, output parity, and each leaf's
+  `scriptHex`, `leafHashHex`, `merklePathHexes`, and `controlBlockHex`.
+
+The new array inputs have count and combined-byte limits; source conflicts,
+malformed hex, mismatched versions and invalid custom shapes are rejected.
+Existing file authorization, range checks and cancellation apply to these formats.
+
+```json
+{
+  "format": "taptree-builder",
+  "internalKeyHex": "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+  "scriptHexes": ["51", "52", "53"],
+  "treeStructure": [0, [1, 2]]
+}
+```
 
 ## Static timing inspection
 

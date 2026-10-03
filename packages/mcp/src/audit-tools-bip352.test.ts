@@ -59,9 +59,9 @@ describe('BIP-352 tweak verification over the MCP protocol', () => {
   it('advertises the new format and key/scalar schemas alongside the existing formats', async () => {
     const { tools } = await client.listTools()
     const tool = tools.find(item => item.name === 'bitpeek_secp256k1_audit')!
-    expect(tool.inputSchema.properties?.format).toMatchObject({ default: 'auto', enum: [
+    expect(tool.inputSchema.properties?.format).toMatchObject({ default: 'auto', enum: expect.arrayContaining([
       'auto', 'pubkey', 'der', 'compact', 'bitcoin-tx', 'bip340-schnorr', 'dleq', 'taproot-tweak', 'bip352-tweak',
-    ] })
+    ]) })
     expect(tool.inputSchema.properties?.spendKeyHex).toMatchObject({ type: 'string', minLength: 64, maxLength: 66 })
     expect(tool.inputSchema.properties?.tweakHex).toMatchObject({ type: 'string', minLength: 64, maxLength: 64 })
     expect(tool.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false })

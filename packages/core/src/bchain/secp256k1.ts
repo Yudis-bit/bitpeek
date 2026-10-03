@@ -1,5 +1,10 @@
 import { unsignedBigEndian } from '../bytes'
 import { taggedHash } from '../crypto'
+import { TaprootEngine } from './taproot'
+import type {
+  TapLeaf, TapTreeStructure, TapTreeResult, TaprootControlBlockInspection,
+  TaprootScriptPathVerificationResult, TapscriptKeyAuditResult,
+} from './taproot'
 
 export const SECP256K1_P = 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2fn
 export const SECP256K1_N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n
@@ -33,6 +38,67 @@ export interface SilentPaymentOutputKeyResult {
 export interface SilentPaymentTweakVerificationResult {
   valid: boolean
   parity: number
+  reason?: string
+}
+
+export interface Bip340NonceResult {
+  valid: boolean
+  k?: bigint
+  rx?: bigint
+  reason?: string
+}
+
+export interface Bip340SignResult {
+  valid: boolean
+  signature64?: Uint8Array
+  rx?: bigint
+  s?: bigint
+  publicKey32?: Uint8Array
+  reason?: string
+}
+
+export interface Bip340AuxAuditResult {
+  valid: boolean
+  matchesAux: boolean
+  isDeterministicDefault: boolean
+  expectedSignature?: Uint8Array
+  candidateSignature?: Uint8Array
+  reason?: string
+}
+
+export interface SilentPaymentLabelDefinition {
+  labelIndex: number
+  labelTweak32: Uint8Array
+  labelPubKey33?: Uint8Array
+}
+
+export interface SilentPaymentScanMatch {
+  outputIndex: number
+  outputKey32: Uint8Array
+  isLabeled: boolean
+  labelIndex?: number
+  labelTweak32?: Uint8Array
+  /** 0 selects the even-Y output lift; 1 selects its negation. */
+  candidateSlotParity: number
+  batchIndex: number
+  batchOffset: number
+}
+
+export interface SilentPaymentScanParams {
+  txOutputs: Uint8Array[]
+  spendPubKey: Uint8Array
+  scanPrivKey32: Uint8Array
+  sharedSecretTweak: bigint | Uint8Array
+  labels?: SilentPaymentLabelDefinition[]
+  batchSize?: number
+}
+
+export interface SilentPaymentScanResult {
+  valid: boolean
+  matches: SilentPaymentScanMatch[]
+  totalOutputsScanned: number
+  batchCount: number
+  unlabeledPoint?: Point
   reason?: string
 }
 
@@ -109,6 +175,19 @@ function compressedPoint(point: NonNullable<Point>): Uint8Array {
   return bytes
 }
 
+function bigEndian32(value: bigint): Uint8Array {
+  const bytes = new Uint8Array(32)
+  for (let index = 31; index >= 0; index--) {
+    bytes[index] = Number(value & 255n)
+    value >>= 8n
+  }
+  return bytes
+}
+
+function compressedPointHex(point: NonNullable<Point>): string {
+  return Array.from(compressedPoint(point), byte => byte.toString(16).padStart(2, '0')).join('')
+}
+
 function silentPaymentPubKey(bytes: Uint8Array): Point {
   if (bytes.length === 32) return liftX(bytes)
   if (bytes.length !== 33) return null
@@ -174,12 +253,101 @@ function signatureResult(
   }
 }
 
-/** Public-data curve and signature verification; BigInt arithmetic is not constant-time. */
+/** Reference curve, signing and verification arithmetic; BigInt operations are not constant-time. */
 export class Secp256k1Engine {
   public static pointAdd(left: Point, right: Point): Point { return pointAdd(left, right) }
   public static pointDouble(point: Point): Point { return pointDouble(point) }
   public static scalarMul(scalar: bigint, point: Point): Point { return scalarMul(scalar, point) }
   public static liftX(bytes: Uint8Array): Point { return liftX(bytes) }
+
+  public static tapLeafHash(script: Uint8Array, leafVersion?: number): Uint8Array { return TaprootEngine.tapLeafHash(script, leafVersion) }
+  public static tapBranchHash(a32: Uint8Array, b32: Uint8Array): Uint8Array { return TaprootEngine.tapBranchHash(a32, b32) }
+  public static tapTweakHash(internalKey32: Uint8Array, merkleRoot32?: Uint8Array): Uint8Array { return TaprootEngine.tapTweakHash(internalKey32, merkleRoot32) }
+  public static inspectControlBlock(bytes: Uint8Array): TaprootControlBlockInspection { return TaprootEngine.inspectControlBlock(bytes) }
+  public static verifyScriptPath(controlBlock: Uint8Array, outputKey32: Uint8Array, leafScript: Uint8Array): TaprootScriptPathVerificationResult {
+    return TaprootEngine.verifyScriptPath(controlBlock, outputKey32, leafScript)
+  }
+  public static buildTapTree(leaves: TapLeaf[], internalKey32: Uint8Array, structure?: TapTreeStructure): TapTreeResult {
+    return TaprootEngine.buildTapTree(leaves, internalKey32, structure)
+  }
+  public static auditTapscriptKeys(pubkeys: Uint8Array[]): TapscriptKeyAuditResult { return TaprootEngine.auditTapscriptKeys(pubkeys) }
+
+  /** BIP-340 synthetic nonce for a 32-byte message. Omitted aux means 32 zero bytes.
+   * Returns the scalar normalized to the even-Y commitment, not the raw hash scalar.
+   * This reference implementation is not a constant-time signing backend.
+   */
+  public static bip340DeriveNonce(
+    seckey32: Uint8Array, msg32: Uint8Array, auxRand32?: Uint8Array,
+  ): Bip340NonceResult {
+    if (seckey32.length !== 32) return { valid: false, reason: 'Secret key must be 32 bytes' }
+    if (msg32.length !== 32) return { valid: false, reason: 'Message must be 32 bytes' }
+    if (auxRand32 !== undefined && auxRand32.length !== 32) {
+      return { valid: false, reason: 'auxRand must be 32 bytes when supplied' }
+    }
+    const dPrime = unsignedBigEndian(seckey32)
+    if (dPrime === 0n || dPrime >= SECP256K1_N) {
+      return { valid: false, reason: 'Secret key outside range 0 < d < n' }
+    }
+    const P = scalarMul(dPrime, GENERATOR)
+    if (P === null) return { valid: false, reason: 'Public key is point at infinity' }
+    const d = (P.y & 1n) === 0n ? dPrime : SECP256K1_N - dPrime
+    const auxHash = taggedHash('BIP0340/aux', auxRand32 ?? new Uint8Array(32))
+    const t = bigEndian32(d)
+    for (let index = 0; index < 32; index++) t[index] = t[index]! ^ auxHash[index]!
+    const rand = taggedHash('BIP0340/nonce', t, bigEndian32(P.x), msg32)
+    const kPrime = unsignedBigEndian(rand) % SECP256K1_N
+    if (kPrime === 0n) return { valid: false, reason: 'Derived nonce is zero' }
+    const R = scalarMul(kPrime, GENERATOR)
+    if (R === null) return { valid: false, reason: 'R commitment is point at infinity' }
+    const k = (R.y & 1n) === 0n ? kPrime : SECP256K1_N - kPrime
+    return { valid: true, k, rx: R.x }
+  }
+
+  /** Generate and self-verify a 64-byte BIP-340 signature for a 32-byte message. */
+  public static bip340Sign(
+    seckey32: Uint8Array, msg32: Uint8Array, auxRand32?: Uint8Array,
+  ): Bip340SignResult {
+    const nonce = this.bip340DeriveNonce(seckey32, msg32, auxRand32)
+    if (!nonce.valid || nonce.k === undefined || nonce.rx === undefined) return { valid: false, reason: nonce.reason }
+    const dPrime = unsignedBigEndian(seckey32)
+    const P = scalarMul(dPrime, GENERATOR)
+    if (P === null) return { valid: false, reason: 'Public key is point at infinity' }
+    const d = (P.y & 1n) === 0n ? dPrime : SECP256K1_N - dPrime
+    const publicKey32 = bigEndian32(P.x)
+    const rxBytes = bigEndian32(nonce.rx)
+    const e = unsignedBigEndian(taggedHash('BIP0340/challenge', rxBytes, publicKey32, msg32)) % SECP256K1_N
+    const s = (nonce.k + e * d) % SECP256K1_N
+    const signature64 = new Uint8Array(64)
+    signature64.set(rxBytes)
+    signature64.set(bigEndian32(s), 32)
+    const verification = this.verifySchnorr(publicKey32, msg32, signature64)
+    if (!verification.valid) return { valid: false, reason: `Signature self-verification failed: ${verification.reason}` }
+    return { valid: true, signature64, rx: nonce.rx, s, publicKey32 }
+  }
+
+  /** Compare a signature to zero-aux and candidate-aux signing transcripts.
+   * valid reports successful input validation/comparison; matching is reported separately.
+   * A mismatch cannot establish whether the original signer used fresh randomness.
+   */
+  public static bip340AuditSignatureAux(
+    seckey32: Uint8Array, msg32: Uint8Array, sig64: Uint8Array, candidateAux32?: Uint8Array,
+  ): Bip340AuxAuditResult {
+    const fail = (reason?: string): Bip340AuxAuditResult => ({ valid: false, matchesAux: false, isDeterministicDefault: false, reason })
+    if (sig64.length !== 64) return fail('Signature must be 64 bytes')
+    if (candidateAux32 !== undefined && candidateAux32.length !== 32) return fail('auxRand must be 32 bytes when supplied')
+    const deterministic = this.bip340Sign(seckey32, msg32)
+    if (!deterministic.valid || !deterministic.signature64) return fail(deterministic.reason)
+    const isDeterministicDefault = deterministic.signature64.every((byte, index) => byte === sig64[index])
+    let matchesAux = isDeterministicDefault
+    let candidateSignature: Uint8Array | undefined
+    if (candidateAux32 !== undefined) {
+      const candidate = this.bip340Sign(seckey32, msg32, candidateAux32)
+      if (!candidate.valid || !candidate.signature64) return fail(candidate.reason)
+      candidateSignature = candidate.signature64
+      matchesAux = candidateSignature.every((byte, index) => byte === sig64[index])
+    }
+    return { valid: true, matchesAux, isDeterministicDefault, expectedSignature: deterministic.signature64, candidateSignature }
+  }
 
   public static verifySchnorr(pubkey32: Uint8Array, msg32: Uint8Array, sig64: Uint8Array): { valid: boolean; reason?: string } {
     if (pubkey32.length !== 32) return { valid: false, reason: 'Public key must contain exactly 32 bytes' }
@@ -317,6 +485,92 @@ export class Secp256k1Engine {
     for (let index = 0; index < 32; index++) difference |= derived.outputKey32![index]! ^ expectedOutputKey32[index]!
     return difference === 0 ? { valid: true, parity: derived.parity! }
       : { valid: false, parity: derived.parity!, reason: 'Output key mismatch' }
+  }
+
+  /** Audit candidate-slot inversion against the known incorrect offset placement. */
+  public static verifySilentPaymentBatchMapping(
+    jStart: number, slotIndex: number,
+  ): { correctIndex: number; mutantIndex: number; isEquiv: boolean } {
+    if (!Number.isSafeInteger(jStart) || jStart < 0 || !Number.isSafeInteger(slotIndex) || slotIndex < 0
+      || !Number.isSafeInteger(jStart + slotIndex)) {
+      throw new RangeError('Batch offset and slot index must be nonnegative safe integers with a safe sum')
+    }
+    const correctIndex = jStart + Math.floor(slotIndex / 2)
+    const mutantIndex = Math.floor((jStart + slotIndex) / 2)
+    return { correctIndex, mutantIndex, isEquiv: correctIndex === mutantIndex }
+  }
+
+  /** Scan all output batches for one precomputed BIP-352 t_k and label cache.
+   * Batching partitions transaction positions; it does not advance the protocol's k.
+   * Labels and the shared-secret tweak are supplied by the caller; the scan key is validated.
+   */
+  public static scanSilentPaymentOutputs(params: SilentPaymentScanParams): SilentPaymentScanResult {
+    const fail = (reason: string): SilentPaymentScanResult => ({ valid: false, matches: [], totalOutputsScanned: 0, batchCount: 0, reason })
+    const batchSize = params.batchSize ?? 50
+    if (!Number.isSafeInteger(batchSize) || batchSize <= 0) return fail('batchSize must be a positive safe integer')
+    if (params.scanPrivKey32.length !== 32) return fail('Scan private key must be 32 bytes')
+    const scanScalar = unsignedBigEndian(params.scanPrivKey32)
+    if (scanScalar === 0n || scanScalar >= SECP256K1_N) return fail('Scan private key outside valid range (0 < b_scan < n)')
+    const spendPoint = silentPaymentPubKey(params.spendPubKey)
+    if (spendPoint === null) return fail('Invalid spend public key')
+    let tweak: bigint
+    if (params.sharedSecretTweak instanceof Uint8Array) {
+      if (params.sharedSecretTweak.length !== 32) return fail('Tweak bytes must be 32 bytes')
+      tweak = unsignedBigEndian(params.sharedSecretTweak)
+    } else {
+      tweak = params.sharedSecretTweak
+    }
+    if (typeof tweak !== 'bigint' || tweak <= 0n || tweak >= SECP256K1_N) return fail('Tweak scalar outside 0 < t < n')
+    const unlabeledPoint = pointAdd(spendPoint, scalarMul(tweak, GENERATOR))
+    if (unlabeledPoint === null) return fail('Unlabeled point is infinity')
+    const negUnlabeled = { x: unlabeledPoint.x, y: SECP256K1_P - unlabeledPoint.y }
+
+    const labelMap = new Map<string, SilentPaymentLabelDefinition>()
+    for (const label of params.labels ?? []) {
+      if (!silentPaymentIndexBytes(label.labelIndex)) return fail('Label index must be a uint32')
+      if (label.labelTweak32.length !== 32) return fail('Label tweak must be 32 bytes')
+      const labelScalar = unsignedBigEndian(label.labelTweak32)
+      if (labelScalar === 0n || labelScalar >= SECP256K1_N) return fail('Label tweak scalar outside 0 < m < n')
+      const labelPoint = label.labelPubKey33 === undefined ? scalarMul(labelScalar, GENERATOR)
+        : label.labelPubKey33.length === 33 ? silentPaymentPubKey(label.labelPubKey33) : null
+      if (labelPoint === null) return fail('Invalid label public key')
+      labelMap.set(compressedPointHex(labelPoint), label)
+    }
+
+    const matches: SilentPaymentScanMatch[] = []
+    const totalOutputs = params.txOutputs.length
+    const batchCount = Math.ceil(totalOutputs / batchSize) || 1
+    for (let batchIndex = 0; batchIndex < batchCount; batchIndex++) {
+      const jStart = batchIndex * batchSize
+      const jEnd = Math.min(jStart + batchSize, totalOutputs)
+      for (let j = jStart; j < jEnd; j++) {
+        const outBytes = params.txOutputs[j]
+        if (!outBytes || outBytes.length !== 32) continue
+        if (unsignedBigEndian(outBytes) === unlabeledPoint.x) {
+          matches.push({ outputIndex: j, outputKey32: outBytes, isLabeled: false,
+            candidateSlotParity: Number(unlabeledPoint.y & 1n), batchIndex, batchOffset: jStart })
+          continue
+        }
+        if (labelMap.size === 0) continue
+        const pEven = liftX(outBytes)
+        if (pEven === null) continue
+        const pOdd = { x: pEven.x, y: SECP256K1_P - pEven.y }
+        // C_even = P_even - P_unlabeled; C_odd = -P_even - P_unlabeled.
+        const candidates = [pointAdd(pEven, negUnlabeled), pointAdd(pOdd, negUnlabeled)]
+        for (const [parity, candidate] of candidates.entries()) {
+          if (candidate === null) continue
+          const label = labelMap.get(compressedPointHex(candidate))
+          if (!label) continue
+          const slotIndex = 2 * (j - jStart) + parity
+          const mappedIndex = this.verifySilentPaymentBatchMapping(jStart, slotIndex).correctIndex
+          matches.push({ outputIndex: mappedIndex, outputKey32: outBytes, isLabeled: true,
+            labelIndex: label.labelIndex, labelTweak32: label.labelTweak32,
+            candidateSlotParity: parity, batchIndex, batchOffset: jStart })
+          break
+        }
+      }
+    }
+    return { valid: true, matches, totalOutputsScanned: totalOutputs, batchCount, unlabeledPoint }
   }
 
   public static validateScalar(scalar: bigint): { valid: boolean; reason?: string } {

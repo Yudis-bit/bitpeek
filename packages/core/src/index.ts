@@ -31,7 +31,13 @@ export * from './bchain'
 export type {
   Secp256k1PublicKeyAggregationResult, SilentPaymentTweakResult,
   SilentPaymentOutputKeyResult, SilentPaymentTweakVerificationResult,
+  Bip340NonceResult, Bip340SignResult, Bip340AuxAuditResult,
+  SilentPaymentLabelDefinition, SilentPaymentScanMatch, SilentPaymentScanParams, SilentPaymentScanResult,
 } from './bchain/secp256k1'
+export type {
+  TapLeaf, TapTreeStructure, TapTreeLeafInfo, TapTreeResult, TaprootControlBlockInspection,
+  TaprootScriptPathVerificationResult, TapscriptKeyAuditFinding, TapscriptKeyAuditResult,
+} from './bchain/taproot'
 export * from './ai'
 export * from './operations'
 export * from './sdk'

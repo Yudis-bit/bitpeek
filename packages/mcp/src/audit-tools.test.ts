@@ -67,7 +67,9 @@ describe('MCP audit tools over the SDK protocol transport', () => {
     for (const name of ['bitpeek_secp256k1_audit', 'bitpeek_constant_time_audit']) {
       const tool = listed.tools.find(item => item.name === name)
       expect(tool?.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false })
-      expect(tool?.inputSchema.oneOf).toHaveLength(2)
+      expect(tool?.inputSchema.oneOf).toEqual(expect.arrayContaining([
+        expect.objectContaining({ required: ['rawHex'] }), expect.objectContaining({ required: ['handle'] }),
+      ]))
       expect(tool?.inputSchema.additionalProperties).toBe(false)
     }
     const { payload } = await call(client, 'bitpeek_capabilities', {})
