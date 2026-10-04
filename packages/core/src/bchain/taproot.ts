@@ -1,6 +1,7 @@
 import { taggedHash } from '../crypto'
 import { unsignedBigEndian } from '../bytes'
 import { SECP256K1_N, SECP256K1_P, SECP256K1_GX, SECP256K1_GY, liftX, pointAdd, scalarMul, type Point } from './secp256k1'
+import { auditBip375Shares, type Bip375AuditParams, type Bip375AuditResult } from './bip375'
 
 export const TAPROOT_LEAF_TAPSCRIPT = 0xc0
 export const TAPROOT_CONTROL_BASE_SIZE = 33
@@ -114,6 +115,8 @@ function tweakedPoint(internalPoint: NonNullable<Point>, tweak: bigint): Point {
 
 /** Public-data BIP-341 commitment checks and descriptor key audits, without script execution. */
 export class TaprootEngine {
+  public static auditBip375Shares(params: Bip375AuditParams): Bip375AuditResult { return auditBip375Shares(params) }
+
   public static tapLeafHash(script: Uint8Array, leafVersion = TAPROOT_LEAF_TAPSCRIPT): Uint8Array {
     if (!Number.isInteger(leafVersion) || leafVersion < 0 || leafVersion > 0xff || (leafVersion & 1) !== 0) {
       throw new RangeError('Leaf version must be an even byte')

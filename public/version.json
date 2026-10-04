@@ -1,8 +1,8 @@
 {
   "version": "1.0.0",
-  "commit": "8ac34c14db346557f16917b542ae98157555e7c1",
-  "gitCommit": "8ac34c14db346557f16917b542ae98157555e7c1",
-  "buildTime": "2026-10-03T18:11:30.759Z",
+  "commit": "65712d1cc5d94da69154e77ba6fa78311009c5db",
+  "gitCommit": "65712d1cc5d94da69154e77ba6fa78311009c5db",
+  "buildTime": "2026-10-04T00:03:06.976Z",
   "schemaVersions": {
     "offsetPatch": [
       1,

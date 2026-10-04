@@ -28,6 +28,8 @@ export * from './native'
 export * from './trace'
 export * from './runner'
 export * from './bchain'
+export type { Bip324SessionKeys, Bip324DirectionKeys, Bip324FrameAuditOptions, Bip324FrameAuditResult } from './bchain/bip324'
+export type { Secp256k1DifferentialAdapter, Secp256k1DifferentialInputs, Secp256k1DifferentialResult } from './bchain/secp256k1-diff-oracle'
 export type {
   Secp256k1PublicKeyAggregationResult, SilentPaymentTweakResult,
   SilentPaymentOutputKeyResult, SilentPaymentTweakVerificationResult,

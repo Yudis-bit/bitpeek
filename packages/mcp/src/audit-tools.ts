@@ -3,8 +3,12 @@ import {
   auditSecp256k1, ConstantTimeAuditor, FileByteSource, BitpeekError, parseHex,
   SECP256K1_AUDIT_MAX_BYTES, sha256Hex, Secp256k1Engine, ReferenceDisassembler,
   TaprootEngine, TAPROOT_CONTROL_MAX_SIZE, SECP256K1_GX, SECP256K1_GY, unsignedBigEndian,
+  auditTapscript, evaluateTapscript, auditBip375Shares, BIP375_MAX_SIGNERS, BIP375_MAX_OUTPUTS,
+  decodeSwiftECBytes, encodeSwiftEC, auditBip324Frame, deriveBip324SessionKeys,
+  BIP324_MAX_AUDIT_PACKET_INDEX, auditDifferentialExecution, generateSecp256k1Boundaries, auditSecp256k1BoundaryExecutions,
 } from '../../core/src/index.js'
-import type { Secp256k1AuditFormat, SilentPaymentLabelDefinition, TapTreeStructure, TaintSource } from '../../core/src/index.js'
+import type { Secp256k1AuditFormat, SilentPaymentLabelDefinition, TapTreeStructure, TaintSource,
+  Bip375SignerShare, BitcoinVerificationProfile, Secp256k1DifferentialOperation, Point } from '../../core/src/index.js'
 import type { McpSecurityManager } from './security.js'
 
 export const MCP_TIMING_MAX_BYTES = 65536
@@ -23,7 +27,8 @@ const auditAnnotations = { readOnlyHint: true, destructiveHint: false, idempoten
 const hex32 = { type: 'string', minLength: 64, maxLength: 96, description: '32-byte hexadecimal value.' }
 const pointHex = { type: 'string', minLength: 66, maxLength: 195, description: 'Compressed (33-byte) or uncompressed (65-byte) SEC public key; preserves Y parity.' }
 const maxScanOutputs = SECP256K1_AUDIT_MAX_BYTES / 32
-const secp256k1Formats = ['auto', 'pubkey', 'der', 'compact', 'bitcoin-tx', 'bip340-schnorr', 'dleq', 'taproot-tweak', 'bip352-tweak', 'bip340-sign', 'bip340-aux-audit', 'bip352-scan', 'taproot-control-block', 'tapscript-keys', 'taptree-builder']
+const masterFormats = ['tapscript-audit', 'tapscript-eval', 'bip375-audit', 'bip324-swift-ec', 'bip324-frame-audit', 'secp256k1-diff-oracle']
+const secp256k1Formats = ['auto', 'pubkey', 'der', 'compact', 'bitcoin-tx', 'bip340-schnorr', 'dleq', 'taproot-tweak', 'bip352-tweak', 'bip340-sign', 'bip340-aux-audit', 'bip352-scan', 'taproot-control-block', 'tapscript-keys', 'taptree-builder', ...masterFormats]
 const noSource = { anyOf: ['rawHex', 'handle', 'offset', 'length'].map(name => ({ required: [name] })) }
 const verificationProperties = {
   pubkeyHex: { ...hex32, description: 'BIP-340 x-only public key. rawHex/file range supplies the 64-byte signature.' },
@@ -74,12 +79,60 @@ const verificationProperties = {
     description: 'Descriptor keys to audit after x-only canonicalization. Supports mixed x-only and compressed keys; invalid encodings are findings.' },
   keySize: { type: 'integer', enum: [32, 33], default: 32,
     description: 'Key width for packed tapscript-keys rawHex/file input; use keysHex for mixed widths.' },
+  profile: { type: 'string', enum: ['specification', 'published-bip'], default: 'specification',
+    description: 'Phase 3 reference rules or published BIP-342/BIP-352 rules. Published Tapscript requires serializedWitnessSize.' },
+  witnessHexes: { type: 'array', maxItems: maxScanOutputs, items: { type: 'string', maxLength: SECP256K1_AUDIT_MAX_BYTES * 3 },
+    description: 'Initial Tapscript stack, in bottom-to-top order; excludes script, control block and annex. Combined bytes <= 1 MiB.' },
+  serializedWitnessSize: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER - 50,
+    description: 'Complete serialized input witness size, including CompactSize prefixes, script, control block and annex; required for published-bip.' },
+  simulationMode: { type: 'boolean', default: false, description: 'Explicit structural signature simulation; never claims cryptographic verification.' },
+  traceExecution: { type: 'boolean', default: false },
+  traceLimit: { type: 'integer', minimum: 0, maximum: 100000, default: 10000 },
+  lockTime: { type: 'integer', minimum: 0, maximum: 0xffffffff },
+  inputSequence: { type: 'integer', minimum: 0, maximum: 0xffffffff },
+  transactionVersion: { type: 'integer', minimum: -0x80000000, maximum: 0x7fffffff },
+  signers: { type: 'array', minItems: 1, maxItems: BIP375_MAX_SIGNERS,
+    items: { type: 'object', additionalProperties: false, required: ['inputPubkeyHex', 'ecdhShareHex', 'dleqProofHex'], properties: {
+      inputPubkeyHex: { type: 'string', minLength: 64, maxLength: 66, pattern: '^[0-9a-fA-F]+$' },
+      ecdhShareHex: { type: 'string', minLength: 66, maxLength: 66, pattern: '^(02|03)[0-9a-fA-F]{64}$' },
+      dleqProofHex: { type: 'string', minLength: 128, maxLength: 128, pattern: '^[0-9a-fA-F]{128}$' },
+    } }, description: 'Extracted per-input BIP-375 ECDH shares and BIP-374 proofs, for one recipient.' },
+  scanKeyHex: { type: 'string', minLength: 64, maxLength: 66, description: 'Recipient scan public key.' },
+  outpointSmallestHex: { type: 'string', minLength: 72, maxLength: 72, pattern: '^[0-9a-fA-F]{72}$' },
+  allInputPubkeysHex: { type: 'array', minItems: 1, maxItems: BIP375_MAX_SIGNERS,
+    items: { type: 'string', minLength: 64, maxLength: 66 }, description: 'All eligible input keys; repeated keys represent distinct inputs.' },
+  expectedScalarFoldHex: { type: 'string', minLength: 66, maxLength: 66 },
+  outputCount: { type: 'integer', minimum: 0, maximum: BIP375_MAX_OUTPUTS },
+  swiftEcHex: { type: 'string', minLength: 128, maxLength: 128, pattern: '^[0-9a-fA-F]{128}$', description: '64-byte ElligatorSwift wire encoding; all bit strings decode.' },
+  swiftAction: { type: 'string', enum: ['decode', 'encode'], default: 'decode' },
+  bip324PacketHex: { type: 'string', maxLength: SECP256K1_AUDIT_MAX_BYTES * 3, description: 'Exactly one encrypted BIP-324 v2 packet.' },
+  lengthKeyHex: hex32,
+  payloadKeyHex: hex32,
+  sharedSecretHex: { ...hex32, description: 'Encoding-bound BIP-324 ECDH transcript hash, for HKDF session derivation.' },
+  networkMagicHex: { type: 'string', minLength: 8, maxLength: 8, description: 'Required four network magic bytes with sharedSecretHex.' },
+  direction: { type: 'string', enum: ['initiator', 'responder'], description: 'Sending direction; required with sharedSecretHex.' },
+  packetIndex: { type: 'integer', minimum: 0, maximum: BIP324_MAX_AUDIT_PACKET_INDEX, default: 0,
+    description: 'Packet index starting at zero, using initial keys with ratchets advanced to this index.' },
+  aadHex: { type: 'string', maxLength: 4095 * 3, description: 'First-packet garbage AAD; later packets normally use empty AAD.' },
+  inspectApplicationPayload: { type: 'boolean', default: false, description: 'Inspect application message command framing; omit for version-negotiation packets.' },
+  diffOp: { type: 'string', enum: ['mul', 'add', 'doubling', 'inversion', 'schnorr', 'identities'], default: 'identities' },
+  runBoundaries: { type: 'boolean', default: false, description: 'Also execute the deterministic scalar/field/infinity/parity boundary campaign against repository arithmetic.' },
+  scalarHex: hex32,
+  scalar2Hex: hex32,
+  fieldElementHex: hex32,
+  diffPointHex: { type: 'string', maxLength: 195, description: 'SEC point, or 00 for group infinity.' },
+  diffOtherPointHex: { type: 'string', maxLength: 195 },
+  diffThirdPointHex: { type: 'string', maxLength: 195 },
+  observedResultHex: { type: 'string', maxLength: 195, description: 'Observed native/Wasm/C affine SEC point (00 = infinity) or 32-byte inverse, for comparison.' },
+  observedValid: { type: 'boolean', description: 'Observed Schnorr verifier result.' },
+  criticalCodeHex: { type: 'string', maxLength: MCP_TIMING_MAX_BYTES * 3, description: 'Optional critical machine-code region for static timing hazard inspection.' },
+  diffArch: { type: 'string', enum: ['x86_64', 'aarch64'], default: 'x86_64' },
 }
 
 export const MCP_AUDIT_TOOLS: Tool[] = [
   {
     name: 'bitpeek_secp256k1_audit',
-    description: 'Audit secp256k1 encodings and Bitcoin transactions; verify BIP-340 signatures, BIP-374 DLEQ proofs (including BIP-375 shares), BIP-341 and BIP-352 tweaks; reference-sign or compare BIP-340 aux, scan BIP-352 batches, verify Taproot script commitments, audit descriptor key canonicalization, or build TapTrees/control blocks. BigInt reference signing is not constant-time. Use rawHex/file bytes for signatures, proofs, messages, output keys, packed keys, or builder internal keys. Direct signing/scanning/key-audit/builder inputs use messageHex/outputsHex/keysHex/internalKeyHex respectively. Maximum 1 MiB of source bytes or combined array bytes. Script commitment checks do not execute Tapscript.',
+    description: 'Audit secp256k1 and Bitcoin encodings; verify Schnorr, DLEQ, Taproot and silent-payment invariants; evaluate/audit Tapscript, audit extracted BIP-375 shares, encode/decode BIP-324 SwiftEC, inspect authenticated v2 frames, and compare independent Jacobian arithmetic with repository or supplied observed results. BigInt reference operations are not constant-time. Maximum 1 MiB of source/combined array bytes. New formats include JSON and reportMarkdown. Script commitments, transaction sighashes and extracted input eligibility remain caller responsibilities.',
     annotations: auditAnnotations,
     inputSchema: {
       type: 'object', additionalProperties: false, oneOf: [
@@ -88,6 +141,12 @@ export const MCP_AUDIT_TOOLS: Tool[] = [
         { properties: { format: { const: 'bip352-scan' } }, required: ['format', 'spendKeyHex', 'scanPrivKeyHex', 'tweakHex', 'outputsHex'], not: noSource },
         { properties: { format: { const: 'tapscript-keys' } }, required: ['format', 'keysHex'], not: noSource },
         { properties: { format: { const: 'taptree-builder' } }, required: ['format', 'internalKeyHex', 'scriptHexes'], not: noSource },
+        { properties: { format: { enum: ['tapscript-audit', 'tapscript-eval'] } }, required: ['format', 'leafScriptHex'], not: noSource },
+        { properties: { format: { const: 'bip375-audit' } }, required: ['format', 'signers', 'scanKeyHex', 'spendKeyHex', 'outpointSmallestHex', 'allInputPubkeysHex'], not: noSource },
+        { properties: { format: { const: 'bip324-swift-ec' } }, required: ['format', 'swiftEcHex'], not: noSource },
+        { properties: { format: { const: 'bip324-swift-ec' }, swiftAction: { const: 'encode' } }, required: ['format', 'swiftAction', 'pubkeyHex', 'auxRandHex'], not: { anyOf: [noSource, { required: ['swiftEcHex'] }] } },
+        { properties: { format: { const: 'bip324-frame-audit' } }, required: ['format', 'bip324PacketHex'], not: noSource },
+        { properties: { format: { const: 'secp256k1-diff-oracle' } }, required: ['format'], not: noSource },
       ],
       $defs: { tapTreeStructure: { anyOf: [
         { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
@@ -207,6 +266,57 @@ function hexBytes(bytes?: Uint8Array): string | undefined {
   return bytes === undefined ? undefined : Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
 }
 
+function exactHexArgument(args: Record<string, unknown>, name: string, size: number): Uint8Array {
+  const bytes = hexArgument(args, name, size)
+  if (bytes.length !== size) throw new BitpeekError('INVALID_INPUT', `${name} must contain exactly ${size} bytes`)
+  return bytes
+}
+function booleanArgument(args: Record<string, unknown>, name: string, fallback = false): boolean {
+  const value = args[name] === undefined ? fallback : args[name]
+  if (typeof value !== 'boolean') throw new BitpeekError('INVALID_INPUT', `${name} must be a boolean`)
+  return value
+}
+function verificationProfile(args: Record<string, unknown>): BitcoinVerificationProfile {
+  const value = args.profile === undefined ? 'specification' : args.profile
+  if (value !== 'specification' && value !== 'published-bip') throw new BitpeekError('INVALID_INPUT', 'profile must be specification or published-bip')
+  return value
+}
+function joinAuditBytes(parts: Uint8Array[]): Uint8Array {
+  const length = parts.reduce((size, part) => size + part.length, 0)
+  if (length > SECP256K1_AUDIT_MAX_BYTES) throw new BitpeekError('RESOURCE_LIMIT', 'Combined audit bytes exceed 1 MiB')
+  const bytes = new Uint8Array(length)
+  let offset = 0
+  for (const part of parts) { bytes.set(part, offset); offset += part.length }
+  return bytes
+}
+function bip375Signers(args: Record<string, unknown>): Bip375SignerShare[] {
+  if (!Array.isArray(args.signers) || args.signers.length === 0 || args.signers.length > BIP375_MAX_SIGNERS) {
+    throw new BitpeekError('INVALID_INPUT', `signers must contain 1 to ${BIP375_MAX_SIGNERS} entries`)
+  }
+  return Array.from(args.signers, (entry: unknown, index) => {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) throw new BitpeekError('INVALID_INPUT', `signers[${index}] must be an object`)
+    const signer = entry as Record<string, unknown>
+    for (const key of Object.keys(signer)) if (!['inputPubkeyHex', 'ecdhShareHex', 'dleqProofHex'].includes(key)) {
+      throw new BitpeekError('INVALID_INPUT', `Unsupported signer property: ${key}`)
+    }
+    return { inputPubkey: hexArgument(signer, 'inputPubkeyHex', 33), ecdhShare: exactHexArgument(signer, 'ecdhShareHex', 33),
+      dleqProof: exactHexArgument(signer, 'dleqProofHex', 64) }
+  })
+}
+function differentialPoint(args: Record<string, unknown>, name: string): Point {
+  const bytes = hexArgument(args, name, 65)
+  if (bytes.length === 1 && bytes[0] === 0) return null
+  if (bytes.length === 32) {
+    const point = Secp256k1Engine.liftX(bytes)
+    if (point !== null) return point
+    throw new BitpeekError('INVALID_INPUT', `${name} is not a valid x-only point`)
+  }
+  return pointArgument(args, name)
+}
+function jsonSafeRecord(value: unknown): Record<string, unknown> {
+  return JSON.parse(JSON.stringify(value, (_key, item: unknown) => typeof item === 'bigint' ? `0x${item.toString(16)}` : item)) as Record<string, unknown>
+}
+
 async function readAuditInput(
   args: Record<string, unknown>, security: McpSecurityManager,
   maxBytes: number, defaultLength?: number, signal?: AbortSignal,
@@ -265,11 +375,22 @@ export async function callAuditTool(
       : format === 'bip352-scan' ? ['spendKeyHex', 'scanPrivKeyHex', 'tweakHex', 'outputsHex', 'batchSize', 'labels']
       : format === 'taproot-control-block' ? ['controlBlockHex', 'leafScriptHex']
       : format === 'tapscript-keys' ? ['keysHex', 'keySize']
-      : format === 'taptree-builder' ? ['internalKeyHex', 'scriptHexes', 'leafVersions', 'treeStructure'] : []
+      : format === 'taptree-builder' ? ['internalKeyHex', 'scriptHexes', 'leafVersions', 'treeStructure']
+      : format === 'tapscript-audit' ? ['leafScriptHex', 'profile', 'serializedWitnessSize']
+      : format === 'tapscript-eval' ? ['leafScriptHex', 'profile', 'serializedWitnessSize', 'witnessHexes', 'messageHex', 'simulationMode', 'traceExecution', 'traceLimit', 'lockTime', 'inputSequence', 'transactionVersion']
+      : format === 'bip375-audit' ? ['signers', 'scanKeyHex', 'spendKeyHex', 'outpointSmallestHex', 'allInputPubkeysHex', 'outputsHex', 'expectedScalarFoldHex', 'outputCount', 'profile']
+      : format === 'bip324-swift-ec' ? ['swiftEcHex', 'swiftAction', 'pubkeyHex', 'auxRandHex']
+      : format === 'bip324-frame-audit' ? ['bip324PacketHex', 'lengthKeyHex', 'payloadKeyHex', 'sharedSecretHex', 'networkMagicHex', 'direction', 'packetIndex', 'aadHex', 'inspectApplicationPayload']
+      : format === 'secp256k1-diff-oracle' ? ['diffOp', 'runBoundaries', 'scalarHex', 'scalar2Hex', 'fieldElementHex', 'diffPointHex', 'diffOtherPointHex', 'diffThirdPointHex', 'observedResultHex', 'observedValid', 'pubkeyHex', 'messageHex', 'criticalCodeHex', 'diffArch'] : []
     for (const key of Object.keys(verificationProperties)) {
       if (args[key] !== undefined && !parameters.includes(key)) throw new BitpeekError('INVALID_INPUT', `${key} is not supported for format ${format}`)
     }
     const hasSource = args.rawHex !== undefined || args.handle !== undefined
+    const directSourceProperty = format.startsWith('tapscript-') && masterFormats.includes(format) ? 'leafScriptHex'
+      : format === 'bip324-frame-audit' ? 'bip324PacketHex'
+      : format === 'bip324-swift-ec' ? args.swiftAction === 'encode' ? 'pubkeyHex' : 'swiftEcHex' : undefined
+    if (hasSource && directSourceProperty && args[directSourceProperty] !== undefined) throw new BitpeekError('INVALID_INPUT', `Supply ${directSourceProperty} or rawHex/handle, not both`)
+    if (format === 'bip375-audit' && hasSource) throw new BitpeekError('INVALID_INPUT', 'bip375-audit requires extracted signers and eligible input keys, without rawHex/handle')
     if (format === 'bip340-sign' && hasSource && args.messageHex !== undefined) {
       throw new BitpeekError('INVALID_INPUT', 'Supply messageHex or rawHex/handle for signing, not both')
     }
@@ -286,12 +407,22 @@ export async function callAuditTool(
       throw new BitpeekError('INVALID_INPUT', 'Supply internalKeyHex or rawHex/handle for tree building, not both')
     }
     let inlineKeys: Uint8Array[] | undefined
+    let signers: Bip375SignerShare[] | undefined
+    let allInputPubkeys: Uint8Array[] | undefined
     let input: Awaited<ReturnType<typeof readAuditInput>>
-    if (!hasSource && ['bip340-sign', 'bip352-scan', 'tapscript-keys', 'taptree-builder'].includes(format)) {
+    if (!hasSource && ['bip340-sign', 'bip352-scan', 'tapscript-keys', 'taptree-builder', ...masterFormats].includes(format)) {
       checkSignal(signal)
       if (args.offset !== undefined || args.length !== undefined) throw new BitpeekError('INVALID_INPUT', 'offset and length require a session handle')
       let bytes: Uint8Array
-      if (format === 'bip340-sign') bytes = hexArgument(args, 'messageHex')
+      if (directSourceProperty) bytes = hexArgument(args, directSourceProperty, SECP256K1_AUDIT_MAX_BYTES, true)
+      else if (format === 'bip375-audit') {
+        signers = bip375Signers(args)
+        allInputPubkeys = hexArrayArgument(args, 'allInputPubkeysHex', 33)
+        bytes = joinAuditBytes([...signers.flatMap(signer => [new Uint8Array([signer.inputPubkey.length]), signer.inputPubkey, signer.ecdhShare, signer.dleqProof]),
+          ...allInputPubkeys.flatMap(key => [new Uint8Array([key.length]), key])])
+      }
+      else if (format === 'secp256k1-diff-oracle') bytes = new Uint8Array(0)
+      else if (format === 'bip340-sign') bytes = hexArgument(args, 'messageHex')
       else if (format === 'taptree-builder') bytes = hexArgument(args, 'internalKeyHex')
       else if (format === 'tapscript-keys') {
         inlineKeys = hexArrayArgument(args, 'keysHex', 65)
@@ -311,7 +442,134 @@ export async function callAuditTool(
       input = { bytes, source: { kind: 'hex', length: bytes.length, sha256: sha256Hex(bytes) } }
     } else input = await readAuditInput(args, security, SECP256K1_AUDIT_MAX_BYTES, undefined, signal)
     const { bytes, source } = input
-    if (format === 'bip340-sign') {
+    if (format === 'tapscript-audit' || format === 'tapscript-eval') {
+      const profile = verificationProfile(args)
+      const options = { profile, serializedWitnessSize: args.serializedWitnessSize === undefined ? undefined
+        : safeInteger(args.serializedWitnessSize, 'serializedWitnessSize', 0, Number.MAX_SAFE_INTEGER - 50) }
+      try {
+        if (format === 'tapscript-audit') {
+          const audit = auditTapscript(bytes, options)
+          const status = audit.isPermanentlyUnspendable ? 'FAIL' : audit.findings.some(finding => finding.severity !== 'info') ? 'WARN' : audit.analysisComplete ? 'PASS' : 'INCOMPLETE'
+          payload = { format, ...audit, valid: !audit.isPermanentlyUnspendable, status, source,
+            verificationScope: 'tapscript-static-safety', cryptographicSignaturesVerified: false,
+            summary: `${status}: ${format} ${audit.findings.length} finding(s)` }
+        } else {
+          const witness = args.witnessHexes === undefined ? [] : hexArrayArgument(args, 'witnessHexes', SECP256K1_AUDIT_MAX_BYTES)
+          joinAuditBytes([bytes, ...witness])
+          const evaluation = evaluateTapscript(bytes, witness, { ...options,
+            simulationMode: booleanArgument(args, 'simulationMode'), traceExecution: booleanArgument(args, 'traceExecution'),
+            traceLimit: args.traceLimit === undefined ? undefined : safeInteger(args.traceLimit, 'traceLimit', 0, 100000),
+            message: args.messageHex === undefined ? undefined : exactHexArgument(args, 'messageHex', 32),
+            lockTime: args.lockTime === undefined ? undefined : safeInteger(args.lockTime, 'lockTime', 0, 0xffffffff),
+            inputSequence: args.inputSequence === undefined ? undefined : safeInteger(args.inputSequence, 'inputSequence', 0, 0xffffffff),
+            transactionVersion: args.transactionVersion === undefined ? undefined : safeInteger(args.transactionVersion, 'transactionVersion', -0x80000000, 0x7fffffff) })
+          payload = { format, ...evaluation, valid: evaluation.success, status: evaluation.success ? 'PASS' : 'FAIL', source,
+            verificationScope: evaluation.simulationMode ? 'tapscript-structural-simulation' : 'tapscript-precomputed-sighash-evaluation',
+            summary: `${evaluation.success ? 'PASS' : 'FAIL'}: ${format} ${evaluation.failureReason ?? 'script evaluation succeeded'}` }
+        }
+      } catch (error) {
+        if (error instanceof RangeError) throw new BitpeekError('INVALID_INPUT', error.message)
+        throw error
+      }
+    } else if (format === 'bip375-audit') {
+      const expectedOutputs = args.outputsHex === undefined ? undefined : hexArrayArgument(args, 'outputsHex', 32)
+      joinAuditBytes([bytes, ...(expectedOutputs ?? [])])
+      const audit = auditBip375Shares({ signers: signers!, allInputPubkeys: allInputPubkeys!,
+        scanPubkey: hexArgument(args, 'scanKeyHex', 33), spendPubkey: hexArgument(args, 'spendKeyHex', 33),
+        outpointSmallest: exactHexArgument(args, 'outpointSmallestHex', 36), expectedOutputs,
+        expectedScalarFold: args.expectedScalarFoldHex === undefined ? undefined : exactHexArgument(args, 'expectedScalarFoldHex', 33),
+        outputCount: args.outputCount === undefined ? undefined : safeInteger(args.outputCount, 'outputCount', 0, BIP375_MAX_OUTPUTS), profile: verificationProfile(args) })
+      payload = { format, ...audit, status: audit.valid ? 'PASS' : 'FAIL', source, verificationScope: 'extracted-bip375-share-proofs-and-scalar-fold',
+        cryptographicSignaturesVerified: false, dleqProofsVerified: audit.valid,
+        summary: `${audit.valid ? 'PASS' : 'FAIL'}: ${format} ${audit.rejectionReason ?? `${audit.signerCount} signer share(s) verified`}` }
+    } else if (format === 'bip324-swift-ec') {
+      const action = args.swiftAction === undefined ? 'decode' : args.swiftAction
+      if (action !== 'decode' && action !== 'encode') throw new BitpeekError('INVALID_INPUT', 'swiftAction must be decode or encode')
+      if (action === 'decode' && (args.pubkeyHex !== undefined || args.auxRandHex !== undefined)) throw new BitpeekError('INVALID_INPUT', 'pubkeyHex and auxRandHex apply only to SwiftEC encoding')
+      if (action === 'encode' && args.swiftEcHex !== undefined) throw new BitpeekError('INVALID_INPUT', 'swiftEcHex applies only to SwiftEC decoding')
+      try {
+        const point = action === 'decode' ? decodeSwiftECBytes(bytes) : differentialPoint({ pubkeyHex: hexBytes(bytes) }, 'pubkeyHex')
+        if (point === null) throw new BitpeekError('INVALID_INPUT', 'SwiftEC cannot encode infinity')
+        const encoding = action === 'decode' ? bytes : encodeSwiftEC(point, exactHexArgument(args, 'auxRandHex', 32))
+        payload = { format, action, valid: true, status: 'PASS', source, swiftEcHex: hexBytes(encoding),
+          point: { x: `0x${point.x.toString(16)}`, y: `0x${point.y.toString(16)}` },
+          verificationScope: 'bip324-elligator-swift-reference', constantTimeProven: false,
+          summary: `PASS: ${format} ${action} produced a valid secp256k1 point/encoding` }
+      } catch (error) {
+        if (error instanceof RangeError) throw new BitpeekError('INVALID_INPUT', error.message)
+        throw error
+      }
+    } else if (format === 'bip324-frame-audit') {
+      const hasKeys = args.lengthKeyHex !== undefined || args.payloadKeyHex !== undefined
+      if (hasKeys && args.sharedSecretHex !== undefined) throw new BitpeekError('INVALID_INPUT', 'Supply directional keys or sharedSecretHex, not both')
+      if (args.sharedSecretHex === undefined && (args.networkMagicHex !== undefined || args.direction !== undefined)) throw new BitpeekError('INVALID_INPUT', 'networkMagicHex and direction require sharedSecretHex')
+      let keys
+      if (hasKeys) keys = { lengthKey: exactHexArgument(args, 'lengthKeyHex', 32), payloadKey: exactHexArgument(args, 'payloadKeyHex', 32) }
+      else if (args.sharedSecretHex !== undefined) {
+        if (args.direction !== 'initiator' && args.direction !== 'responder') throw new BitpeekError('INVALID_INPUT', 'direction must be initiator or responder with sharedSecretHex')
+        const session = deriveBip324SessionKeys(exactHexArgument(args, 'sharedSecretHex', 32), exactHexArgument(args, 'networkMagicHex', 4))
+        keys = args.direction === 'initiator' ? { lengthKey: session.initiatorLengthKey, payloadKey: session.initiatorPayloadKey }
+          : { lengthKey: session.responderLengthKey, payloadKey: session.responderPayloadKey }
+      }
+      const audit = auditBip324Frame(bytes, { keys, packetIndex: args.packetIndex === undefined ? undefined : safeInteger(args.packetIndex, 'packetIndex', 0, BIP324_MAX_AUDIT_PACKET_INDEX),
+        aad: args.aadHex === undefined ? undefined : hexArgument(args, 'aadHex', 4095, true), inspectApplicationPayload: booleanArgument(args, 'inspectApplicationPayload') })
+      const status = audit.valid === null ? 'INCOMPLETE' : audit.valid ? 'PASS' : 'FAIL'
+      payload = { format, ...audit, status, source, cryptographicSignaturesVerified: false, constantTimeProven: false,
+        summary: `${status}: ${format} ${audit.authenticationVerified ? 'Poly1305 tag verified' : audit.findings[0]?.message ?? 'frame inspection'}` }
+    } else if (format === 'secp256k1-diff-oracle') {
+      const operation = args.diffOp === undefined ? 'identities' : args.diffOp
+      if (typeof operation !== 'string' || !['mul', 'add', 'doubling', 'inversion', 'schnorr', 'identities'].includes(operation)) throw new BitpeekError('INVALID_INPUT', 'Unsupported diffOp')
+      const operationProperties = operation === 'mul' ? ['scalarHex', 'diffPointHex', 'observedResultHex']
+        : operation === 'add' ? ['diffPointHex', 'diffOtherPointHex', 'observedResultHex']
+        : operation === 'doubling' ? ['diffPointHex', 'observedResultHex']
+        : operation === 'inversion' ? ['fieldElementHex', 'observedResultHex']
+        : operation === 'schnorr' ? ['pubkeyHex', 'messageHex', 'observedValid']
+        : ['scalarHex', 'scalar2Hex', 'diffPointHex', 'diffOtherPointHex', 'diffThirdPointHex']
+      for (const key of parameters) {
+        if (args[key] !== undefined && !['diffOp', 'runBoundaries', 'criticalCodeHex', 'diffArch', ...operationProperties].includes(key)) {
+          throw new BitpeekError('INVALID_INPUT', `${key} is not supported for diffOp ${operation}`)
+        }
+      }
+      if (args.diffArch !== undefined && args.diffArch !== 'x86_64' && args.diffArch !== 'aarch64') throw new BitpeekError('INVALID_INPUT', 'diffArch must be x86_64 or aarch64')
+      if (args.observedResultHex !== undefined && args.observedValid !== undefined) throw new BitpeekError('INVALID_INPUT', 'Supply only the observed result for the selected operation')
+      if (args.observedValid !== undefined && operation !== 'schnorr') throw new BitpeekError('INVALID_INPUT', 'observedValid applies only to Schnorr verification')
+      if (args.observedResultHex !== undefined && ['schnorr', 'identities'].includes(operation)) throw new BitpeekError('INVALID_INPUT', 'observedResultHex requires a single arithmetic operation')
+      if (hasSource && !['mul', 'inversion', 'doubling', 'add', 'schnorr'].includes(operation)) throw new BitpeekError('INVALID_INPUT', 'rawHex/handle requires a single differential operation')
+      if (hasSource && ((operation === 'mul' && args.scalarHex !== undefined) || (operation === 'inversion' && args.fieldElementHex !== undefined)
+        || ((operation === 'doubling' || operation === 'add') && (args.diffPointHex !== undefined || args.diffOtherPointHex !== undefined)))) {
+        throw new BitpeekError('INVALID_INPUT', 'Packed differential input conflicts with direct input')
+      }
+      const packed = (size: number) => { if (bytes.length !== size) throw new BitpeekError('INVALID_INPUT', `Packed ${operation} input must contain ${size} bytes`); return unsignedBigEndian(bytes) }
+      const point = args.diffPointHex === undefined ? undefined : differentialPoint(args, 'diffPointHex')
+      const observedResult = args.observedValid !== undefined ? booleanArgument(args, 'observedValid')
+        : args.observedResultHex === undefined ? undefined : operation === 'inversion' ? unsignedBigEndian(exactHexArgument(args, 'observedResultHex', 32)) : differentialPoint(args, 'observedResultHex')
+      try {
+        const audit = auditDifferentialExecution(operation as Secp256k1DifferentialOperation, {
+          scalar: hasSource && operation === 'mul' ? packed(32) : args.scalarHex === undefined ? undefined : unsignedBigEndian(exactHexArgument(args, 'scalarHex', 32)),
+          scalar2: args.scalar2Hex === undefined ? undefined : unsignedBigEndian(exactHexArgument(args, 'scalar2Hex', 32)),
+          fieldElement: hasSource && operation === 'inversion' ? packed(32) : args.fieldElementHex === undefined ? undefined : unsignedBigEndian(exactHexArgument(args, 'fieldElementHex', 32)),
+          point: hasSource && operation === 'doubling' ? differentialPoint({ point: hexBytes(bytes) }, 'point')
+            : hasSource && operation === 'add' ? (packed(66), differentialPoint({ point: hexBytes(bytes.subarray(0, 33)) }, 'point')) : point,
+          otherPoint: hasSource && operation === 'add' ? differentialPoint({ point: hexBytes(bytes.subarray(33)) }, 'point')
+            : args.diffOtherPointHex === undefined ? undefined : differentialPoint(args, 'diffOtherPointHex'),
+          thirdPoint: args.diffThirdPointHex === undefined ? undefined : differentialPoint(args, 'diffThirdPointHex'), observedResult,
+          pubkey32: args.pubkeyHex === undefined ? undefined : exactHexArgument(args, 'pubkeyHex', 32),
+          message32: args.messageHex === undefined ? undefined : exactHexArgument(args, 'messageHex', 32),
+          signature64: hasSource && operation === 'schnorr' ? bytes : undefined,
+          criticalCode: args.criticalCodeHex === undefined ? undefined : hexArgument(args, 'criticalCodeHex', MCP_TIMING_MAX_BYTES),
+          arch: args.diffArch as 'x86_64' | 'aarch64' | undefined })
+        const campaign = booleanArgument(args, 'runBoundaries') ? auditSecp256k1BoundaryExecutions() : undefined
+        const valid = audit.valid && (campaign?.valid ?? true)
+        payload = { format, ...jsonSafeRecord(audit), valid, boundaries: jsonSafeRecord({ vectors: generateSecp256k1Boundaries() }).vectors,
+          boundaryCampaign: campaign === undefined ? undefined : jsonSafeRecord(campaign),
+          status: valid ? 'PASS' : 'FAIL', source, verificationScope: 'independent-Jacobian-differential-arithmetic',
+          comparisonTarget: observedResult === undefined ? 'repository-affine-BigInt' : 'supplied-observed-result',
+          summary: `${valid ? 'PASS' : 'FAIL'}: ${format} ${audit.divergenceCount + (campaign?.divergenceCount ?? 0)}/${audit.comparisons + (campaign?.comparisons ?? 0)} comparison(s) diverged` }
+      } catch (error) {
+        if (error instanceof RangeError) throw new BitpeekError('INVALID_INPUT', error.message)
+        throw error
+      }
+    } else if (format === 'bip340-sign') {
       const signing = Secp256k1Engine.bip340Sign(hexArgument(args, 'seckeyHex'), bytes,
         args.auxRandHex === undefined ? undefined : hexArgument(args, 'auxRandHex'))
       const status = signing.valid ? 'PASS' : 'FAIL'
@@ -485,6 +743,9 @@ export async function callAuditTool(
         payload.summary = `${payload.summary}; ${taintAnalysis.violations.length} taint verification finding(s)`
       }
     }
+  }
+  if (typeof args.format === 'string' && masterFormats.includes(args.format)) {
+    payload.reportMarkdown = `**${payload.status}: ${args.format}**\n\n${payload.summary}\n\nVerification scope: ${payload.verificationScope}.`
   }
   return { structuredContent: payload, content: [{ type: 'text', text: JSON.stringify(payload) }] }
 }

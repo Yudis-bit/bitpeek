@@ -1,6 +1,7 @@
 import { unsignedBigEndian } from '../bytes'
 import { taggedHash } from '../crypto'
 import { TaprootEngine } from './taproot'
+import { resolveBitcoinVerificationProfile, type BitcoinVerificationProfile } from './verification-profile'
 import type {
   TapLeaf, TapTreeStructure, TapTreeResult, TaprootControlBlockInspection,
   TaprootScriptPathVerificationResult, TapscriptKeyAuditResult,
@@ -158,13 +159,14 @@ export function liftX(bytes: Uint8Array): Point {
   return y === null ? null : { x, y: (y & 1n) === 0n ? y : SECP256K1_P - y }
 }
 
-function isCurvePoint(point: Point): point is NonNullable<Point> {
+export function isCurvePoint(point: Point): point is NonNullable<Point> {
   return point !== null && typeof point.x === 'bigint' && typeof point.y === 'bigint'
     && point.x >= 0n && point.x < SECP256K1_P && point.y >= 0n && point.y < SECP256K1_P
     && mod(point.y * point.y) === mod(point.x * point.x * point.x + 7n)
 }
 
-function compressedPoint(point: NonNullable<Point>): Uint8Array {
+export function compressedPoint(point: NonNullable<Point>): Uint8Array {
+  if (!isCurvePoint(point)) throw new RangeError('Expected a finite point on secp256k1')
   const bytes = new Uint8Array(33)
   bytes[0] = 2 + Number(point.y & 1n)
   let x = point.x
@@ -365,6 +367,63 @@ export class Secp256k1Engine {
     if ((R.y & 1n) !== 0n) return { valid: false, reason: 'R has odd Y coordinate' }
     if (R.x !== r) return { valid: false, reason: 'Signature verification equation failed (Rx != r)' }
     return { valid: true }
+  }
+
+  /** Reference DLEQ prover. BigInt arithmetic is not constant-time.
+   * specification uses the repository's nonce transcript and bounded zero-nonce retry.
+   * published-bip uses BIP-374's aux XOR and nonce(t, A, C, m), aborting for k=0.
+   * Both profiles produce proofs accepted by the existing BIP-374 verifier.
+   */
+  public static proveDLEQ(
+    sk: bigint | Uint8Array, G1: Point, P1: Point, G2: Point, P2: Point,
+    auxRand?: Uint8Array, message?: Uint8Array, profile?: BitcoinVerificationProfile,
+  ): Uint8Array {
+    const rules = resolveBitcoinVerificationProfile(profile)
+    if (sk instanceof Uint8Array && sk.length !== 32) throw new RangeError('Secret key must be 32 bytes')
+    const scalar = sk instanceof Uint8Array ? unsignedBigEndian(sk) : sk
+    if (typeof scalar !== 'bigint' || scalar <= 0n || scalar >= SECP256K1_N) {
+      throw new RangeError('Secret key outside range 0 < sk < n')
+    }
+    if (auxRand !== undefined && auxRand.length !== 32) throw new RangeError('auxRand must be 32 bytes')
+    if (message !== undefined && message.length !== 32) throw new RangeError('DLEQ message must contain exactly 32 bytes')
+    for (const [name, point] of [['G1', G1], ['P1', P1], ['G2', G2], ['P2', P2]] as const) {
+      if (!isCurvePoint(point)) throw new RangeError(`${name} must be a finite point on secp256k1`)
+    }
+    const expectedP1 = scalarMul(scalar, G1)!
+    const expectedP2 = scalarMul(scalar, G2)!
+    if (P1!.x !== expectedP1.x || P1!.y !== expectedP1.y) throw new RangeError('P1 does not equal sk * G1')
+    if (P2!.x !== expectedP2.x || P2!.y !== expectedP2.y) throw new RangeError('P2 does not equal sk * G2')
+    const aux = auxRand ?? new Uint8Array(32)
+    const secretBytes = bigEndian32(scalar)
+    const m = message ?? new Uint8Array(0)
+    let nonceHash: Uint8Array
+    if (rules === 'published-bip') {
+      const auxHash = taggedHash('BIP0374/aux', aux)
+      const t = secretBytes.map((byte, index) => byte ^ auxHash[index]!)
+      nonceHash = taggedHash('BIP0374/nonce', t, compressedPoint(P1!), compressedPoint(P2!), m)
+    } else {
+      nonceHash = taggedHash('BIP0374/nonce', secretBytes, aux, compressedPoint(P1!),
+        compressedPoint(G2!), compressedPoint(P2!), compressedPoint(G1!), m)
+    }
+    let k = unsignedBigEndian(nonceHash) % SECP256K1_N
+    if (rules === 'specification') {
+      for (let attempt = 0; k === 0n && attempt < 32; attempt++) {
+        nonceHash = taggedHash('BIP0374/nonce', nonceHash)
+        k = unsignedBigEndian(nonceHash) % SECP256K1_N
+      }
+    }
+    if (k === 0n) throw new RangeError('Derived DLEQ nonce is zero')
+    const R1 = scalarMul(k, G1)!
+    const R2 = scalarMul(k, G2)!
+    const e = unsignedBigEndian(taggedHash('BIP0374/challenge', compressedPoint(P1!), compressedPoint(G2!),
+      compressedPoint(P2!), compressedPoint(G1!), compressedPoint(R1), compressedPoint(R2), m)) % SECP256K1_N
+    const s = (k + e * scalar) % SECP256K1_N
+    const proof = new Uint8Array(64)
+    proof.set(bigEndian32(e))
+    proof.set(bigEndian32(s), 32)
+    const check = this.verifyDLEQ(G1, P1, G2, P2, proof, message)
+    if (!check.valid) throw new RangeError(`DLEQ proof self-verification failed: ${check.reason}`)
+    return proof
   }
 
   public static verifyDLEQ(G1: Point, P1: Point, G2: Point, P2: Point, proof64: Uint8Array, message?: Uint8Array): { valid: boolean; reason?: string } {
